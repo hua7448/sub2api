@@ -142,6 +142,48 @@ git merge upstream/main
 git commit -m "sync: merge upstream main YYYY-MM-DD"
 ```
 
+## 官方迭代跟踪准则
+
+当需要“跟踪官方更新”时，先判断官方变更类型，再决定是否同步和发布。生产永远只更新到本 fork 验证过的 SmartAPI 稳定 tag，不直接跟随 upstream、origin/main 或 `latest`。
+
+检查官方差异：
+
+```bash
+git checkout main
+git fetch origin
+git fetch upstream
+git log --oneline main..upstream/main
+git diff --stat main..upstream/main
+```
+
+按风险分级处理：
+
+- 低风险：文档、样式、非核心前端展示、小范围 bugfix。可以按周同步，验证通过后正常发 `v<官方基线版本>-smartapi.N`。
+- 中风险：账号调度、计费统计、渠道管理、缓存、并发、后台设置、Docker/CI 构建。必须开 `sync/upstream-YYYY-MM-DD`，跑相关后端测试和前端 build，先 4146 试运行。
+- 高风险：数据库迁移、支付、OAuth 登录/授权、注册登录、API key 创建/鉴权、订阅/余额扣费、权限判断、数据备份/恢复、安全策略。必须单独列出风险点、验证回滚路径、备份数据库，并在发布前说明是否存在不可逆迁移。
+
+同步执行准则：
+
+- 同步分支只做 upstream merge 和冲突解决，不混入 SmartAPI 新功能、主题调整或业务定制。
+- 冲突解决优先保留本 fork 的固定规则：SmartAPI 更新源、`-smartapi.N` tag 规则、`prerelease: false`、生产不用 `latest`、4146 先试运行。
+- 如果 upstream 修改了同一块更新逻辑、发布 workflow、Dockerfile、配置默认值，必须重新确认一键更新链路：`/releases/latest`、release assets、checksum、容器内 `/app` 可写、重启策略。
+- 如果 upstream 新增或修改数据库 migration，发布说明必须标注“包含数据库迁移”，生产替换前必须备份，回滚前必须评估迁移是否向后兼容。
+- 如果官方更新只是发布 tag 但 main 无新提交，仍以代码差异为准；不要为了追 tag 直接发布。
+
+同步完成后的发布命名：
+
+```text
+官方基线 0.1.137 第一次 SmartAPI 发布：v0.1.137-smartapi.1
+同一官方基线上的 SmartAPI 修复：v0.1.137-smartapi.2
+下一次官方基线 0.1.138：v0.1.138-smartapi.1
+```
+
+建议节奏：
+
+- 普通官方更新：每周检查一次。
+- 安全修复、严重 bugfix、影响核心可用性的 upstream 更新：当天同步、当天 4146 试运行。
+- 无明确收益的 upstream 大改：先记录差异和风险，不急于发布到生产。
+
 ## 镜像发布
 
 正式发布优先使用 GitHub Actions `Release` workflow。需要管理员后台一键更新时，必须使用完整 release：
