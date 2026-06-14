@@ -149,8 +149,30 @@ git commit -m "sync: merge upstream main YYYY-MM-DD"
 - `simple_release`: `false`
 - 产物：`ghcr.io/hua7448/sub2api:<version>`
 - Release assets 必须包含各平台二进制压缩包和 `checksums.txt`，否则后台只能检查版本，不能完成热更新。
+- GoReleaser 配置必须保持 `prerelease: false`。如果 `-smartapi.<序号>` tag 被 GitHub 标成 prerelease，后台 `/releases/latest` 将看不到它。
 
 本地或服务器手动构建只用于试运行，不作为正式发布来源。
+
+首次使用 fork Actions 时，GitHub 可能会禁用 workflow。需要在仓库 Actions 页面手动启用：
+
+```text
+https://github.com/hua7448/sub2api/actions
+```
+
+如需本地查看或触发 workflow，安装并登录 GitHub CLI：
+
+```bash
+HOMEBREW_NO_AUTO_UPDATE=1 \
+ALL_PROXY=http://127.0.0.1:7897 \
+HTTPS_PROXY=http://127.0.0.1:7897 \
+HTTP_PROXY=http://127.0.0.1:7897 \
+brew install gh
+
+ALL_PROXY=http://127.0.0.1:7897 \
+HTTPS_PROXY=http://127.0.0.1:7897 \
+HTTP_PROXY=http://127.0.0.1:7897 \
+gh auth login -h github.com -p ssh -w
+```
 
 正式发布步骤：
 
@@ -160,6 +182,37 @@ git pull origin main
 git tag -a v0.1.136-smartapi.1 -m "Release v0.1.136-smartapi.1"
 git push origin v0.1.136-smartapi.1
 ```
+
+如果 tag 没有自动触发，或需要手动触发完整 release：
+
+```bash
+gh workflow run release.yml \
+  --repo hua7448/sub2api \
+  --ref v0.1.136-smartapi.1 \
+  -f tag=v0.1.136-smartapi.1 \
+  -f simple_release=false
+
+gh run watch --repo hua7448/sub2api <run-id> --interval 15 --exit-status
+```
+
+注意：workflow 必须以 tag ref 触发，即 `headBranch` 应为 `v0.1.136-smartapi.1`，`headSha` 应为该 tag 指向的提交。不要在 `main` ref 上手动发布同一个 tag，否则可能用错代码构建前端产物。
+
+Release 成功后必须确认：
+
+```bash
+gh release view v0.1.136-smartapi.1 \
+  --repo hua7448/sub2api \
+  --json isDraft,isPrerelease,name,tagName,url,assets
+
+gh api repos/hua7448/sub2api/releases/latest \
+  --jq '.tag_name, .prerelease, .name'
+```
+
+期望：
+
+- `isPrerelease` 为 `false`。
+- `/releases/latest` 返回当前 `v...-smartapi.N` tag。
+- assets 中包含 `checksums.txt`、`linux_amd64.tar.gz`、`linux_arm64.tar.gz`。
 
 GitHub Actions 成功后，生产 compose 使用明确镜像：
 
@@ -197,7 +250,7 @@ docker build -t sub2api-test:<name> .
 
 ```bash
 docker run -d \
-  --name sub2api-test \
+  --name sub2api-smartapi-test \
   --restart unless-stopped \
   --network sub2api-deploy_sub2api-network \
   -p 4146:8080 \
@@ -208,7 +261,15 @@ docker run -d \
   -e REDIS_HOST=sub2api-redis \
   -e AUTO_SETUP=true \
   -v /root/sub2api-deploy/data:/app/data \
-  sub2api-test:<name>
+  ghcr.io/hua7448/sub2api:<version>
+```
+
+如果 `4146` 被旧测试容器占用，先查看并清理旧测试容器，或换临时端口：
+
+```bash
+docker ps --format 'table {{.Names}}\t{{.Image}}\t{{.Ports}}' | grep 4146 || true
+ss -ltnp | grep ':4146' || true
+docker rm -f sub2api-smartapi-test 2>/dev/null || true
 ```
 
 验证通过后才能进入正式切换。
@@ -239,6 +300,35 @@ services:
 docker compose pull sub2api
 docker compose up -d sub2api
 docker compose logs -f sub2api
+```
+
+当前生产环境如直接使用 `docker run` 管理 4145 主服务，替换命令为：
+
+```bash
+docker rm -f sub2api
+
+docker run -d \
+  --name sub2api \
+  --restart unless-stopped \
+  --network sub2api-deploy_sub2api-network \
+  -p 4145:8080 \
+  --env-file /root/sub2api-deploy/.env \
+  -e SERVER_HOST=0.0.0.0 \
+  -e SERVER_PORT=8080 \
+  -e DATABASE_HOST=sub2api-postgres \
+  -e REDIS_HOST=sub2api-redis \
+  -e AUTO_SETUP=true \
+  -v /root/sub2api-deploy/data:/app/data \
+  ghcr.io/hua7448/sub2api:<version>
+```
+
+部署后检查：
+
+```bash
+docker ps --format 'table {{.Names}}\t{{.Image}}\t{{.Status}}\t{{.Ports}}' | grep sub2api
+docker logs -f sub2api
+docker exec sub2api /app/sub2api --version
+curl -fsS http://127.0.0.1:4145/health && echo
 ```
 
 ## 回滚规则
