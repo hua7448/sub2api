@@ -154,6 +154,12 @@ type UpdateConfig struct {
 	// 支持 http/https/socks5/socks5h 协议
 	// 例如: "http://127.0.0.1:7890", "socks5://127.0.0.1:1080"
 	ProxyURL string `mapstructure:"proxy_url"`
+	// GitHubRepo 用于检查 SmartAPI fork 的 GitHub Release。
+	// 格式为 owner/repo，例如 "hua7448/sub2api"。
+	GitHubRepo string `mapstructure:"github_repo"`
+	// StableTagSuffix 限定一键更新只识别稳定的 fork tag。
+	// 默认使用 smartapi，对应 tag 形如 v0.1.136-smartapi.1。
+	StableTagSuffix string `mapstructure:"stable_tag_suffix"`
 }
 
 type IdempotencyConfig struct {
@@ -1756,6 +1762,11 @@ func setDefaults() {
 	viper.SetDefault("pricing.fallback_file", "./resources/model-pricing/model_prices_and_context_window.json")
 	viper.SetDefault("pricing.update_interval_hours", 24)
 	viper.SetDefault("pricing.hash_check_interval_minutes", 10)
+
+	// SmartAPI fork update source. One-click update only follows our stable
+	// release tags, e.g. v0.1.136-smartapi.1.
+	viper.SetDefault("update.github_repo", "hua7448/sub2api")
+	viper.SetDefault("update.stable_tag_suffix", "smartapi")
 
 	// Timezone (default to Asia/Shanghai for Chinese users)
 	viper.SetDefault("timezone", "Asia/Shanghai")

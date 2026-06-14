@@ -17,7 +17,7 @@
 - `fix/<name>`: 缺陷修复分支，例如 `fix/docker-legal-docs`。
 - `theme/<name>`: 视觉主题分支，例如 `theme/anthropic-colors`。
 - `sync/upstream-<date>`: 同步官方更新的临时分支，例如 `sync/upstream-2026-06-14`。
-- `release/<version>`: 发布准备分支，例如 `release/v0.1.136-hua.1`。
+- `release/<version>`: 发布准备分支，例如 `release/v0.1.136-smartapi.1`。
 - `hotfix/<name>`: 生产紧急修复分支。
 
 禁止直接在 `main` 上做日常开发。所有业务改动先进入功能分支，经验证后再合并。
@@ -27,25 +27,54 @@
 发布 tag 使用：
 
 ```text
-v<官方基线版本>-hua.<序号>
+v<官方基线版本>-smartapi.<序号>
 ```
 
 示例：
 
 ```text
-v0.1.136-hua.1
-v0.1.136-hua.2
-v0.1.137-hua.1
+v0.1.136-smartapi.1
+v0.1.136-smartapi.2
+v0.1.137-smartapi.1
 ```
 
 规则：
 
 - `<官方基线版本>` 取当前合并过的 upstream 版本。
 - `<序号>` 从 1 开始递增。
+- 管理员后台“一键更新”只检查本 fork 的稳定 tag，即 `-smartapi.<序号>` 后缀。
 - 不使用 `latest` 作为生产部署依据；生产部署必须写明确版本 tag。
 - `latest` 只能作为辅助标签，不能作为回滚依据。
 
 ## 本地开发流程
+
+本地 Go 环境：
+
+- Go 版本必须与 `backend/go.mod` 和 release workflow 保持一致；当前为 `go1.26.4`。
+- macOS 本地推荐使用 Homebrew 安装固定稳定版：
+
+```bash
+brew install go
+go version
+```
+
+- 网络不稳定时可以临时使用本地代理执行安装或测试：
+
+```bash
+HOMEBREW_NO_AUTO_UPDATE=1 \
+ALL_PROXY=http://127.0.0.1:7897 \
+HTTPS_PROXY=http://127.0.0.1:7897 \
+HTTP_PROXY=http://127.0.0.1:7897 \
+brew install go
+
+ALL_PROXY=http://127.0.0.1:7897 \
+HTTPS_PROXY=http://127.0.0.1:7897 \
+HTTP_PROXY=http://127.0.0.1:7897 \
+GOPROXY=https://proxy.golang.org,direct \
+go test ./...
+```
+
+- 提交 Go 代码前必须对改过的 Go 文件执行 `gofmt`。不要提交因 `go mod tidy` 引入的无关依赖变更。
 
 开始新需求：
 
@@ -115,10 +144,11 @@ git commit -m "sync: merge upstream main YYYY-MM-DD"
 
 ## 镜像发布
 
-正式发布优先使用 GitHub Actions `Release` workflow，并启用 simple release：
+正式发布优先使用 GitHub Actions `Release` workflow。需要管理员后台一键更新时，必须使用完整 release：
 
-- `simple_release`: `true`
+- `simple_release`: `false`
 - 产物：`ghcr.io/hua7448/sub2api:<version>`
+- Release assets 必须包含各平台二进制压缩包和 `checksums.txt`，否则后台只能检查版本，不能完成热更新。
 
 本地或服务器手动构建只用于试运行，不作为正式发布来源。
 
@@ -127,8 +157,8 @@ git commit -m "sync: merge upstream main YYYY-MM-DD"
 ```bash
 git checkout main
 git pull origin main
-git tag -a v0.1.136-hua.1 -m "Release v0.1.136-hua.1"
-git push origin v0.1.136-hua.1
+git tag -a v0.1.136-smartapi.1 -m "Release v0.1.136-smartapi.1"
+git push origin v0.1.136-smartapi.1
 ```
 
 GitHub Actions 成功后，生产 compose 使用明确镜像：
@@ -136,8 +166,10 @@ GitHub Actions 成功后，生产 compose 使用明确镜像：
 ```yaml
 services:
   sub2api:
-    image: ghcr.io/hua7448/sub2api:0.1.136-hua.1
+    image: ghcr.io/hua7448/sub2api:0.1.136-smartapi.1
 ```
+
+首个支持 SmartAPI 一键更新的生产镜像部署后，后续小版本可以继续使用管理员后台“检查更新”下载本 fork 的完整 release 二进制并重启服务。容器必须带 `restart: unless-stopped` 或等效重启策略；如果以后重新创建容器，仍应使用最新明确镜像 tag，避免回到旧镜像内置版本。
 
 ## 服务器试运行
 
