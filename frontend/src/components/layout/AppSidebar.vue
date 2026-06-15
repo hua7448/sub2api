@@ -187,6 +187,7 @@ import { useAdminSettingsStore, useAppStore, useAuthStore, useOnboardingStore } 
 import VersionBadge from '@/components/common/VersionBadge.vue'
 import { sanitizeSvg } from '@/utils/sanitize'
 import { FeatureFlags, makeSidebarFlag } from '@/utils/featureFlags'
+import { getSettings as getImageGallerySettings } from '@/api/imageGallery'
 
 interface NavItem {
   path: string
@@ -593,6 +594,21 @@ const SignalIcon = {
     )
 }
 
+const ImageIcon = {
+  render: () =>
+    h(
+      'svg',
+      { fill: 'none', viewBox: '0 0 24 24', stroke: 'currentColor', 'stroke-width': '1.5' },
+      [
+        h('path', {
+          'stroke-linecap': 'round',
+          'stroke-linejoin': 'round',
+          d: 'm2.25 15.75 5.159-5.159a2.25 2.25 0 0 1 3.182 0l5.159 5.159m-1.5-1.5 1.409-1.409a2.25 2.25 0 0 1 3.182 0l2.909 2.909m-18 3.75h16.5a1.5 1.5 0 0 0 1.5-1.5V6a1.5 1.5 0 0 0-1.5-1.5H3.75A1.5 1.5 0 0 0 2.25 6v12a1.5 1.5 0 0 0 1.5 1.5Zm10.5-11.25h.008v.008h-.008V8.25Zm.375 0a.375.375 0 1 1-.75 0 .375.375 0 0 1 .75 0Z'
+        }),
+      ]
+    )
+}
+
 const ShieldIcon = {
   render: () =>
     h(
@@ -653,6 +669,8 @@ const flagAffiliate = makeSidebarFlag(FeatureFlags.affiliate)
 const flagRiskControl = makeSidebarFlag(FeatureFlags.riskControl)
 const flagOpsMonitoring = () => adminSettingsStore.opsMonitoringEnabled
 const flagAdminPayment = () => adminSettingsStore.paymentEnabled
+const imageGalleryEnabled = ref<boolean | undefined>(undefined)
+const flagImageGallery = () => imageGalleryEnabled.value
 
 // buildSelfNavItems 构造用户自己的导航项（用户端主菜单和管理员的"我的账户"子菜单共享这组声明）。
 // withDashboard=true 时包含仪表盘（用户端），false 时不含（管理员的个人区已经有独立仪表盘入口）。
@@ -667,6 +685,7 @@ function buildSelfNavItems(withDashboard: boolean): NavItem[] {
   items.push(
     { path: '/keys', label: t('nav.apiKeys'), icon: KeyIcon },
     { path: '/usage', label: t('nav.usage'), icon: ChartIcon, hideInSimpleMode: true },
+    { path: '/image-gallery', label: '生图广场', icon: ImageIcon, hideInSimpleMode: true, featureFlag: flagImageGallery },
     { path: '/available-channels', label: t('nav.availableChannels'), icon: ChannelIcon, hideInSimpleMode: true, featureFlag: flagAvailableChannels },
     { path: '/monitor', label: t('nav.channelStatus'), icon: SignalIcon, featureFlag: flagChannelMonitor },
     { path: '/subscriptions', label: t('nav.mySubscriptions'), icon: CreditCardIcon, hideInSimpleMode: true },
@@ -738,6 +757,7 @@ const adminNavItems = computed((): NavItem[] => {
     { path: '/admin/risk-control', label: t('nav.riskControl'), icon: ShieldIcon, hideInSimpleMode: true, featureFlag: flagRiskControl },
     { path: '/admin/redeem', label: t('nav.redeemCodes'), icon: TicketIcon, hideInSimpleMode: true },
     { path: '/admin/promo-codes', label: t('nav.promoCodes'), icon: GiftIcon, hideInSimpleMode: true },
+    { path: '/admin/image-gallery', label: '生图广场', icon: ImageIcon, hideInSimpleMode: true },
     {
       path: '/admin/affiliates',
       label: t('nav.affiliateManagement'),
@@ -889,6 +909,13 @@ onMounted(() => {
   if (isAdmin.value) {
     adminSettingsStore.fetch()
   }
+  getImageGallerySettings()
+    .then((settings) => {
+      imageGalleryEnabled.value = settings.enabled
+    })
+    .catch(() => {
+      imageGalleryEnabled.value = false
+    })
 })
 </script>
 

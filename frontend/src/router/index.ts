@@ -218,6 +218,16 @@ const routes: RouteRecordRaw[] = [
     }
   },
   {
+    path: '/image-gallery',
+    name: 'ImageGallery',
+    component: () => import('@/views/user/ImageGalleryView.vue'),
+    meta: {
+      requiresAuth: true,
+      requiresAdmin: false,
+      title: 'Image Gallery'
+    }
+  },
+  {
     path: '/redeem',
     name: 'Redeem',
     component: () => import('@/views/user/RedeemView.vue'),
@@ -547,6 +557,16 @@ const routes: RouteRecordRaw[] = [
       title: 'System Settings',
       titleKey: 'admin.settings.title',
       descriptionKey: 'admin.settings.description'
+    }
+  },
+  {
+    path: '/admin/image-gallery',
+    name: 'AdminImageGallery',
+    component: () => import('@/views/admin/ImageGalleryAdminView.vue'),
+    meta: {
+      requiresAuth: true,
+      requiresAdmin: true,
+      title: 'Image Gallery Management'
     }
   },
   {
