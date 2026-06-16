@@ -35,6 +35,7 @@ import { Checkbox } from './Checkbox'
 import ViewportTooltip from './ViewportTooltip'
 import { ChevronDownIcon, CloseIcon, CopyIcon, PlusIcon, TrashIcon, GithubIcon, ExportIcon, ImportIcon, DragHandleIcon, LinkIcon } from './icons'
 import { fetchSub2APIEligibleKeys, getCachedSub2APIEligibleKeys, getCachedSub2APISettings, type Sub2APIEligibleKey } from '../lib/sub2api'
+import { hostText } from '../lib/sub2apiHost'
 
 function newId(prefix: string) {
   return `${prefix}-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 7)}`
@@ -431,7 +432,7 @@ export default function SettingsModal() {
         setSettings(nextSettings)
       }
     } catch (error) {
-      const message = error instanceof Error ? error.message : '刷新 API Key 失败'
+      const message = error instanceof Error ? error.message : hostText('刷新 API Key 失败', 'Failed to refresh API keys')
       showToast(message, 'error')
     } finally {
       setIsRefreshingSub2APIKeys(false)
@@ -1154,40 +1155,49 @@ export default function SettingsModal() {
     }
   }
 
+  const streamPartialImageOptions = [
+    { label: hostText('0，不请求', '0, none'), value: 0 },
+    { label: hostText('1 张', '1 image'), value: 1 },
+    { label: hostText('2 张', '2 images'), value: 2 },
+    { label: hostText('3 张', '3 images'), value: 3 },
+  ]
+
   const renderSub2APISettings = () => (
     <div className="space-y-4">
       <div className="rounded-2xl border border-blue-200/70 bg-blue-50/80 p-4 text-sm text-blue-900 dark:border-blue-500/20 dark:bg-blue-500/10 dark:text-blue-100">
-        所有请求都通过当前登录态代理转发，不在浏览器保存真实 API Key。
+        {hostText('所有请求都通过当前登录态代理转发，不在浏览器保存真实 API Key。', 'All requests are forwarded through the current signed-in session. Real API keys are never stored in the browser.')}
       </div>
       <label className="block">
         <span className="mb-1.5 flex items-center justify-between gap-3 text-sm text-gray-600 dark:text-gray-300">
-          <span>API Key</span>
+          <span>{hostText('API Key', 'API Key')}</span>
           <button
             type="button"
             onClick={() => { void refreshSub2APIKeys() }}
             disabled={isRefreshingSub2APIKeys}
             className="rounded-lg px-2 py-1 text-xs text-blue-600 transition hover:bg-blue-50 disabled:cursor-not-allowed disabled:opacity-60 dark:text-blue-300 dark:hover:bg-blue-500/10"
           >
-            {isRefreshingSub2APIKeys ? '刷新中' : '刷新'}
+            {isRefreshingSub2APIKeys ? hostText('刷新中', 'Refreshing') : hostText('刷新', 'Refresh')}
           </button>
         </span>
         <Select
-          value={activeProfile.sub2apiKeyId ?? sub2apiKeys[0]?.id ?? ''}
+          value={String(activeProfile.sub2apiKeyId ?? sub2apiKeys[0]?.id ?? '')}
           onChange={(value) => updateActiveProfile({ sub2apiKeyId: Number(value) }, true)}
           options={sub2apiKeys.map((key) => ({
             label: `${key.name || `Key #${key.id}`}${key.group_name ? ` · ${key.group_name}` : ''}`,
-            value: key.id,
+            value: String(key.id),
           }))}
           disabled={sub2apiKeys.length === 0}
           className="w-full rounded-xl border border-gray-200/70 bg-white/60 px-3 py-2.5 text-sm text-gray-700 outline-none transition focus:border-blue-300 dark:border-white/[0.08] dark:bg-white/[0.03] dark:text-gray-200 dark:focus:border-blue-500/50"
         />
         <div className="mt-1.5 text-xs text-gray-500 dark:text-gray-500">
-          {sub2apiKeys.length === 0 ? '没有可用 Key：请确认 Key 属于当前用户、状态 active、未过期、额度未耗尽，且所属分组允许生图。' : '只保存 Key ID；真实 Key 只在服务端用于转发和计费。'}
+          {sub2apiKeys.length === 0
+            ? hostText('没有可用 Key：请确认 Key 属于当前用户、状态 active、未过期、额度未耗尽，且所属分组允许生图。', 'No eligible key: make sure the key belongs to the current user, is active, not expired, not exhausted, and its group allows image generation.')
+            : hostText('只保存 Key ID；真实 Key 只在服务端用于转发和计费。', 'Only the key ID is stored. The real key is used server-side for forwarding and billing.')}
         </div>
       </label>
       <div className="grid gap-4 sm:grid-cols-2">
         <label className="block">
-          <span className="mb-1.5 block text-sm text-gray-600 dark:text-gray-300">API 接口</span>
+          <span className="mb-1.5 block text-sm text-gray-600 dark:text-gray-300">{hostText('API 接口', 'API mode')}</span>
           <Select
             value={activeProfile.apiMode ?? DEFAULT_SETTINGS.apiMode}
             onChange={(value) => updateActiveProfile({ apiMode: value as AppSettings['apiMode'] }, true)}
@@ -1199,7 +1209,7 @@ export default function SettingsModal() {
           />
         </label>
         <label className="block">
-          <span className="mb-1.5 block text-sm text-gray-600 dark:text-gray-300">模型</span>
+          <span className="mb-1.5 block text-sm text-gray-600 dark:text-gray-300">{hostText('模型', 'Model')}</span>
           <Select
             value={activeProfile.model}
             onChange={(value) => updateActiveProfile({ model: String(value) }, true)}
@@ -1210,7 +1220,7 @@ export default function SettingsModal() {
       </div>
       <div className="grid gap-4 sm:grid-cols-2">
         <label className="block">
-          <span className="mb-1.5 block text-sm text-gray-600 dark:text-gray-300">请求超时 (秒)</span>
+          <span className="mb-1.5 block text-sm text-gray-600 dark:text-gray-300">{hostText('请求超时 (秒)', 'Request timeout (seconds)')}</span>
           <input
             value={timeoutInput}
             onChange={(e) => setTimeoutInput(e.target.value)}
@@ -1222,25 +1232,20 @@ export default function SettingsModal() {
           />
         </label>
         <label className="block">
-          <span className="mb-1.5 block text-sm text-gray-600 dark:text-gray-300">中间步骤图像数</span>
+          <span className="mb-1.5 block text-sm text-gray-600 dark:text-gray-300">{hostText('中间步骤图像数', 'Partial images')}</span>
           <Select
             value={normalizeStreamPartialImages(activeProfile.streamPartialImages)}
             onChange={(value) => updateActiveProfile({ streamPartialImages: normalizeStreamPartialImages(value) }, true)}
             disabled={!activeProfile.streamImages}
-            options={[
-              { label: '0，不请求', value: 0 },
-              { label: '1 张', value: 1 },
-              { label: '2 张', value: 2 },
-              { label: '3 张', value: 3 },
-            ]}
+            options={streamPartialImageOptions}
             className="w-full rounded-xl border border-gray-200/70 bg-white/60 px-3 py-2.5 text-sm text-gray-700 outline-none transition focus:border-blue-300 dark:border-white/[0.08] dark:bg-white/[0.03] dark:text-gray-200 dark:focus:border-blue-500/50"
           />
         </label>
       </div>
       <div className="flex items-center justify-between gap-3 rounded-2xl border border-gray-200/70 bg-white/60 p-4 dark:border-white/[0.08] dark:bg-white/[0.03]">
         <div>
-          <div className="text-sm text-gray-700 dark:text-gray-200">流式传输</div>
-          <div className="mt-1 text-xs text-gray-500 dark:text-gray-500">用于 Responses Agent 和 Images API 中间图。</div>
+          <div className="text-sm text-gray-700 dark:text-gray-200">{hostText('流式传输', 'Streaming')}</div>
+          <div className="mt-1 text-xs text-gray-500 dark:text-gray-500">{hostText('用于 Responses Agent 和 Images API 中间图。', 'Used by Responses Agent and Images API partial images.')}</div>
         </div>
         <button
           type="button"
@@ -1248,7 +1253,7 @@ export default function SettingsModal() {
           className={`relative inline-flex h-4 w-7 items-center rounded-full transition-colors ${activeProfile.streamImages ? 'bg-blue-500' : 'bg-gray-300 dark:bg-gray-600'}`}
           role="switch"
           aria-checked={!!activeProfile.streamImages}
-          aria-label="流式传输"
+          aria-label={hostText('流式传输', 'Streaming')}
         >
           <span className={`inline-block h-3 w-3 transform rounded-full bg-white shadow transition-transform ${activeProfile.streamImages ? 'translate-x-[14px]' : 'translate-x-[2px]'}`} />
         </button>
@@ -1273,14 +1278,14 @@ export default function SettingsModal() {
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
             </svg>
-            设置
+            {hostText('设置', 'Settings')}
           </h3>
           <div className="flex items-center gap-3">
             <span className="text-sm text-gray-400 dark:text-gray-500 font-mono select-none">v{__APP_VERSION__}</span>
             <button
               onClick={handleClose}
               className="rounded-full p-1 text-gray-400 transition hover:bg-gray-100 hover:text-gray-600 dark:hover:bg-white/[0.06] dark:hover:text-gray-200"
-              aria-label="关闭"
+              aria-label={hostText('关闭', 'Close')}
             >
               <CloseIcon className="h-5 w-5" />
             </button>
@@ -1298,7 +1303,7 @@ export default function SettingsModal() {
                 <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 7a2 2 0 012 2m4 0a6 6 0 01-7.743 5.743L11 17H9v2H7v2H4a1 1 0 01-1-1v-2.586a1 1 0 01.293-.707l5.964-5.964A6 6 0 1121 9z" />
                 </svg>
-                API 配置
+                {hostText('API 配置', 'API Settings')}
               </button>
               <button
                 onClick={() => setActiveTab('general')}
@@ -1307,7 +1312,7 @@ export default function SettingsModal() {
                 <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6v6l4 2m6-2a10 10 0 11-20 0 10 10 0 0120 0z" />
                 </svg>
-                习惯配置
+                {hostText('习惯配置', 'Preferences')}
               </button>
               <button
                 onClick={() => setActiveTab('agent')}
@@ -1318,7 +1323,7 @@ export default function SettingsModal() {
                   <rect width="16" height="12" x="4" y="8" rx="2" strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} />
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2 14h2M20 14h2M15 13v2M9 13v2" />
                 </svg>
-                Agent 配置
+                {hostText('Agent 配置', 'Agent Settings')}
               </button>
               <button
                 onClick={() => setActiveTab('data')}
@@ -1327,7 +1332,7 @@ export default function SettingsModal() {
                 <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 7v10c0 2.21 3.582 4 8 4s8-1.79 8-4V7M4 7c0 2.21 3.582 4 8 4s8-1.79 8-4M4 7c0-2.21 3.582-4 8-4s8 1.79 8 4" />
                 </svg>
-                数据管理
+                {hostText('数据管理', 'Data')}
               </button>
               <button
                 onClick={() => setActiveTab('about')}
@@ -1336,7 +1341,7 @@ export default function SettingsModal() {
                 <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
                 </svg>
-                关于
+                {hostText('关于', 'About')}
               </button>
             </nav>
           </div>
@@ -2199,28 +2204,26 @@ export default function SettingsModal() {
 
                   > 本站点基于开源项目 [GPT Image Playground](https://github.com/CookSleep/gpt_image_playground) ([MIT](https://github.com/CookSleep/gpt_image_playground/blob/main/LICENSE)) 修改。
                 */}
-                <a
-                  href="https://github.com/CookSleep/gpt_image_playground"
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="group flex flex-col items-center outline-none"
-                >
+                <div className="group flex flex-col items-center outline-none">
                   <div className="mb-5 flex h-[88px] w-[88px] items-center justify-center rounded-full border border-gray-200/80 bg-gray-50/50 text-gray-800 transition-colors group-hover:bg-gray-100 dark:border-white/[0.08] dark:bg-white/[0.02] dark:text-gray-100 dark:group-hover:bg-white/[0.06]">
                     <GithubIcon className="h-11 w-11" />
                   </div>
-                  <h4 className="text-[17px] font-bold text-gray-800 dark:text-gray-100">GPT Image Playground</h4>
+                  <h4 className="text-[17px] font-bold text-gray-800 dark:text-gray-100">{hostText('生图广场', 'Image Playground')}</h4>
                   <p className="mt-1.5 text-[13px] text-gray-500 transition-colors group-hover:text-gray-700 dark:text-gray-400 dark:group-hover:text-gray-300">
-                    @CookSleep
+                    {hostText('基于 GPT Image Playground 修改', 'Based on GPT Image Playground')}
                   </p>
-                </a>
+                </div>
                 
                 <p className="mt-8 mb-6 max-w-[360px] text-center text-[13px] leading-relaxed text-gray-500 dark:text-gray-400">
-                  本项目的成长离不开每一位用户的使用、反馈、贡献与支持，感谢一路有你。
+                  {hostText(
+                    '本页面使用本地浏览器历史记录，所有请求经当前登录态代理转发，不保存真实 API Key。',
+                    'This workspace keeps history in your browser and sends requests through the signed-in sub2api proxy without storing real API keys.',
+                  )}
                 </p>
 
                 <div className="flex flex-wrap items-center justify-center gap-3">
                   <a
-                    href="https://github.com/CookSleep/gpt_image_playground/issues"
+                    href="https://github.com/CookSleep/gpt_image_playground"
                     target="_blank"
                     rel="noopener noreferrer"
                     className="flex items-center justify-center gap-2 whitespace-nowrap rounded-xl bg-gray-100/80 px-5 py-2.5 text-sm font-medium text-gray-700 transition-all hover:bg-gray-200 hover:text-gray-900 dark:bg-white/[0.06] dark:text-gray-300 dark:hover:bg-white/[0.1] dark:hover:text-white"
@@ -2228,10 +2231,10 @@ export default function SettingsModal() {
                     <svg className="h-4 w-4 opacity-70" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 10h.01M12 10h.01M16 10h.01M9 16H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-5l-5 5v-5z" />
                     </svg>
-                    反馈问题
+                    {hostText('上游项目', 'Upstream')}
                   </a>
                   <a
-                    href="https://www.ifdian.net/a/cooksleep"
+                    href="https://github.com/CookSleep/gpt_image_playground/blob/main/LICENSE"
                     target="_blank"
                     rel="noopener noreferrer"
                     className="flex items-center justify-center gap-2 whitespace-nowrap rounded-xl bg-gray-100/80 px-5 py-2.5 text-sm font-medium text-gray-700 transition-all hover:bg-gray-200 hover:text-gray-900 dark:bg-white/[0.06] dark:text-gray-300 dark:hover:bg-white/[0.1] dark:hover:text-white"
@@ -2239,7 +2242,7 @@ export default function SettingsModal() {
                     <svg className="h-4 w-4 opacity-70" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z" />
                     </svg>
-                    赞助作者
+                    MIT License
                   </a>
                 </div>
               </div>

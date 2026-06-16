@@ -99,7 +99,7 @@ func (s *FrontendServer) Middleware() gin.HandlerFunc {
 
 		if isImagePlaygroundPath(cleanPath) {
 			if isImagePlaygroundIndexRoute(cleanPath) {
-				s.serveStaticContent(c, "image-playground/index.html", "text/html; charset=utf-8")
+				s.servePlaygroundIndexHTML(c)
 				return
 			}
 			if !s.fileExists(cleanPath) {
@@ -158,6 +158,36 @@ func (s *FrontendServer) serveStaticContent(c *gin.Context, cleanPath, contentTy
 	c.Header("Cache-Control", "no-cache")
 	c.Data(http.StatusOK, contentType, content)
 	c.Abort()
+}
+
+func (s *FrontendServer) servePlaygroundIndexHTML(c *gin.Context) {
+	content, err := s.renderPlaygroundIndexHTML(c)
+	if err != nil {
+		c.String(http.StatusNotFound, "Image playground asset not found")
+		c.Abort()
+		return
+	}
+	c.Header("Cache-Control", "no-cache")
+	c.Data(http.StatusOK, "text/html; charset=utf-8", replaceNoncePlaceholder(content, middleware.GetNonceFromContext(c)))
+	c.Abort()
+}
+
+func (s *FrontendServer) renderPlaygroundIndexHTML(c *gin.Context) ([]byte, error) {
+	content, err := fs.ReadFile(s.distFS, "image-playground/index.html")
+	if err != nil {
+		return nil, err
+	}
+	ctx, cancel := context.WithTimeout(c.Request.Context(), 2*time.Second)
+	defer cancel()
+	settings, err := s.settings.GetPublicSettingsForInjection(ctx)
+	if err != nil {
+		return content, nil
+	}
+	settingsJSON, err := json.Marshal(settings)
+	if err != nil {
+		return content, nil
+	}
+	return injectPlaygroundSettings(content, settingsJSON), nil
 }
 
 // tryServeOverride checks if a local override file exists and serves it.
@@ -250,9 +280,22 @@ func (s *FrontendServer) injectSettings(settingsJSON []byte) []byte {
 	return result
 }
 
+func injectPlaygroundSettings(html, settingsJSON []byte) []byte {
+	script := []byte(`<script nonce="` + NonceHTMLPlaceholder + `">window.__APP_CONFIG__=` + string(settingsJSON) + `;</script>`)
+	headClose := []byte("</head>")
+	result := bytes.Replace(html, headClose, append(script, headClose...), 1)
+	result = injectSiteTitleForPage(result, settingsJSON, "生图广场", "Image Playground")
+	result = injectSiteIcon(result, settingsJSON)
+	return result
+}
+
 // injectSiteTitle replaces the static <title> in HTML with the configured site name.
 // This ensures the browser tab shows the correct title before JS executes.
 func injectSiteTitle(html, settingsJSON []byte) []byte {
+	return injectSiteTitleForPage(html, settingsJSON, "AI API Gateway", "AI API Gateway")
+}
+
+func injectSiteTitleForPage(html, settingsJSON []byte, zhPageTitle, enPageTitle string) []byte {
 	var cfg struct {
 		SiteName string `json:"site_name"`
 	}
@@ -267,12 +310,51 @@ func injectSiteTitle(html, settingsJSON []byte) []byte {
 		return html
 	}
 
-	newTitle := []byte("<title>" + cfg.SiteName + " - AI API Gateway</title>")
+	pageTitle := enPageTitle
+	if bytes.Contains(html, []byte(`lang="zh`)) || bytes.Contains(html, []byte(`lang="zh-CN"`)) {
+		pageTitle = zhPageTitle
+	}
+	newTitle := []byte("<title>" + cfg.SiteName + " - " + pageTitle + "</title>")
 	var buf bytes.Buffer
 	buf.Write(html[:titleStart])
 	buf.Write(newTitle)
 	buf.Write(html[titleEnd+len("</title>"):])
 	return buf.Bytes()
+}
+
+func injectSiteIcon(html, settingsJSON []byte) []byte {
+	var cfg struct {
+		SiteLogo string `json:"site_logo"`
+	}
+	if err := json.Unmarshal(settingsJSON, &cfg); err != nil || strings.TrimSpace(cfg.SiteLogo) == "" {
+		return html
+	}
+	logo := []byte(cfg.SiteLogo)
+	replacements := []string{
+		`<link rel="apple-touch-icon" href="./pwa-icon.svg" />`,
+		`<link rel="icon" href="./pwa-icon.svg" type="image/svg+xml" />`,
+		`<link rel="apple-touch-icon" href="/logo.png" />`,
+		`<link rel="icon" href="/logo.png" />`,
+	}
+	result := html
+	for _, old := range replacements {
+		start := bytes.Index(result, []byte(old))
+		if start == -1 {
+			continue
+		}
+		var next bytes.Buffer
+		next.Write(result[:start])
+		if strings.Contains(old, "apple-touch-icon") {
+			next.WriteString(`<link rel="apple-touch-icon" href="`)
+		} else {
+			next.WriteString(`<link rel="icon" href="`)
+		}
+		next.Write(logo)
+		next.WriteString(`" />`)
+		next.Write(result[start+len(old):])
+		result = next.Bytes()
+	}
+	return result
 }
 
 // replaceNoncePlaceholder replaces the nonce placeholder with actual nonce value
@@ -314,6 +396,11 @@ func ServeEmbeddedFrontend() gin.HandlerFunc {
 			}
 			c.String(http.StatusNotFound, "Image playground asset not found")
 			c.Abort()
+			return
+		}
+
+		if cleanPath == "index.html" {
+			serveIndexHTML(c, distFS)
 			return
 		}
 

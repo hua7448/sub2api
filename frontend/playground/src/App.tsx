@@ -1,4 +1,4 @@
-import { useEffect } from 'react'
+import { useEffect, useState } from 'react'
 import { initStore } from './store'
 import { useStore } from './store'
 import { buildSettingsFromUrlParams, clearUrlSettingParams, hasUrlSettingParams } from './lib/urlSettings'
@@ -19,13 +19,24 @@ import SupportPromptModal from './components/SupportPromptModal'
 import { FavoriteCollectionPickerModal, FavoriteCollectionsView, ManageCollectionsModal } from './components/FavoriteCollections'
 import { useGlobalClickSuppression } from './lib/clickSuppression'
 import { applySub2APISettings, fetchSub2APIEligibleKeys, fetchSub2APISettings } from './lib/sub2api'
+import { applyHostDocumentChrome, subscribeHostLocaleChange } from './lib/sub2apiHost'
 
 export default function App() {
   const setSettings = useStore((s) => s.setSettings)
   const appMode = useStore((s) => s.appMode)
   const filterFavorite = useStore((s) => s.filterFavorite)
   const activeFavoriteCollectionId = useStore((s) => s.activeFavoriteCollectionId)
+  const [, setHostLocaleVersion] = useState(0)
   useGlobalClickSuppression()
+
+  useEffect(() => {
+    const updateHostChrome = () => {
+      applyHostDocumentChrome()
+      setHostLocaleVersion((version) => version + 1)
+    }
+    updateHostChrome()
+    return subscribeHostLocaleChange(updateHostChrome)
+  }, [])
 
   useEffect(() => {
     const searchParams = new URLSearchParams(window.location.search)
@@ -45,18 +56,19 @@ export default function App() {
       window.history.replaceState(null, '', nextUrl)
     }
 
-    initStore()
-
-    void Promise.all([fetchSub2APISettings(), fetchSub2APIEligibleKeys()])
-      .then(([remoteSettings, keys]) => {
+    void (async () => {
+      try {
+        await initStore()
+        const [remoteSettings, keys] = await Promise.all([fetchSub2APISettings(), fetchSub2APIEligibleKeys()])
         const baseSettings = applySub2APISettings(useStore.getState().settings, remoteSettings, keys)
         setSettings(applyUrlSettings(baseSettings))
         clearAppliedUrlSettings()
-      })
-      .catch((error) => {
+      } catch (error) {
+        const message = error instanceof Error ? error.message : String(error ?? '')
         console.warn('Failed to initialize sub2api playground:', error)
-        if (String(error?.message ?? '').includes('401')) window.location.assign('/login')
-      })
+        if (message.includes('401')) window.location.assign('/login')
+      }
+    })()
   }, [setSettings])
 
   useEffect(() => {
