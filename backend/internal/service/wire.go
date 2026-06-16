@@ -3,6 +3,9 @@ package service
 import (
 	"context"
 	"database/sql"
+	"fmt"
+	"net/http"
+	"strings"
 	"time"
 
 	dbent "github.com/Wei-Shaw/sub2api/ent"
@@ -31,8 +34,8 @@ func ProvidePricingService(cfg *config.Config, remoteClient PricingRemoteClient)
 }
 
 // ProvideUpdateService creates UpdateService with BuildInfo
-func ProvideUpdateService(cache UpdateCache, githubClient GitHubReleaseClient, buildInfo BuildInfo) *UpdateService {
-	return NewUpdateService(cache, githubClient, buildInfo.Version, buildInfo.BuildType)
+func ProvideUpdateService(cache UpdateCache, githubClient GitHubReleaseClient, buildInfo BuildInfo, cfg *config.Config) *UpdateService {
+	return NewUpdateService(cache, githubClient, buildInfo.Version, buildInfo.BuildType, cfg.Update)
 }
 
 // ProvideEmailQueueService creates EmailQueueService with default worker count
@@ -499,6 +502,23 @@ func ProvideAPIKeyService(
 	return svc
 }
 
+func ProvideImageGalleryService(repo ImageGalleryRepository, settingRepo SettingRepository, apiKeyService *APIKeyService, cfg *config.Config) *ImageGalleryService {
+	svc := NewImageGalleryService(repo, settingRepo, apiKeyService)
+	host := strings.TrimSpace(cfg.Server.Host)
+	if host == "" || host == "0.0.0.0" || host == "::" {
+		host = "127.0.0.1"
+	}
+	port := cfg.Server.Port
+	if port <= 0 {
+		port = 3000
+	}
+	svc.SetGatewayClient(&LocalImageGatewayClient{
+		BaseURL: fmt.Sprintf("http://%s:%d", host, port),
+		Client:  &http.Client{Timeout: 180 * time.Second},
+	})
+	return svc
+}
+
 // ProviderSet is the Wire provider set for all services
 var ProviderSet = wire.NewSet(
 	// Core services
@@ -585,6 +605,7 @@ var ProviderSet = wire.NewSet(
 	NewChannelService,
 	NewModelPricingResolver,
 	NewContentModerationService,
+	ProvideImageGalleryService,
 	NewAffiliateService,
 	ProvidePaymentConfigService,
 	ProvidePaymentService,

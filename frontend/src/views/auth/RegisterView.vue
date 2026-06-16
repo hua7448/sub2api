@@ -1,12 +1,15 @@
 <template>
-  <AuthLayout>
-    <div class="space-y-6">
+  <AuthLayout variant="pixel">
+    <div class="register-pixel space-y-6">
       <!-- Title -->
       <div class="text-center">
-        <h2 class="text-2xl font-bold text-gray-900 dark:text-white">
+        <div class="register-pixel-kicker">
+          NEW IDENTITY
+        </div>
+        <h2 class="register-pixel-title">
           {{ t('auth.createAccount') }}
         </h2>
-        <p class="mt-2 text-sm text-gray-500 dark:text-dark-400">
+        <p class="mt-2 text-sm text-gray-600 dark:text-dark-300">
           {{ t('auth.signUpToStart', { siteName }) }}
         </p>
       </div>
@@ -45,7 +48,7 @@
               autofocus
               autocomplete="email"
               :disabled="registrationActionDisabled"
-              class="input pl-11"
+              class="input register-pixel-input pl-11"
               :class="{ 'input-error': errors.email }"
               :placeholder="t('auth.emailPlaceholder')"
             />
@@ -68,7 +71,7 @@
               required
               autocomplete="new-password"
               :disabled="registrationActionDisabled"
-              class="input pl-11 pr-11"
+              class="input register-pixel-input pl-11 pr-11"
               :class="{ 'input-error': errors.password }"
               :placeholder="t('auth.createPasswordPlaceholder')"
             />
@@ -101,7 +104,7 @@
               v-model="formData.invitation_code"
               type="text"
               :disabled="registrationActionDisabled"
-              class="input pl-11 pr-10"
+              class="input register-pixel-input pl-11 pr-10"
               :class="{
                 'border-green-500 focus:border-green-500 focus:ring-green-500': invitationValidation.valid,
                 'border-red-500 focus:border-red-500 focus:ring-red-500': invitationValidation.invalid || errors.invitation_code
@@ -149,7 +152,7 @@
               v-model="formData.promo_code"
               type="text"
               :disabled="registrationActionDisabled"
-              class="input pl-11 pr-10"
+              class="input register-pixel-input pl-11 pr-10"
               :class="{
                 'border-green-500 focus:border-green-500 focus:ring-green-500': promoValidation.valid,
                 'border-red-500 focus:border-red-500 focus:ring-red-500': promoValidation.invalid
@@ -209,7 +212,7 @@
         <button
           type="submit"
           :disabled="registrationActionDisabled || (turnstileEnabled && !turnstileToken)"
-          class="btn btn-primary w-full"
+          class="btn btn-primary register-pixel-submit w-full"
         >
           <svg
             v-if="isLoading"
@@ -243,7 +246,7 @@
 
       </form>
 
-      <div v-if="showOAuthLogin" class="space-y-3 pt-1">
+      <div v-if="showOAuthLogin" class="register-pixel-oauth space-y-3 pt-1">
         <div class="flex items-center gap-3">
           <div class="h-px flex-1 bg-gray-200 dark:bg-dark-700"></div>
           <span class="text-xs text-gray-500 dark:text-dark-400">
@@ -918,6 +921,93 @@ async function handleRegister(): Promise<void> {
 </script>
 
 <style scoped>
+.register-pixel {
+  --pixel-ink: #302c27;
+  --pixel-paper: #fffaf2;
+}
+
+.dark .register-pixel {
+  --pixel-ink: #f1ede6;
+  --pixel-paper: #1f1d1a;
+}
+
+.register-pixel-kicker {
+  display: inline-flex;
+  margin-bottom: 0.75rem;
+  border: 3px solid var(--pixel-ink);
+  background: #f4e4d6;
+  padding: 0.25rem 0.625rem;
+  color: #663229;
+  font-size: 0.6875rem;
+  font-weight: 800;
+  letter-spacing: 0.12em;
+  line-height: 1;
+  box-shadow: 4px 4px 0 var(--pixel-ink);
+}
+
+.dark .register-pixel-kicker {
+  background: #663229;
+  color: #fffaf2;
+}
+
+.register-pixel-title {
+  color: var(--pixel-ink);
+  font-size: clamp(1.75rem, 5vw, 2.35rem);
+  font-weight: 900;
+  line-height: 1.05;
+}
+
+.register-pixel :deep(.input-label) {
+  color: var(--pixel-ink);
+  font-size: 0.75rem;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.register-pixel-input {
+  border-width: 3px;
+  border-color: var(--pixel-ink);
+  border-radius: 0;
+  background: var(--pixel-paper);
+  box-shadow: 4px 4px 0 rgba(48, 44, 39, 0.18);
+}
+
+.register-pixel-input:focus {
+  box-shadow:
+    4px 4px 0 rgba(48, 44, 39, 0.22),
+    0 0 0 3px rgba(184, 95, 63, 0.22);
+}
+
+.dark .register-pixel-input {
+  box-shadow: 4px 4px 0 rgba(241, 237, 230, 0.18);
+}
+
+.register-pixel-submit {
+  min-height: 3rem;
+  border: 3px solid var(--pixel-ink);
+  border-radius: 0;
+  color: #fffaf2;
+  font-weight: 900;
+  letter-spacing: 0.02em;
+  box-shadow: 6px 6px 0 var(--pixel-ink);
+}
+
+.register-pixel-submit:hover:not(:disabled) {
+  transform: translate(-1px, -1px);
+  box-shadow: 7px 7px 0 var(--pixel-ink);
+}
+
+.register-pixel-submit:active:not(:disabled) {
+  transform: translate(3px, 3px);
+  box-shadow: 3px 3px 0 var(--pixel-ink);
+}
+
+.register-pixel-oauth :deep(button),
+.register-pixel-oauth :deep(a) {
+  border-radius: 0;
+}
+
 .fade-enter-active,
 .fade-leave-active {
   transition: all 0.3s ease;

@@ -274,6 +274,25 @@ func GetSubscriptionFromContext(c *gin.Context) (*service.UserSubscription, bool
 	return subscription, ok
 }
 
+// SetAuthenticatedAPIKeyContext stores a pre-validated API key identity in Gin
+// context for internal entry points that intentionally bypass header-based API
+// key authentication while still using the normal gateway handlers.
+func SetAuthenticatedAPIKeyContext(c *gin.Context, apiKey *service.APIKey, subscription *service.UserSubscription) {
+	if c == nil || apiKey == nil || apiKey.User == nil {
+		return
+	}
+	if subscription != nil {
+		c.Set(string(ContextKeySubscription), subscription)
+	}
+	c.Set(string(ContextKeyAPIKey), apiKey)
+	c.Set(string(ContextKeyUser), AuthSubject{
+		UserID:      apiKey.User.ID,
+		Concurrency: apiKey.User.Concurrency,
+	})
+	c.Set(string(ContextKeyUserRole), apiKey.User.Role)
+	setGroupContext(c, apiKey.Group)
+}
+
 func setGroupContext(c *gin.Context, group *service.Group) {
 	if !service.IsGroupContextValid(group) {
 		return

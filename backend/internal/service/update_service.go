@@ -18,6 +18,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/Wei-Shaw/sub2api/internal/config"
 	infraerrors "github.com/Wei-Shaw/sub2api/internal/pkg/errors"
 )
 
@@ -28,7 +29,9 @@ var (
 const (
 	updateCacheKey = "update_check_cache"
 	updateCacheTTL = 1200 // 20 minutes
-	githubRepo     = "Wei-Shaw/sub2api"
+
+	defaultUpdateGitHubRepo = "hua7448/sub2api"
+	defaultStableTagSuffix  = "smartapi"
 
 	// Security: allowed download domains for updates
 	allowedDownloadHost = "github.com"
@@ -53,31 +56,49 @@ type GitHubReleaseClient interface {
 
 // UpdateService handles software updates
 type UpdateService struct {
-	cache          UpdateCache
-	githubClient   GitHubReleaseClient
-	currentVersion string
-	buildType      string // "source" for manual builds, "release" for CI builds
+	cache           UpdateCache
+	githubClient    GitHubReleaseClient
+	currentVersion  string
+	buildType       string // "source" for manual builds, "release" for CI builds
+	githubRepo      string
+	stableTagSuffix string
 }
 
 // NewUpdateService creates a new UpdateService
-func NewUpdateService(cache UpdateCache, githubClient GitHubReleaseClient, version, buildType string) *UpdateService {
+func NewUpdateService(cache UpdateCache, githubClient GitHubReleaseClient, version, buildType string, cfg ...config.UpdateConfig) *UpdateService {
+	updateCfg := config.UpdateConfig{}
+	if len(cfg) > 0 {
+		updateCfg = cfg[0]
+	}
+	repo := strings.TrimSpace(updateCfg.GitHubRepo)
+	if repo == "" {
+		repo = defaultUpdateGitHubRepo
+	}
+	suffix := normalizeStableTagSuffix(updateCfg.StableTagSuffix)
+	if suffix == "" {
+		suffix = defaultStableTagSuffix
+	}
 	return &UpdateService{
-		cache:          cache,
-		githubClient:   githubClient,
-		currentVersion: version,
-		buildType:      buildType,
+		cache:           cache,
+		githubClient:    githubClient,
+		currentVersion:  version,
+		buildType:       buildType,
+		githubRepo:      repo,
+		stableTagSuffix: suffix,
 	}
 }
 
 // UpdateInfo contains update information
 type UpdateInfo struct {
-	CurrentVersion string       `json:"current_version"`
-	LatestVersion  string       `json:"latest_version"`
-	HasUpdate      bool         `json:"has_update"`
-	ReleaseInfo    *ReleaseInfo `json:"release_info,omitempty"`
-	Cached         bool         `json:"cached"`
-	Warning        string       `json:"warning,omitempty"`
-	BuildType      string       `json:"build_type"` // "source" or "release"
+	CurrentVersion  string       `json:"current_version"`
+	LatestVersion   string       `json:"latest_version"`
+	HasUpdate       bool         `json:"has_update"`
+	ReleaseInfo     *ReleaseInfo `json:"release_info,omitempty"`
+	Cached          bool         `json:"cached"`
+	Warning         string       `json:"warning,omitempty"`
+	BuildType       string       `json:"build_type"` // "source" or "release"
+	UpdateRepo      string       `json:"update_repo"`
+	StableTagSuffix string       `json:"stable_tag_suffix"`
 }
 
 // ReleaseInfo contains GitHub release details
@@ -130,11 +151,13 @@ func (s *UpdateService) CheckUpdate(ctx context.Context, force bool) (*UpdateInf
 			return cached, nil
 		}
 		return &UpdateInfo{
-			CurrentVersion: s.currentVersion,
-			LatestVersion:  s.currentVersion,
-			HasUpdate:      false,
-			Warning:        err.Error(),
-			BuildType:      s.buildType,
+			CurrentVersion:  s.currentVersion,
+			LatestVersion:   s.currentVersion,
+			HasUpdate:       false,
+			Warning:         err.Error(),
+			BuildType:       s.buildType,
+			UpdateRepo:      s.githubRepo,
+			StableTagSuffix: s.stableTagSuffix,
 		}, nil
 	}
 
@@ -280,12 +303,15 @@ func (s *UpdateService) Rollback() error {
 }
 
 func (s *UpdateService) fetchLatestRelease(ctx context.Context) (*UpdateInfo, error) {
-	release, err := s.githubClient.FetchLatestRelease(ctx, githubRepo)
+	release, err := s.githubClient.FetchLatestRelease(ctx, s.githubRepo)
 	if err != nil {
 		return nil, err
 	}
 
 	latestVersion := strings.TrimPrefix(release.TagName, "v")
+	if !isStableForkVersion(latestVersion, s.stableTagSuffix) {
+		return nil, fmt.Errorf("latest release %q is not a stable %s release", release.TagName, s.stableTagSuffix)
+	}
 
 	assets := make([]Asset, len(release.Assets))
 	for i, a := range release.Assets {
@@ -299,7 +325,7 @@ func (s *UpdateService) fetchLatestRelease(ctx context.Context) (*UpdateInfo, er
 	return &UpdateInfo{
 		CurrentVersion: s.currentVersion,
 		LatestVersion:  latestVersion,
-		HasUpdate:      compareVersions(s.currentVersion, latestVersion) < 0,
+		HasUpdate:      compareVersions(s.currentVersion, latestVersion, s.stableTagSuffix) < 0,
 		ReleaseInfo: &ReleaseInfo{
 			Name:        release.Name,
 			Body:        release.Body,
@@ -307,8 +333,10 @@ func (s *UpdateService) fetchLatestRelease(ctx context.Context) (*UpdateInfo, er
 			HTMLURL:     release.HTMLURL,
 			Assets:      assets,
 		},
-		Cached:    false,
-		BuildType: s.buildType,
+		Cached:          false,
+		BuildType:       s.buildType,
+		UpdateRepo:      s.githubRepo,
+		StableTagSuffix: s.stableTagSuffix,
 	}, nil
 }
 
@@ -480,12 +508,18 @@ func (s *UpdateService) getFromCache(ctx context.Context) (*UpdateInfo, error) {
 	}
 
 	var cached struct {
-		Latest      string       `json:"latest"`
-		ReleaseInfo *ReleaseInfo `json:"release_info"`
-		Timestamp   int64        `json:"timestamp"`
+		Latest          string       `json:"latest"`
+		ReleaseInfo     *ReleaseInfo `json:"release_info"`
+		Timestamp       int64        `json:"timestamp"`
+		UpdateRepo      string       `json:"update_repo"`
+		StableTagSuffix string       `json:"stable_tag_suffix"`
 	}
 	if err := json.Unmarshal([]byte(data), &cached); err != nil {
 		return nil, err
+	}
+
+	if cached.UpdateRepo != s.githubRepo || cached.StableTagSuffix != s.stableTagSuffix {
+		return nil, fmt.Errorf("cache source mismatch")
 	}
 
 	if time.Now().Unix()-cached.Timestamp > updateCacheTTL {
@@ -493,36 +527,47 @@ func (s *UpdateService) getFromCache(ctx context.Context) (*UpdateInfo, error) {
 	}
 
 	return &UpdateInfo{
-		CurrentVersion: s.currentVersion,
-		LatestVersion:  cached.Latest,
-		HasUpdate:      compareVersions(s.currentVersion, cached.Latest) < 0,
-		ReleaseInfo:    cached.ReleaseInfo,
-		Cached:         true,
-		BuildType:      s.buildType,
+		CurrentVersion:  s.currentVersion,
+		LatestVersion:   cached.Latest,
+		HasUpdate:       compareVersions(s.currentVersion, cached.Latest, s.stableTagSuffix) < 0,
+		ReleaseInfo:     cached.ReleaseInfo,
+		Cached:          true,
+		BuildType:       s.buildType,
+		UpdateRepo:      s.githubRepo,
+		StableTagSuffix: s.stableTagSuffix,
 	}, nil
 }
 
 func (s *UpdateService) saveToCache(ctx context.Context, info *UpdateInfo) {
 	cacheData := struct {
-		Latest      string       `json:"latest"`
-		ReleaseInfo *ReleaseInfo `json:"release_info"`
-		Timestamp   int64        `json:"timestamp"`
+		Latest          string       `json:"latest"`
+		ReleaseInfo     *ReleaseInfo `json:"release_info"`
+		Timestamp       int64        `json:"timestamp"`
+		UpdateRepo      string       `json:"update_repo"`
+		StableTagSuffix string       `json:"stable_tag_suffix"`
 	}{
-		Latest:      info.LatestVersion,
-		ReleaseInfo: info.ReleaseInfo,
-		Timestamp:   time.Now().Unix(),
+		Latest:          info.LatestVersion,
+		ReleaseInfo:     info.ReleaseInfo,
+		Timestamp:       time.Now().Unix(),
+		UpdateRepo:      s.githubRepo,
+		StableTagSuffix: s.stableTagSuffix,
 	}
 
 	data, _ := json.Marshal(cacheData)
 	_ = s.cache.SetUpdateInfo(ctx, string(data), time.Duration(updateCacheTTL)*time.Second)
 }
 
-// compareVersions compares two semantic versions
-func compareVersions(current, latest string) int {
-	currentParts := parseVersion(current)
-	latestParts := parseVersion(latest)
+// compareVersions compares SmartAPI release versions. It supports both upstream
+// semver tags and fork tags like 0.1.136-smartapi.2.
+func compareVersions(current, latest string, suffixes ...string) int {
+	suffix := defaultStableTagSuffix
+	if len(suffixes) > 0 && normalizeStableTagSuffix(suffixes[0]) != "" {
+		suffix = normalizeStableTagSuffix(suffixes[0])
+	}
+	currentParts := parseVersion(current, suffix)
+	latestParts := parseVersion(latest, suffix)
 
-	for i := 0; i < 3; i++ {
+	for i := 0; i < len(currentParts); i++ {
 		if currentParts[i] < latestParts[i] {
 			return -1
 		}
@@ -533,14 +578,61 @@ func compareVersions(current, latest string) int {
 	return 0
 }
 
-func parseVersion(v string) [3]int {
+func parseVersion(v string, suffixes ...string) [4]int {
+	suffix := defaultStableTagSuffix
+	if len(suffixes) > 0 && normalizeStableTagSuffix(suffixes[0]) != "" {
+		suffix = normalizeStableTagSuffix(suffixes[0])
+	}
 	v = strings.TrimPrefix(v, "v")
-	parts := strings.Split(v, ".")
-	result := [3]int{0, 0, 0}
+	result := [4]int{0, 0, 0, 0}
+
+	base := v
+	forkSuffix := "-" + suffix + "."
+	if idx := strings.Index(v, forkSuffix); idx >= 0 {
+		base = v[:idx]
+		forkPatch := v[idx+len(forkSuffix):]
+		if parsed, err := strconv.Atoi(readLeadingDigits(forkPatch)); err == nil {
+			result[3] = parsed
+		}
+	}
+
+	parts := strings.Split(base, ".")
 	for i := 0; i < len(parts) && i < 3; i++ {
-		if parsed, err := strconv.Atoi(parts[i]); err == nil {
+		if parsed, err := strconv.Atoi(readLeadingDigits(parts[i])); err == nil {
 			result[i] = parsed
 		}
 	}
 	return result
+}
+
+func isStableForkVersion(v, suffix string) bool {
+	suffix = normalizeStableTagSuffix(suffix)
+	if suffix == "" {
+		return true
+	}
+	v = strings.TrimPrefix(strings.TrimSpace(v), "v")
+	needle := "-" + suffix + "."
+	idx := strings.Index(v, needle)
+	if idx < 0 {
+		return false
+	}
+	return readLeadingDigits(v[idx+len(needle):]) != ""
+}
+
+func normalizeStableTagSuffix(s string) string {
+	s = strings.ToLower(strings.TrimSpace(s))
+	s = strings.TrimPrefix(s, "-")
+	s = strings.TrimSuffix(s, ".")
+	return s
+}
+
+func readLeadingDigits(s string) string {
+	var b strings.Builder
+	for _, r := range s {
+		if r < '0' || r > '9' {
+			break
+		}
+		b.WriteRune(r)
+	}
+	return b.String()
 }

@@ -1,12 +1,15 @@
 <template>
-  <AuthLayout>
-    <div class="space-y-6">
+  <AuthLayout variant="pixel">
+    <div class="login-pixel space-y-6">
       <!-- Title -->
       <div class="text-center">
-        <h2 class="text-2xl font-bold text-gray-900 dark:text-white">
+        <div class="login-pixel-kicker">
+          AUTH NODE
+        </div>
+        <h2 class="login-pixel-title">
           {{ t('auth.welcomeBack') }}
         </h2>
-        <p class="mt-2 text-sm text-gray-500 dark:text-dark-400">
+        <p class="mt-2 text-sm text-gray-600 dark:text-dark-300">
           {{ t('auth.signInToAccount') }}
         </p>
       </div>
@@ -29,7 +32,7 @@
               autofocus
               autocomplete="email"
               :disabled="authActionDisabled"
-              class="input pl-11"
+              class="input login-pixel-input pl-11"
               :class="{ 'input-error': errors.email }"
               :placeholder="t('auth.emailPlaceholder')"
             />
@@ -52,7 +55,7 @@
               required
               autocomplete="current-password"
               :disabled="authActionDisabled"
-              class="input pl-11 pr-11"
+              class="input login-pixel-input pl-11 pr-11"
               :class="{ 'input-error': errors.password }"
               :placeholder="t('auth.passwordPlaceholder')"
             />
@@ -93,7 +96,7 @@
         <button
           type="submit"
           :disabled="authActionDisabled || (turnstileEnabled && !turnstileToken)"
-          class="btn btn-primary w-full"
+          class="btn btn-primary login-pixel-submit w-full"
         >
           <svg
             v-if="isLoading"
@@ -131,7 +134,7 @@
           @open="showAgreementModal = true"
         />
 
-        <div v-if="showOAuthLogin" class="space-y-3 pt-1">
+        <div v-if="showOAuthLogin" class="login-pixel-oauth space-y-3 pt-1">
           <div class="flex items-center gap-3">
             <div class="h-px flex-1 bg-gray-200 dark:bg-dark-700"></div>
             <span class="text-xs text-gray-500 dark:text-dark-400">
@@ -553,6 +556,95 @@ function handle2FACancel(): void {
 </script>
 
 <style scoped>
+.login-pixel {
+  --pixel-ink: #302c27;
+  --pixel-paper: #fffaf2;
+  --pixel-muted: #7d7164;
+}
+
+.dark .login-pixel {
+  --pixel-ink: #f1ede6;
+  --pixel-paper: #1f1d1a;
+  --pixel-muted: #d0c6b8;
+}
+
+.login-pixel-kicker {
+  display: inline-flex;
+  margin-bottom: 0.75rem;
+  border: 3px solid var(--pixel-ink);
+  background: #f4e4d6;
+  padding: 0.25rem 0.625rem;
+  color: #663229;
+  font-size: 0.6875rem;
+  font-weight: 800;
+  letter-spacing: 0.12em;
+  line-height: 1;
+  box-shadow: 4px 4px 0 var(--pixel-ink);
+}
+
+.dark .login-pixel-kicker {
+  background: #663229;
+  color: #fffaf2;
+}
+
+.login-pixel-title {
+  color: var(--pixel-ink);
+  font-size: clamp(1.75rem, 5vw, 2.35rem);
+  font-weight: 900;
+  line-height: 1.05;
+}
+
+.login-pixel :deep(.input-label) {
+  color: var(--pixel-ink);
+  font-size: 0.75rem;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.login-pixel-input {
+  border-width: 3px;
+  border-color: var(--pixel-ink);
+  border-radius: 0;
+  background: var(--pixel-paper);
+  box-shadow: 4px 4px 0 rgba(48, 44, 39, 0.18);
+}
+
+.login-pixel-input:focus {
+  box-shadow:
+    4px 4px 0 rgba(48, 44, 39, 0.22),
+    0 0 0 3px rgba(184, 95, 63, 0.22);
+}
+
+.dark .login-pixel-input {
+  box-shadow: 4px 4px 0 rgba(241, 237, 230, 0.18);
+}
+
+.login-pixel-submit {
+  min-height: 3rem;
+  border: 3px solid var(--pixel-ink);
+  border-radius: 0;
+  color: #fffaf2;
+  font-weight: 900;
+  letter-spacing: 0.02em;
+  box-shadow: 6px 6px 0 var(--pixel-ink);
+}
+
+.login-pixel-submit:hover:not(:disabled) {
+  transform: translate(-1px, -1px);
+  box-shadow: 7px 7px 0 var(--pixel-ink);
+}
+
+.login-pixel-submit:active:not(:disabled) {
+  transform: translate(3px, 3px);
+  box-shadow: 3px 3px 0 var(--pixel-ink);
+}
+
+.login-pixel-oauth :deep(button),
+.login-pixel-oauth :deep(a) {
+  border-radius: 0;
+}
+
 .fade-enter-active,
 .fade-leave-active {
   transition: all 0.3s ease;

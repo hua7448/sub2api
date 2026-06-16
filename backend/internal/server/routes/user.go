@@ -122,5 +122,22 @@ func RegisterUserRoutes(
 			monitors.GET("", h.ChannelMonitor.List)
 			monitors.GET("/:id/status", h.ChannelMonitor.GetStatus)
 		}
+
+		imageGallery := authenticated.Group("/image-gallery")
+		{
+			imageGallery.GET("/eligible-keys", h.ImageGallery.EligibleKeys)
+		}
+
+		imagePlayground := authenticated.Group("/image-playground")
+		{
+			imagePlayground.GET("/settings", h.ImageGallery.Settings)
+			imagePlayground.GET("/eligible-keys", h.ImageGallery.EligibleKeys)
+			proxy := imagePlayground.Group("/proxy")
+			{
+				proxy.POST("/images/generations", h.ImageGallery.ProxyImagesGenerations)
+				proxy.POST("/images/edits", h.ImageGallery.ProxyImagesEdits)
+				proxy.POST("/responses", h.ImageGallery.ProxyResponses)
+			}
+		}
 	}
 }

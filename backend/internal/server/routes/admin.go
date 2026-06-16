@@ -103,6 +103,9 @@ func RegisterAdminRoutes(
 
 		// 邀请返利（专属用户管理）
 		registerAffiliateRoutes(admin, h)
+
+		// 生图广场
+		registerImageGalleryRoutes(admin, h)
 	}
 }
 
@@ -125,6 +128,14 @@ func registerContentModerationRoutes(admin *gin.RouterGroup, h *handler.Handlers
 		risk.POST("/users/:user_id/unban", h.Admin.ContentModeration.UnbanUser)
 		risk.DELETE("/hashes", h.Admin.ContentModeration.DeleteFlaggedHash)
 		risk.DELETE("/hashes/all", h.Admin.ContentModeration.ClearFlaggedHashes)
+	}
+}
+
+func registerImageGalleryRoutes(admin *gin.RouterGroup, h *handler.Handlers) {
+	gallery := admin.Group("/image-gallery")
+	{
+		gallery.GET("/settings", h.Admin.ImageGallery.GetSettings)
+		gallery.PUT("/settings", h.Admin.ImageGallery.UpdateSettings)
 	}
 }
 

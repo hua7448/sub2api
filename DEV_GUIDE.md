@@ -7,10 +7,13 @@
 | 项目 | 说明 |
 |------|------|
 | **上游仓库** | Wei-Shaw/sub2api |
-| **Fork 仓库** | bayma888/sub2api-bmai |
+| **Fork 仓库** | hua7448/sub2api |
 | **技术栈** | Go 后端 (Ent ORM + Gin) + Vue3 前端 (pnpm) |
 | **数据库** | PostgreSQL 16 + Redis |
 | **包管理** | 后端: go modules, 前端: **pnpm**（不是 npm） |
+
+> Fork 的分支命名、同步 upstream、版本发布、服务器试运行、正式部署和回滚规则见
+> [docs/FORK_WORKFLOW_CN.md](docs/FORK_WORKFLOW_CN.md)。该文档优先级高于本指南中的历史说明。
 
 ## 二、本地环境配置
 
@@ -53,7 +56,7 @@ npm install -g pnpm
 
 ### CI 要求
 
-- Go 版本必须是 **1.25.7**
+- Go 版本必须是 **1.26.4**
 - 前端使用 `pnpm install --frozen-lockfile`，必须提交 `pnpm-lock.yaml`
 
 ### 本地测试命令

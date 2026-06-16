@@ -92,6 +92,31 @@ func TestInjectSiteTitle(t *testing.T) {
 	})
 }
 
+func TestInjectPlaygroundSettings(t *testing.T) {
+	t.Run("injects_host_settings_title_and_icon", func(t *testing.T) {
+		html := []byte(`<!DOCTYPE html><html lang="zh-CN"><head><link rel="apple-touch-icon" href="/logo.png" /><link rel="icon" href="/logo.png" /><title>Image Playground</title></head><body></body></html>`)
+		settingsJSON := []byte(`{"site_name":"SmartAPI","site_logo":"/custom-logo.png"}`)
+
+		result := injectPlaygroundSettings(html, settingsJSON)
+		body := string(result)
+
+		assert.Contains(t, body, `<script nonce="__CSP_NONCE_VALUE__">window.__APP_CONFIG__={"site_name":"SmartAPI","site_logo":"/custom-logo.png"};</script>`)
+		assert.Contains(t, body, `<title>SmartAPI - 生图广场</title>`)
+		assert.Contains(t, body, `<link rel="apple-touch-icon" href="/custom-logo.png" />`)
+		assert.Contains(t, body, `<link rel="icon" href="/custom-logo.png" />`)
+		assert.NotContains(t, body, `GPT Image Playground`)
+	})
+
+	t.Run("uses_english_page_title_when_document_lang_is_english", func(t *testing.T) {
+		html := []byte(`<!DOCTYPE html><html lang="en"><head><title>Image Playground</title></head><body></body></html>`)
+		settingsJSON := []byte(`{"site_name":"SmartAPI"}`)
+
+		result := injectPlaygroundSettings(html, settingsJSON)
+
+		assert.Contains(t, string(result), `<title>SmartAPI - Image Playground</title>`)
+	})
+}
+
 func TestReplaceNoncePlaceholder(t *testing.T) {
 	t.Run("replaces_single_placeholder", func(t *testing.T) {
 		html := []byte(`<script nonce="__CSP_NONCE_VALUE__">console.log('test');</script>`)
