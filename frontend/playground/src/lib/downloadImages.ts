@@ -108,12 +108,43 @@ export function getImageZipEntries(imageIds: string[], fileNameBase = 'image'): 
 async function getImageBlob(imageIdOrUrl: string): Promise<Blob> {
   let src = imageIdOrUrl
   if (!imageIdOrUrl.startsWith('data:') && !imageIdOrUrl.startsWith('http://') && !imageIdOrUrl.startsWith('https://')) {
-    src = await ensureImageCached(imageIdOrUrl) ?? imageIdOrUrl
+    const cached = await ensureImageCached(imageIdOrUrl)
+    if (!cached) throw new Error(`读取图片失败：${imageIdOrUrl}`)
+    src = cached
   }
 
+  if (src.startsWith('data:')) return dataUrlToBlob(src)
+
   const res = await fetch(src)
-  if (!res.ok && !src.startsWith('data:')) throw new Error(`读取图片失败：${imageIdOrUrl}`)
+  if (!res.ok) throw new Error(`读取图片失败：${imageIdOrUrl}`)
   return await res.blob()
+}
+
+function dataUrlToBlob(dataUrl: string): Blob {
+  const commaIndex = dataUrl.indexOf(',')
+  if (!dataUrl.startsWith('data:') || commaIndex < 0) {
+    throw new Error('无效的图片数据')
+  }
+
+  const meta = dataUrl.slice(5, commaIndex)
+  const mime = meta.split(';')[0] || 'application/octet-stream'
+  const payload = dataUrl.slice(commaIndex + 1)
+
+  if (meta.toLowerCase().split(';').includes('base64')) {
+    let binary = ''
+    try {
+      binary = atob(payload)
+    } catch {
+      binary = atob(decodeURIComponent(payload))
+    }
+    const bytes = new Uint8Array(binary.length)
+    for (let i = 0; i < binary.length; i++) {
+      bytes[i] = binary.charCodeAt(i)
+    }
+    return new Blob([bytes], { type: mime })
+  }
+
+  return new Blob([new TextEncoder().encode(decodeURIComponent(payload))], { type: mime })
 }
 
 function triggerDownload(blob: Blob, fileName: string) {
@@ -138,4 +169,3 @@ function sanitizeFileNamePart(value: string): string {
 function delay(ms: number) {
   return new Promise((resolve) => window.setTimeout(resolve, ms))
 }
-
