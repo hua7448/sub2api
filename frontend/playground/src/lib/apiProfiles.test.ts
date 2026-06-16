@@ -585,6 +585,51 @@ describe('custom providers', () => {
     expect(clamped.profiles[0].streamPartialImages).toBe(3)
   })
 
+  it('preserves sub2api profile mode, model, timeout, and streaming options', () => {
+    const settings = normalizeSettings({
+      profiles: [{
+        id: 'sub2api-default',
+        name: 'sub2api',
+        provider: 'sub2api',
+        baseUrl: 'https://ignored.example.com/v1',
+        apiKey: 'sk-ignored',
+        sub2apiKeyId: 7,
+        model: 'gpt-5.5',
+        timeout: 300,
+        apiMode: 'responses',
+        codexCli: true,
+        apiProxy: true,
+        streamImages: false,
+        streamPartialImages: 3,
+      }],
+    })
+
+    expect(settings).toMatchObject({
+      baseUrl: '',
+      apiKey: '',
+      model: 'gpt-5.5',
+      timeout: 300,
+      apiMode: 'responses',
+      codexCli: false,
+      apiProxy: false,
+      streamImages: false,
+      streamPartialImages: 3,
+    })
+    expect(settings.profiles[0]).toMatchObject({
+      provider: 'sub2api',
+      baseUrl: '',
+      apiKey: '',
+      sub2apiKeyId: 7,
+      model: 'gpt-5.5',
+      timeout: 300,
+      apiMode: 'responses',
+      codexCli: false,
+      apiProxy: false,
+      streamImages: false,
+      streamPartialImages: 3,
+    })
+  })
+
   it('normalizes custom providers to Images API mode', () => {
     const settings = normalizeSettings({
       customProviders: [{ id: 'custom-json', name: 'Custom JSON', submit: { path: 'images/generations' } }],

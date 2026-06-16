@@ -71,9 +71,14 @@ export function selectSub2APIKeyId(profile: ApiProfile): number {
 }
 
 export function applySub2APISettings(settings: AppSettings, remote: Sub2APISettings, keys: Sub2APIEligibleKey[]): AppSettings {
-  const persistedKeyId = Number(settings.profiles?.find((profile) => profile.provider === 'sub2api')?.sub2apiKeyId)
+  const persistedProfile = settings.profiles?.find((profile) => profile.provider === 'sub2api')
+  const persistedKeyId = Number(persistedProfile?.sub2apiKeyId)
   const activeKeyId = keys.some((key) => key.id === persistedKeyId) ? persistedKeyId : keys[0]?.id ?? null
-  const model = remote.default_model || remote.allowed_models[0] || 'gpt-image-2'
+  const apiMode = persistedProfile?.apiMode === 'responses' ? 'responses' : 'images'
+  const persistedModelAllowed = persistedProfile?.model && (
+    remote.allowed_models.length === 0 || remote.allowed_models.includes(persistedProfile.model)
+  )
+  const model = (persistedModelAllowed ? persistedProfile.model : '') || remote.default_model || remote.allowed_models[0] || 'gpt-image-2'
   const profile: ApiProfile = {
     id: 'sub2api-default',
     name: activeKeyId ? `sub2api #${activeKeyId}` : 'sub2api',
@@ -83,12 +88,12 @@ export function applySub2APISettings(settings: AppSettings, remote: Sub2APISetti
     sub2apiKeyId: activeKeyId,
     model,
     timeout: 600,
-    apiMode: 'images',
+    apiMode,
     codexCli: false,
     apiProxy: false,
     responseFormatB64Json: true,
-    streamImages: true,
-    streamPartialImages: 1,
+    streamImages: persistedProfile?.streamImages ?? true,
+    streamPartialImages: persistedProfile?.streamPartialImages ?? 1,
   }
 
   return {

@@ -126,7 +126,7 @@ const TIMEOUT_PARTIAL_IMAGES_LOW_HINT = '也可尝试提高「请求中间步骤
 type TimeoutStreamingHintProfile = Pick<ApiProfile, 'provider' | 'streamImages' | 'streamPartialImages'>
 
 function getTimeoutStreamingHint(profile?: TimeoutStreamingHintProfile | null) {
-  if (profile?.provider !== 'openai') return ''
+  if (profile?.provider !== 'openai' && profile?.provider !== 'sub2api') return ''
   const partialImages = profile.streamPartialImages ?? DEFAULT_SETTINGS.streamPartialImages ?? 0
   if (profile.streamImages !== true) return TIMEOUT_STREAMING_HINT
   if (partialImages === 0) return TIMEOUT_PARTIAL_IMAGES_ZERO_HINT
@@ -1168,7 +1168,9 @@ export const useStore = create<AppState>()(
         const settings = normalizeSettings(state.settings)
         const activeProfile = getActiveApiProfile(settings)
 
-        if (activeProfile.provider === 'openai' && activeProfile.apiMode === 'responses') {
+        const supportsAgentResponses = activeProfile.provider === 'openai' || activeProfile.provider === 'sub2api'
+
+        if (supportsAgentResponses && activeProfile.apiMode === 'responses') {
           const galleryInputDraft = saveGalleryInputDraft(state)
           set((state) => ({
             appMode: 'agent',
@@ -1183,10 +1185,10 @@ export const useStore = create<AppState>()(
           return
         }
 
-        if (activeProfile.provider === 'openai' && activeProfile.apiMode !== 'responses') {
+        if (supportsAgentResponses && activeProfile.apiMode !== 'responses') {
           state.setConfirmDialog({
             title: '需要 Responses API 配置',
-            message: `当前配置「${activeProfile.name}」使用的是 Images API，仅支持生成图片，无 Agent 模式需要的对话能力。\n\n请前往 API 配置页，将当前配置调整为 Responses API，或切换/新建一个支持 Responses API 的配置。`,
+            message: `当前配置「${activeProfile.name}」使用的是 Images API，仅支持直接生成图片，无 Agent 模式需要的对话能力。\n\n请前往 API 配置页，将 API 接口调整为 Responses API，并选择支持 image_generation 工具的文本模型。`,
             confirmText: '去设置',
             cancelText: '取消',
             action: () => {
@@ -1198,7 +1200,7 @@ export const useStore = create<AppState>()(
 
         state.setConfirmDialog({
           title: '配置不支持 Agent 模式',
-          message: `当前配置「${activeProfile.name}」所属的服务商暂不支持 Agent 模式。Agent 模式需要使用支持 Responses API 的 OpenAI 配置。\n\n请前往 API 配置页，切换或新建一个支持 Responses API 的配置。`,
+          message: `当前配置「${activeProfile.name}」所属的服务商暂不支持 Agent 模式。Agent 模式需要使用 sub2api 或 OpenAI 的 Responses API 配置。\n\n请前往 API 配置页，切换或新建一个支持 Responses API 的配置。`,
           confirmText: '去设置',
           cancelText: '取消',
           action: () => {
@@ -1888,7 +1890,7 @@ function getApiRequestNetworkErrorHint(
     if (usesApiProxy) {
       return '提示：请求立即失败，请检查 API 代理服务是否正常运行。'
     }
-    const unsupportedApiHint = profile?.provider === 'openai'
+    const unsupportedApiHint = profile?.provider === 'openai' || profile?.provider === 'sub2api'
       ? `\n· API 不支持 ${getApiModeApiName(profile.apiMode)}`
       : ''
     return `提示：请求立即失败，可能原因：\n· API 服务器不可达或地址有误，请检查 API URL 是否正确、服务是否正常运行${unsupportedApiHint}\n· 接口不支持浏览器跨域请求，可使用 Docker 部署版或本地运行版并配置 API 代理解决`
@@ -3175,7 +3177,7 @@ export async function submitAgentMessage() {
   const normalizedSettings = normalizeSettings(settings)
   const activeProfile = getActiveApiProfile(normalizedSettings)
 
-  if (activeProfile.provider !== 'openai' || activeProfile.apiMode !== 'responses') {
+  if ((activeProfile.provider !== 'openai' && activeProfile.provider !== 'sub2api') || activeProfile.apiMode !== 'responses') {
     state.setAppMode('agent')
     return
   }
@@ -3326,7 +3328,7 @@ export async function regenerateAgentAssistantMessage(conversationId: string, ro
   const normalizedSettings = normalizeSettings(settings)
   const activeProfile = getActiveApiProfile(normalizedSettings)
 
-  if (activeProfile.provider !== 'openai' || activeProfile.apiMode !== 'responses') {
+  if ((activeProfile.provider !== 'openai' && activeProfile.provider !== 'sub2api') || activeProfile.apiMode !== 'responses') {
     state.setAppMode('agent')
     return
   }

@@ -492,12 +492,18 @@ export function normalizeSettings(input: Partial<AppSettings> | unknown): AppSet
   const persistedProfile = Array.isArray(record.profiles) && record.profiles[0] && typeof record.profiles[0] === 'object'
     ? record.profiles[0] as Record<string, unknown>
     : {}
+  const persistedProfileModel = typeof persistedProfile.model === 'string' && persistedProfile.model.trim()
+    ? persistedProfile.model
+    : ''
+  const persistedProfileTimeout = typeof persistedProfile.timeout === 'number' && Number.isFinite(persistedProfile.timeout)
+    ? persistedProfile.timeout
+    : undefined
   const legacyProfile = createDefaultOpenAIProfile({
     baseUrl: '',
     apiKey: '',
     sub2apiKeyId: typeof persistedProfile.sub2apiKeyId === 'number' ? persistedProfile.sub2apiKeyId : null,
-    model: typeof record.model === 'string' && record.model.trim() ? record.model : DEFAULT_IMAGES_MODEL,
-    timeout: typeof record.timeout === 'number' && Number.isFinite(record.timeout) ? record.timeout : DEFAULT_API_TIMEOUT,
+    model: persistedProfileModel || (typeof record.model === 'string' && record.model.trim() ? record.model : DEFAULT_IMAGES_MODEL),
+    timeout: persistedProfileTimeout ?? (typeof record.timeout === 'number' && Number.isFinite(record.timeout) ? record.timeout : DEFAULT_API_TIMEOUT),
     apiMode: legacyApiMode,
     codexCli: false,
     apiProxy: false,
