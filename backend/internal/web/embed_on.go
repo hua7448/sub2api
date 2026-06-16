@@ -97,10 +97,16 @@ func (s *FrontendServer) Middleware() gin.HandlerFunc {
 			cleanPath = "index.html"
 		}
 
-		if strings.HasPrefix(cleanPath, "image-playground/") && !s.fileExists(cleanPath) {
-			c.String(http.StatusNotFound, "Image playground asset not found")
-			c.Abort()
-			return
+		if isImagePlaygroundPath(cleanPath) {
+			if isImagePlaygroundIndexRoute(cleanPath) {
+				s.serveStaticFile(c, "image-playground/index.html")
+				return
+			}
+			if !s.fileExists(cleanPath) {
+				c.String(http.StatusNotFound, "Image playground asset not found")
+				c.Abort()
+				return
+			}
 		}
 
 		// For index.html or SPA routes, serve with injected settings
@@ -115,8 +121,7 @@ func (s *FrontendServer) Middleware() gin.HandlerFunc {
 		}
 
 		// Serve static files normally
-		s.fileServer.ServeHTTP(c.Writer, c.Request)
-		c.Abort()
+		s.serveStaticFile(c, cleanPath)
 	}
 }
 
@@ -127,6 +132,17 @@ func (s *FrontendServer) fileExists(path string) bool {
 	}
 	_ = file.Close()
 	return true
+}
+
+func (s *FrontendServer) serveStaticFile(c *gin.Context, cleanPath string) {
+	if s.tryServeOverride(c, cleanPath) {
+		return
+	}
+	originalPath := c.Request.URL.Path
+	c.Request.URL.Path = "/" + cleanPath
+	s.fileServer.ServeHTTP(c.Writer, c.Request)
+	c.Request.URL.Path = originalPath
+	c.Abort()
 }
 
 // tryServeOverride checks if a local override file exists and serves it.
@@ -272,14 +288,13 @@ func ServeEmbeddedFrontend() gin.HandlerFunc {
 			cleanPath = "index.html"
 		}
 
-		if strings.HasPrefix(cleanPath, "image-playground/") {
-			if file, err := distFS.Open(cleanPath); err == nil {
-				_ = file.Close()
-				if tryServeOverrideFile(c, overrideDir, cleanPath) {
-					return
-				}
-				fileServer.ServeHTTP(c.Writer, c.Request)
-				c.Abort()
+		if isImagePlaygroundPath(cleanPath) {
+			if isImagePlaygroundIndexRoute(cleanPath) {
+				serveStaticFile(c, fileServer, overrideDir, "image-playground/index.html")
+				return
+			}
+			if fileExistsInFS(distFS, cleanPath) {
+				serveStaticFile(c, fileServer, overrideDir, cleanPath)
 				return
 			}
 			c.String(http.StatusNotFound, "Image playground asset not found")
@@ -287,19 +302,45 @@ func ServeEmbeddedFrontend() gin.HandlerFunc {
 			return
 		}
 
-		if file, err := distFS.Open(cleanPath); err == nil {
-			_ = file.Close()
-			// Try local override first
-			if tryServeOverrideFile(c, overrideDir, cleanPath) {
-				return
-			}
-			fileServer.ServeHTTP(c.Writer, c.Request)
-			c.Abort()
+		if fileExistsInFS(distFS, cleanPath) {
+			serveStaticFile(c, fileServer, overrideDir, cleanPath)
 			return
 		}
 
 		serveIndexHTML(c, distFS)
 	}
+}
+
+func isImagePlaygroundPath(cleanPath string) bool {
+	return cleanPath == "image-playground" || strings.HasPrefix(cleanPath, "image-playground/")
+}
+
+func isImagePlaygroundIndexRoute(cleanPath string) bool {
+	if cleanPath == "image-playground" || cleanPath == "image-playground/" || cleanPath == "image-playground/index.html" {
+		return true
+	}
+	rest := strings.TrimPrefix(cleanPath, "image-playground/")
+	return rest != "" && !strings.Contains(filepath.Base(rest), ".")
+}
+
+func fileExistsInFS(distFS fs.FS, cleanPath string) bool {
+	file, err := distFS.Open(cleanPath)
+	if err != nil {
+		return false
+	}
+	_ = file.Close()
+	return true
+}
+
+func serveStaticFile(c *gin.Context, fileServer http.Handler, overrideDir, cleanPath string) {
+	if tryServeOverrideFile(c, overrideDir, cleanPath) {
+		return
+	}
+	originalPath := c.Request.URL.Path
+	c.Request.URL.Path = "/" + cleanPath
+	fileServer.ServeHTTP(c.Writer, c.Request)
+	c.Request.URL.Path = originalPath
+	c.Abort()
 }
 
 // tryServeOverrideFile is a standalone version of tryServeOverride for legacy usage.
