@@ -224,7 +224,8 @@ const routes: RouteRecordRaw[] = [
     meta: {
       requiresAuth: true,
       requiresAdmin: false,
-      title: 'Image Gallery'
+      title: 'Image Playground',
+      titleKey: 'nav.imageGallery'
     }
   },
   {
@@ -566,7 +567,8 @@ const routes: RouteRecordRaw[] = [
     meta: {
       requiresAuth: true,
       requiresAdmin: true,
-      title: 'Image Gallery Management'
+      title: 'Image Playground',
+      titleKey: 'nav.imageGallery'
     }
   },
   {
