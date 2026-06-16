@@ -45,6 +45,8 @@ const (
 	SettingKeyImageGalleryMaxN                  = "image_gallery_max_n"
 	SettingKeyImageGalleryTemplatesEnabled      = "image_gallery_templates_enabled"
 	SettingKeyImageGalleryTemplateImportEnabled = "image_gallery_template_import_enabled"
+	SettingKeyImageGalleryAgentEnabled          = "image_gallery_agent_enabled"
+	SettingKeyImageGalleryAgentWebSearchEnabled = "image_gallery_agent_web_search_enabled"
 )
 
 const (
@@ -86,6 +88,8 @@ type ImageGallerySettings struct {
 	MaxN                  int      `json:"max_n"`
 	TemplatesEnabled      bool     `json:"templates_enabled"`
 	TemplateImportEnabled bool     `json:"template_import_enabled"`
+	AgentEnabled          bool     `json:"agent_enabled"`
+	AgentWebSearchEnabled bool     `json:"agent_web_search_enabled"`
 }
 
 type ImageGalleryTemplate struct {
@@ -376,6 +380,8 @@ func (s *ImageGalleryService) UpdateSettings(ctx context.Context, settings Image
 		SettingKeyImageGalleryMaxN:                  fmt.Sprintf("%d", normalized.MaxN),
 		SettingKeyImageGalleryTemplatesEnabled:      formatBool(normalized.TemplatesEnabled),
 		SettingKeyImageGalleryTemplateImportEnabled: formatBool(normalized.TemplateImportEnabled),
+		SettingKeyImageGalleryAgentEnabled:          formatBool(normalized.AgentEnabled),
+		SettingKeyImageGalleryAgentWebSearchEnabled: formatBool(normalized.AgentWebSearchEnabled),
 	}
 	if err := s.settingRepo.SetMultiple(ctx, values); err != nil {
 		return normalized, err
@@ -424,6 +430,33 @@ func (s *ImageGalleryService) EligibleKeys(ctx context.Context, userID int64) ([
 		})
 	}
 	return out, nil
+}
+
+func (s *ImageGalleryService) ValidateProxyAPIKey(ctx context.Context, userID, apiKeyID int64) (*APIKey, error) {
+	settings, err := s.Settings(ctx)
+	if err != nil {
+		return nil, err
+	}
+	if !settings.Enabled {
+		return nil, ErrImageGalleryDisabled
+	}
+	apiKey, err := s.apiKeyService.GetByID(ctx, apiKeyID)
+	if err != nil {
+		return nil, err
+	}
+	if apiKey.UserID != userID {
+		return nil, ErrImageGalleryForbidden
+	}
+	if apiKey.Key == "" {
+		return nil, infraerrors.BadRequest("IMAGE_GALLERY_KEY_UNAVAILABLE", "api key secret is unavailable")
+	}
+	if !apiKey.IsActive() || apiKey.IsExpired() || apiKey.IsQuotaExhausted() {
+		return nil, infraerrors.Forbidden("IMAGE_GALLERY_KEY_UNAVAILABLE", "api key is unavailable")
+	}
+	if !GroupAllowsImageGeneration(apiKey.Group) {
+		return nil, infraerrors.Forbidden("IMAGE_GALLERY_IMAGE_NOT_ALLOWED", ImageGenerationPermissionMessage())
+	}
+	return apiKey, nil
 }
 
 func (s *ImageGalleryService) Generate(ctx context.Context, userID int64, req ImageGalleryGenerateRequest) (*ImageGalleryGenerateResult, error) {
@@ -858,8 +891,10 @@ func DefaultImageGallerySettings() ImageGallerySettings {
 		AllowedQuality:        []string{"auto", "low", "medium", "high"},
 		AllowedOutputFormats:  []string{"png", "jpeg", "webp"},
 		MaxN:                  4,
-		TemplatesEnabled:      true,
+		TemplatesEnabled:      false,
 		TemplateImportEnabled: false,
+		AgentEnabled:          true,
+		AgentWebSearchEnabled: false,
 	}
 }
 
@@ -881,6 +916,8 @@ func imageGallerySettingKeys() []string {
 		SettingKeyImageGalleryMaxN,
 		SettingKeyImageGalleryTemplatesEnabled,
 		SettingKeyImageGalleryTemplateImportEnabled,
+		SettingKeyImageGalleryAgentEnabled,
+		SettingKeyImageGalleryAgentWebSearchEnabled,
 	}
 }
 
@@ -902,6 +939,8 @@ func parseImageGallerySettings(values map[string]string) ImageGallerySettings {
 	defaults.MaxN = parseIntSetting(values[SettingKeyImageGalleryMaxN], defaults.MaxN)
 	defaults.TemplatesEnabled = parseBoolSetting(values[SettingKeyImageGalleryTemplatesEnabled], defaults.TemplatesEnabled)
 	defaults.TemplateImportEnabled = parseBoolSetting(values[SettingKeyImageGalleryTemplateImportEnabled], defaults.TemplateImportEnabled)
+	defaults.AgentEnabled = parseBoolSetting(values[SettingKeyImageGalleryAgentEnabled], defaults.AgentEnabled)
+	defaults.AgentWebSearchEnabled = parseBoolSetting(values[SettingKeyImageGalleryAgentWebSearchEnabled], defaults.AgentWebSearchEnabled)
 	return normalizeImageGallerySettings(defaults)
 }
 
@@ -940,6 +979,13 @@ func normalizeImageGallerySettings(settings ImageGallerySettings) ImageGallerySe
 	if settings.MaxN <= 0 {
 		settings.MaxN = defaults.MaxN
 	}
+	if !settings.AgentEnabled {
+		settings.AgentWebSearchEnabled = false
+	}
+	settings.PublicEnabled = false
+	settings.PublishRequiresReview = false
+	settings.TemplatesEnabled = false
+	settings.TemplateImportEnabled = false
 	settings.AllowedModels = cleanStringSlice(settings.AllowedModels)
 	settings.AllowedSizes = cleanStringSlice(settings.AllowedSizes)
 	settings.AllowedQuality = cleanStringSlice(settings.AllowedQuality)

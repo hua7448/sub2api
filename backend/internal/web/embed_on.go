@@ -97,6 +97,12 @@ func (s *FrontendServer) Middleware() gin.HandlerFunc {
 			cleanPath = "index.html"
 		}
 
+		if strings.HasPrefix(cleanPath, "image-playground/") && !s.fileExists(cleanPath) {
+			c.String(http.StatusNotFound, "Image playground asset not found")
+			c.Abort()
+			return
+		}
+
 		// For index.html or SPA routes, serve with injected settings
 		if cleanPath == "index.html" || !s.fileExists(cleanPath) {
 			s.serveIndexHTML(c)
@@ -264,6 +270,21 @@ func ServeEmbeddedFrontend() gin.HandlerFunc {
 		cleanPath := strings.TrimPrefix(path, "/")
 		if cleanPath == "" {
 			cleanPath = "index.html"
+		}
+
+		if strings.HasPrefix(cleanPath, "image-playground/") {
+			if file, err := distFS.Open(cleanPath); err == nil {
+				_ = file.Close()
+				if tryServeOverrideFile(c, overrideDir, cleanPath) {
+					return
+				}
+				fileServer.ServeHTTP(c.Writer, c.Request)
+				c.Abort()
+				return
+			}
+			c.String(http.StatusNotFound, "Image playground asset not found")
+			c.Abort()
+			return
 		}
 
 		if file, err := distFS.Open(cleanPath); err == nil {

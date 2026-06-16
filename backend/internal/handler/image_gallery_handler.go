@@ -1,7 +1,9 @@
 package handler
 
 import (
+	"errors"
 	"strconv"
+	"strings"
 
 	"github.com/Wei-Shaw/sub2api/internal/pkg/pagination"
 	"github.com/Wei-Shaw/sub2api/internal/pkg/response"
@@ -11,11 +13,13 @@ import (
 )
 
 type ImageGalleryHandler struct {
-	service *service.ImageGalleryService
+	service             *service.ImageGalleryService
+	openAIGateway       *OpenAIGatewayHandler
+	subscriptionService *service.SubscriptionService
 }
 
-func NewImageGalleryHandler(service *service.ImageGalleryService) *ImageGalleryHandler {
-	return &ImageGalleryHandler{service: service}
+func NewImageGalleryHandler(service *service.ImageGalleryService, openAIGateway *OpenAIGatewayHandler, subscriptionService *service.SubscriptionService) *ImageGalleryHandler {
+	return &ImageGalleryHandler{service: service, openAIGateway: openAIGateway, subscriptionService: subscriptionService}
 }
 
 func (h *ImageGalleryHandler) Settings(c *gin.Context) {
@@ -39,6 +43,97 @@ func (h *ImageGalleryHandler) EligibleKeys(c *gin.Context) {
 		return
 	}
 	response.Success(c, keys)
+}
+
+func (h *ImageGalleryHandler) ProxyImagesGenerations(c *gin.Context) {
+	h.proxyOpenAI(c, "/v1/images/generations", h.openAIGateway.Images)
+}
+
+func (h *ImageGalleryHandler) ProxyImagesEdits(c *gin.Context) {
+	h.proxyOpenAI(c, "/v1/images/edits", h.openAIGateway.Images)
+}
+
+func (h *ImageGalleryHandler) ProxyResponses(c *gin.Context) {
+	h.proxyOpenAI(c, "/v1/responses", h.openAIGateway.Responses)
+}
+
+func (h *ImageGalleryHandler) proxyOpenAI(c *gin.Context, path string, handler func(*gin.Context)) {
+	if h.openAIGateway == nil {
+		response.Error(c, 500, "OpenAI gateway is unavailable")
+		return
+	}
+	subject, ok := middleware2.GetAuthSubjectFromContext(c)
+	if !ok {
+		response.Unauthorized(c, "User not authenticated")
+		return
+	}
+	apiKeyID, ok := parseProxyAPIKeyID(c)
+	if !ok {
+		return
+	}
+	apiKey, err := h.service.ValidateProxyAPIKey(c.Request.Context(), subject.UserID, apiKeyID)
+	if err != nil {
+		response.ErrorFrom(c, err)
+		return
+	}
+	subscription, ok := h.proxySubscription(c, apiKey)
+	if !ok {
+		return
+	}
+
+	c.Request.URL.Path = path
+	c.Request.RequestURI = path
+	c.Request.Header.Del("Authorization")
+	c.Request.Header.Del("Proxy-Authorization")
+	c.Request.Header.Del("X-Api-Key")
+	c.Request.Header.Del("X-Goog-Api-Key")
+	middleware2.SetAuthenticatedAPIKeyContext(c, apiKey, subscription)
+	handler(c)
+}
+
+func (h *ImageGalleryHandler) proxySubscription(c *gin.Context, apiKey *service.APIKey) (*service.UserSubscription, bool) {
+	if apiKey == nil || apiKey.Group == nil || apiKey.User == nil || !apiKey.Group.IsSubscriptionType() {
+		return nil, true
+	}
+	if h.subscriptionService == nil {
+		response.Error(c, 403, "No active subscription found for this group")
+		return nil, false
+	}
+	subscription, err := h.subscriptionService.GetActiveSubscription(c.Request.Context(), apiKey.User.ID, apiKey.Group.ID)
+	if err != nil {
+		response.Error(c, 403, "No active subscription found for this group")
+		return nil, false
+	}
+	needsMaintenance, err := h.subscriptionService.ValidateAndCheckLimits(subscription, apiKey.Group)
+	if err != nil {
+		status := 403
+		if errors.Is(err, service.ErrDailyLimitExceeded) ||
+			errors.Is(err, service.ErrWeeklyLimitExceeded) ||
+			errors.Is(err, service.ErrMonthlyLimitExceeded) {
+			status = 429
+		}
+		response.Error(c, status, err.Error())
+		return nil, false
+	}
+	if needsMaintenance {
+		maintenanceCopy := *subscription
+		h.subscriptionService.DoWindowMaintenance(&maintenanceCopy)
+	}
+	return subscription, true
+}
+
+func parseProxyAPIKeyID(c *gin.Context) (int64, bool) {
+	raw := strings.TrimSpace(c.GetHeader("X-Sub2API-Key-ID"))
+	if raw == "" {
+		response.BadRequest(c, "X-Sub2API-Key-ID header is required")
+		return 0, false
+	}
+	id, err := strconv.ParseInt(raw, 10, 64)
+	if err != nil || id <= 0 {
+		response.BadRequest(c, "Invalid X-Sub2API-Key-ID header")
+		return 0, false
+	}
+	return id, true
 }
 
 func (h *ImageGalleryHandler) Templates(c *gin.Context) {

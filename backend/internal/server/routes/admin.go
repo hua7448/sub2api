@@ -136,16 +136,6 @@ func registerImageGalleryRoutes(admin *gin.RouterGroup, h *handler.Handlers) {
 	{
 		gallery.GET("/settings", h.Admin.ImageGallery.GetSettings)
 		gallery.PUT("/settings", h.Admin.ImageGallery.UpdateSettings)
-		gallery.GET("/items", h.Admin.ImageGallery.Items)
-		gallery.POST("/items/:id/approve", h.Admin.ImageGallery.Approve)
-		gallery.POST("/items/:id/reject", h.Admin.ImageGallery.Reject)
-		gallery.POST("/items/:id/hide", h.Admin.ImageGallery.Hide)
-		gallery.DELETE("/items/:id", h.Admin.ImageGallery.Delete)
-		gallery.GET("/templates", h.Admin.ImageGallery.Templates)
-		gallery.POST("/templates/import", h.Admin.ImageGallery.ImportTemplates)
-		gallery.PATCH("/templates/:id", h.Admin.ImageGallery.UpdateTemplate)
-		gallery.GET("/storage/stats", h.Admin.ImageGallery.StorageStats)
-		gallery.POST("/storage/cleanup", h.Admin.ImageGallery.Cleanup)
 	}
 }
 

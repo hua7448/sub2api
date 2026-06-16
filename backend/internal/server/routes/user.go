@@ -15,14 +15,6 @@ func RegisterUserRoutes(
 	jwtAuth middleware.JWTAuthMiddleware,
 	settingService *service.SettingService,
 ) {
-	publicGallery := v1.Group("/image-gallery")
-	{
-		publicGallery.GET("/settings", h.ImageGallery.Settings)
-		publicGallery.GET("/templates", h.ImageGallery.Templates)
-		publicGallery.GET("/public", h.ImageGallery.Public)
-		publicGallery.GET("/assets/:id", h.ImageGallery.Asset)
-	}
-
 	authenticated := v1.Group("")
 	authenticated.Use(gin.HandlerFunc(jwtAuth))
 	authenticated.Use(middleware.BackendModeUserGuard(settingService))
@@ -134,13 +126,18 @@ func RegisterUserRoutes(
 		imageGallery := authenticated.Group("/image-gallery")
 		{
 			imageGallery.GET("/eligible-keys", h.ImageGallery.EligibleKeys)
-			imageGallery.POST("/generations", h.ImageGallery.Generate)
-			imageGallery.GET("/jobs/:id", h.ImageGallery.Job)
-			imageGallery.GET("/history", h.ImageGallery.History)
-			imageGallery.PATCH("/items/:id", h.ImageGallery.UpdateItem)
-			imageGallery.DELETE("/items/:id", h.ImageGallery.DeleteItem)
-			imageGallery.POST("/items/:id/publish", h.ImageGallery.Publish)
-			imageGallery.POST("/public/:id/favorite", h.ImageGallery.Favorite)
+		}
+
+		imagePlayground := authenticated.Group("/image-playground")
+		{
+			imagePlayground.GET("/settings", h.ImageGallery.Settings)
+			imagePlayground.GET("/eligible-keys", h.ImageGallery.EligibleKeys)
+			proxy := imagePlayground.Group("/proxy")
+			{
+				proxy.POST("/images/generations", h.ImageGallery.ProxyImagesGenerations)
+				proxy.POST("/images/edits", h.ImageGallery.ProxyImagesEdits)
+				proxy.POST("/responses", h.ImageGallery.ProxyResponses)
+			}
 		}
 	}
 }
