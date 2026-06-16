@@ -4,6 +4,7 @@ import { useTooltip } from '../hooks/useTooltip'
 import Select from './Select'
 import { ChevronLeftIcon, CollectionManageIcon, FavoriteIcon, TrashIcon } from './icons'
 import ViewportTooltip from './ViewportTooltip'
+import { hostText } from '../lib/sub2apiHost'
 
 function SearchActionButton({
   tooltip,
@@ -69,7 +70,11 @@ export default function SearchBar() {
   const setConfirmDialog = useStore((s) => s.setConfirmDialog)
   const inCollectionOverview = filterFavorite && !activeFavoriteCollectionId
   const isFailedFilter = filterStatus === 'error'
-  const favoriteTooltip = activeFavoriteCollectionId ? '返回收藏夹' : filterFavorite ? '退出收藏夹' : '收藏夹'
+  const favoriteTooltip = activeFavoriteCollectionId
+    ? hostText('返回收藏夹', 'Back to collections')
+    : filterFavorite
+    ? hostText('退出收藏夹', 'Exit collections')
+    : hostText('收藏夹', 'Collections')
 
   useEffect(() => {
     const handleDocumentMouseDown = (event: MouseEvent) => {
@@ -113,10 +118,13 @@ export default function SearchBar() {
     if (failedTaskCount === 0) return
 
     setConfirmDialog({
-      title: '清除失败记录',
-      message: `确定清除筛选范围内的失败记录吗？\n纯失败任务会被删除；部分失败任务只会清除失败标记，保留已成功图片。共 ${failedTaskCount} 条记录。`,
-      confirmText: '清除',
-      cancelText: '取消',
+      title: hostText('清除失败记录', 'Clear failed records'),
+      message: hostText(
+        `确定清除筛选范围内的失败记录吗？\n纯失败任务会被删除；部分失败任务只会清除失败标记，保留已成功图片。共 ${failedTaskCount} 条记录。`,
+        `Clear failed records in the current filter?\nFully failed tasks will be deleted; partially failed tasks keep successful images and only remove failure markers. Total: ${failedTaskCount}.`,
+      ),
+      confirmText: hostText('清除', 'Clear'),
+      cancelText: hostText('取消', 'Cancel'),
       tone: 'danger',
       action: () => clearFailedTasks(failedTaskIds),
     })
@@ -144,7 +152,7 @@ export default function SearchBar() {
         </SearchActionButton>
         {inCollectionOverview && (
           <SearchActionButton
-            tooltip="管理收藏夹"
+            tooltip={hostText('管理收藏夹', 'Manage collections')}
             onClick={openManageCollectionsModal}
             className="p-2.5 rounded-xl border border-gray-200 dark:border-white/[0.08] bg-white dark:bg-gray-900 text-gray-400 hover:bg-gray-50 dark:hover:bg-white/[0.06] transition-all"
           >
@@ -158,10 +166,10 @@ export default function SearchBar() {
                 value={filterStatus}
                 onChange={handleStatusChange}
                 options={[
-                  { label: '全部', value: 'all' },
-                  { label: '已完成', value: 'done' },
-                  { label: '生成中', value: 'running' },
-                  { label: '失败', value: 'error' },
+                  { label: hostText('全部', 'All'), value: 'all' },
+                  { label: hostText('已完成', 'Done'), value: 'done' },
+                  { label: hostText('生成中', 'Running'), value: 'running' },
+                  { label: hostText('失败', 'Failed'), value: 'error' },
                 ]}
                 className="px-3 py-2.5 rounded-xl border border-gray-200 dark:border-white/[0.08] bg-white dark:bg-gray-900 hover:bg-gray-50 dark:hover:bg-white/[0.06] text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/30 focus:border-blue-400 transition"
               />
@@ -171,8 +179,8 @@ export default function SearchBar() {
                 type="button"
                 onClick={handleClearFailed}
                 disabled={failedCount === 0}
-                title={failedCount > 0 ? `清除 ${failedCount} 条失败记录` : '没有失败记录'}
-                aria-label={failedCount > 0 ? `清除 ${failedCount} 条失败记录` : '没有失败记录'}
+                title={failedCount > 0 ? hostText(`清除 ${failedCount} 条失败记录`, `Clear ${failedCount} failed records`) : hostText('没有失败记录', 'No failed records')}
+                aria-label={failedCount > 0 ? hostText(`清除 ${failedCount} 条失败记录`, `Clear ${failedCount} failed records`) : hostText('没有失败记录', 'No failed records')}
                 className="flex h-[42px] w-[42px] shrink-0 items-center justify-center rounded-xl border border-gray-200 bg-white text-gray-400 transition-all hover:bg-gray-50 hover:text-gray-600 focus:outline-none focus:ring-2 focus:ring-blue-500/30 disabled:cursor-not-allowed disabled:opacity-55 disabled:hover:bg-white disabled:hover:text-gray-400 dark:border-white/[0.08] dark:bg-gray-900 dark:text-gray-500 dark:hover:bg-white/[0.06] dark:hover:text-gray-300 dark:disabled:hover:bg-gray-900 dark:disabled:hover:text-gray-500"
               >
                 <TrashIcon className="h-[18px] w-[18px]" />
@@ -200,7 +208,7 @@ export default function SearchBar() {
           value={searchQuery}
           onChange={(e) => setSearchQuery(e.target.value)}
           type="text"
-          placeholder={inCollectionOverview ? '搜索收藏夹名称...' : '搜索提示词、参数...'}
+          placeholder={inCollectionOverview ? hostText('搜索收藏夹名称...', 'Search collection names...') : hostText('搜索提示词、参数...', 'Search prompts and parameters...')}
           className="w-full pl-10 pr-4 py-2.5 rounded-xl border border-gray-200 dark:border-white/[0.08] bg-white dark:bg-gray-900 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/30 focus:border-blue-400 transition"
         />
       </div>

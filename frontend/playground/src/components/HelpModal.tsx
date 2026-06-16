@@ -1,8 +1,9 @@
-import { useState, useEffect, useRef } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 import type { AppMode } from '../types'
 import { useCloseOnEscape } from '../hooks/useCloseOnEscape'
 import { usePreventBackgroundScroll } from '../hooks/usePreventBackgroundScroll'
+import { hostText } from '../lib/sub2apiHost'
 
 interface HelpModalProps {
   appMode: AppMode
@@ -20,12 +21,31 @@ function useIsMobile() {
   return isMobile
 }
 
+function HelpList({ items }: { items: string[] }) {
+  return (
+    <ul className="list-disc space-y-2 pl-4">
+      {items.map((item) => (
+        <li key={item}>{item}</li>
+      ))}
+    </ul>
+  )
+}
+
 export default function HelpModal({ appMode, isFavoriteCollectionOverview = false, onClose }: HelpModalProps) {
   const isMobile = useIsMobile()
   const modalRef = useRef<HTMLDivElement>(null)
   const isAgentMode = appMode === 'agent'
   useCloseOnEscape(true, onClose)
   usePreventBackgroundScroll(true, modalRef)
+
+  const selectionItems = isMobile
+    ? [hostText('在卡片上左右滑动即可选中或取消选中。', 'Swipe left or right on cards to select or unselect them.')]
+    : [
+        hostText('在空白处拖拽框选卡片。', 'Drag on empty space to box-select cards.'),
+        hostText('按住 Ctrl 或 Command 并点击卡片，可添加或移除单项。', 'Hold Ctrl or Command and click a card to add or remove one item.'),
+        hostText('再次框选已选中的卡片会将其取消选中。', 'Box-selecting selected cards again unselects them.'),
+        hostText('点击卡片外空白处可取消所有选择。', 'Click empty space outside cards to clear the selection.'),
+      ]
 
   return createPortal(
     <div
@@ -36,140 +56,67 @@ export default function HelpModal({ appMode, isFavoriteCollectionOverview = fals
       <div className="absolute inset-0 bg-black/30 backdrop-blur-sm animate-overlay-in" />
       <div
         ref={modalRef}
-        className="relative z-10 w-full max-w-md rounded-3xl border border-white/50 bg-white/95 p-5 shadow-2xl ring-1 ring-black/5 animate-modal-in dark:border-white/[0.08] dark:bg-gray-900/95 dark:ring-white/10 flex flex-col max-h-[85vh] custom-scrollbar"
-        onClick={(e) => e.stopPropagation()}
+        className="relative z-10 flex max-h-[85vh] w-full max-w-md flex-col rounded-2xl border border-amber-200/80 bg-stone-50/95 p-5 shadow-2xl ring-1 ring-amber-900/5 animate-modal-in dark:border-amber-400/20 dark:bg-stone-950/95 dark:ring-white/10"
+        onClick={(event) => event.stopPropagation()}
       >
         <div className="mb-5 flex items-center justify-between gap-4">
-          <h3 className="text-base font-semibold text-gray-800 dark:text-gray-100 flex items-center gap-2">
-            <svg className="w-5 h-5 text-blue-500" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" viewBox="0 0 24 24">
+          <h3 className="flex items-center gap-2 text-base font-semibold text-stone-800 dark:text-stone-100">
+            <svg className="h-5 w-5 text-orange-500" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" viewBox="0 0 24 24">
               <circle cx="12" cy="12" r="10" />
               <path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3" />
               <path d="M12 17h.01" />
             </svg>
-            操作指南
+            {hostText('操作指南', 'Help')}
           </h3>
-          <div className="flex items-center gap-3">
-            <button
-              onClick={onClose}
-              className="rounded-full p-1 text-gray-400 transition hover:bg-gray-100 hover:text-gray-600 dark:hover:bg-white/[0.06] dark:hover:text-gray-200"
-              aria-label="关闭"
-            >
-              <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-              </svg>
-            </button>
-          </div>
+          <button
+            onClick={onClose}
+            className="rounded-full p-1 text-stone-400 transition hover:bg-amber-50 hover:text-stone-700 dark:hover:bg-white/[0.06] dark:hover:text-stone-200"
+            aria-label={hostText('关闭', 'Close')}
+          >
+            <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+            </svg>
+          </button>
         </div>
 
-        <div className="flex-1 overflow-y-auto overscroll-contain mb-6 text-sm text-gray-600 dark:text-gray-300 space-y-6 custom-scrollbar pr-2">
+        <div className="custom-scrollbar mb-2 flex-1 space-y-6 overflow-y-auto overscroll-contain pr-2 text-sm leading-6 text-stone-600 dark:text-stone-300">
           {isAgentMode ? (
-            <>
-              <section>
-                <div className="space-y-4">
-                  <ul className="list-disc pl-4 space-y-2">
-                    <li>需要使用 Responses API 配置。</li>
-                    <li>如需 Agent 搜索互联网或读取 URL 内容，可在设置的 Agent 配置中开启“网络搜索”。</li>
-                    <li>输入 <strong className="text-blue-500 dark:text-blue-400 font-medium">@</strong> 可引用参考图或前面轮次生成的图片；Agent 也会自行参考上下文中的图片。</li>
-                    <li>编辑某轮消息重新发送，或重新生成某轮消息，会产生可切换的分支。</li>
-                    <li>生成的图片会同步到画廊；删除对话默认不会删除画廊中的任务。</li>
-                  </ul>
-                </div>
-              </section>
-            </>
-          ) : isFavoriteCollectionOverview ? (
-            <>
-              <section>
-                <h4 className="mb-4 text-sm font-medium text-gray-800 dark:text-gray-200 flex items-center gap-1.5">
-                  <svg className="w-4 h-4 text-gray-400 dark:text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h7" />
-                  </svg>
-                  多选收藏夹
-                </h4>
-                <div className="space-y-4">
-                  {isMobile ? (
-                    <p>在收藏夹卡片上<strong className="text-blue-500 dark:text-blue-400 font-medium">左右滑动</strong>即可选中或取消选中该卡片。</p>
-                  ) : (
-                    <ul className="list-disc pl-4 space-y-2">
-                      <li>使用鼠标在空白处<strong className="text-blue-500 dark:text-blue-400 font-medium">拖拽框选</strong>收藏夹卡片。</li>
-                      <li>按住 <kbd className="px-1.5 py-0.5 rounded-md bg-gray-100 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 text-xs font-sans">Ctrl</kbd> 或 <kbd className="px-1.5 py-0.5 rounded-md bg-gray-100 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 text-xs font-sans">⌘</kbd> 并点击卡片，可添加或移除单项。</li>
-                      <li>再次框选已选中的卡片会将其取消选中。</li>
-                      <li>点击卡片外任意空白处可取消所有选择。</li>
-                    </ul>
-                  )}
-                </div>
-              </section>
-              <section>
-                <h4 className="mb-4 text-sm font-medium text-gray-800 dark:text-gray-200 flex items-center gap-1.5">
-                  <svg className="w-4 h-4 text-gray-400 dark:text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-                  </svg>
-                  批量操作
-                </h4>
-                <div className="space-y-4">
-                  <p>选中一个或多个收藏夹后，页面底部会出现操作栏，支持<strong className="text-gray-500 dark:text-gray-400 font-medium">取消选择</strong>、<strong className="text-blue-500 dark:text-blue-400 font-medium">全选收藏夹</strong>、<strong className="text-purple-500 dark:text-purple-400 font-medium">反选收藏夹</strong>、<strong className="text-green-500 dark:text-green-400 font-medium">下载选中</strong>，和<strong className="text-red-500 dark:text-red-400 font-medium">删除选中</strong>。</p>
-                </div>
-              </section>
-            </>
-          ) : isMobile ? (
-            <>
-              <section>
-                <h4 className="mb-4 text-sm font-medium text-gray-800 dark:text-gray-200 flex items-center gap-1.5">
-                  <svg className="w-4 h-4 text-gray-400 dark:text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h7" />
-                  </svg>
-                  多选任务
-                </h4>
-                <div className="space-y-4">
-                  <p>在历史任务卡片上<strong className="text-blue-500 dark:text-blue-400 font-medium">左右滑动</strong>即可选中或取消选中该卡片。</p>
-                </div>
-              </section>
-              <section>
-                <h4 className="mb-4 text-sm font-medium text-gray-800 dark:text-gray-200 flex items-center gap-1.5">
-                  <svg className="w-4 h-4 text-gray-400 dark:text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-                  </svg>
-                  批量操作
-                </h4>
-                <div className="space-y-4">
-                  <p>选中一个或多个任务后，页面底部会出现操作栏，支持<strong className="text-gray-500 dark:text-gray-400 font-medium">取消选择</strong>、<strong className="text-blue-500 dark:text-blue-400 font-medium">全选任务</strong>、<strong className="text-purple-500 dark:text-purple-400 font-medium">反选任务</strong>、<strong className="text-yellow-500 dark:text-yellow-400 font-medium">编辑收藏夹</strong>、<strong className="text-green-500 dark:text-green-400 font-medium">下载选中</strong>，和<strong className="text-red-500 dark:text-red-400 font-medium">删除选中</strong>。</p>
-                </div>
-              </section>
-            </>
+            <section>
+              <HelpList
+                items={[
+                  hostText('Agent 模式需要使用 Responses API 配置。', 'Agent mode requires a Responses API configuration.'),
+                  hostText('如需联网搜索，可在设置的 Agent 配置中开启网络搜索。', 'Enable web search in Agent settings when internet search is needed.'),
+                  hostText('输入 @ 可引用参考图或前面轮次生成的图片。', 'Type @ to reference uploaded images or images from earlier rounds.'),
+                  hostText('编辑或重新生成某轮消息会产生可切换的分支。', 'Editing or regenerating a round creates switchable branches.'),
+                  hostText('生成的图片会同步到画廊；删除对话默认不会删除画廊任务。', 'Generated images are synced to Gallery; deleting a conversation does not delete gallery tasks by default.'),
+                ]}
+              />
+            </section>
           ) : (
             <>
               <section>
-                <h4 className="mb-4 text-sm font-medium text-gray-800 dark:text-gray-200 flex items-center gap-1.5">
-                  <svg className="w-4 h-4 text-gray-400 dark:text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h7" />
-                  </svg>
-                  多选任务
+                <h4 className="mb-3 text-sm font-semibold text-stone-800 dark:text-stone-100">
+                  {isFavoriteCollectionOverview
+                    ? hostText('多选收藏夹', 'Multi-select collections')
+                    : hostText('多选任务', 'Multi-select tasks')}
                 </h4>
-                <div className="space-y-4">
-                  <ul className="list-disc pl-4 space-y-2">
-                    <li>使用鼠标在空白处<strong className="text-blue-500 dark:text-blue-400 font-medium">拖拽框选</strong>。</li>
-                    <li>按住 <kbd className="px-1.5 py-0.5 rounded-md bg-gray-100 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 text-xs font-sans">Ctrl</kbd> 或 <kbd className="px-1.5 py-0.5 rounded-md bg-gray-100 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 text-xs font-sans">⌘</kbd> 并点击卡片，可添加或移除单项。</li>
-                    <li>再次框选已选中的卡片会将其取消选中。</li>
-                    <li>点击卡片外任意空白处可取消所有选择。</li>
-                  </ul>
-                </div>
+                <HelpList items={selectionItems} />
               </section>
               <section>
-                <h4 className="mb-4 text-sm font-medium text-gray-800 dark:text-gray-200 flex items-center gap-1.5">
-                  <svg className="w-4 h-4 text-gray-400 dark:text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-                  </svg>
-                  批量操作
+                <h4 className="mb-3 text-sm font-semibold text-stone-800 dark:text-stone-100">
+                  {hostText('批量操作', 'Batch actions')}
                 </h4>
-                <div className="space-y-4">
-                  <p>选中一个或多个任务后，页面底部会出现操作栏，支持<strong className="text-gray-500 dark:text-gray-400 font-medium">取消选择</strong>、<strong className="text-blue-500 dark:text-blue-400 font-medium">全选任务</strong>、<strong className="text-purple-500 dark:text-purple-400 font-medium">反选任务</strong>、<strong className="text-yellow-500 dark:text-yellow-400 font-medium">编辑收藏夹</strong>、<strong className="text-green-500 dark:text-green-400 font-medium">下载选中</strong>，和<strong className="text-red-500 dark:text-red-400 font-medium">删除选中</strong>。</p>
-                </div>
+                <p>
+                  {isFavoriteCollectionOverview
+                    ? hostText('选中一个或多个收藏夹后，底部操作栏支持取消选择、全选、反选、下载选中和删除选中。', 'After selecting one or more collections, the bottom bar supports clear selection, select all, invert, download selected, and delete selected.')
+                    : hostText('选中一个或多个任务后，底部操作栏支持取消选择、全选、反选、编辑收藏夹、下载选中和删除选中。', 'After selecting one or more tasks, the bottom bar supports clear selection, select all, invert, edit collections, download selected, and delete selected.')}
+                </p>
               </section>
             </>
           )}
         </div>
-
       </div>
     </div>,
-    document.body
+    document.body,
   )
 }

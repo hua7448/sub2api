@@ -12,6 +12,8 @@ import { downloadImageEntriesAsZip, downloadImageIds, getImageZipEntries } from 
 import { isAgentTaskPromptPending } from '../lib/taskPromptDisplay'
 import { replaceImageMentionsForApi } from '../lib/promptImageMentions'
 import { CloseIcon, CodeIcon, CopyIcon, DownloadIcon, EditIcon, LinkIcon, TrashIcon } from './icons'
+import { getCachedSub2APIEligibleKeys } from '../lib/sub2api'
+import { hostText } from '../lib/sub2apiHost'
 
 import ViewportTooltip from './ViewportTooltip'
 
@@ -251,9 +253,21 @@ export default function DetailModal() {
   const taskProvider = task.apiProvider
   const isOpenAiTask = (taskProvider ?? 'openai') === 'openai'
   const showPromptWarning = Boolean(isOpenAiTask && task.apiMode === 'responses' && currentOutputImageId && (!currentRevisedPrompt || showRevisedPrompt) && !hasHandledPromptWarning)
-  const taskProviderName = taskProvider === 'fal' ? 'fal.ai' : taskProvider ? 'OpenAI' : '未知'
-  const taskProfileName = task.apiProfileName || '未知'
-  const taskModel = task.apiModel || '未知'
+  const sub2apiKeyIdMatch = task.apiProfileName?.match(/^sub2api #(\d+)$/)
+  const sub2apiKeyName = sub2apiKeyIdMatch
+    ? getCachedSub2APIEligibleKeys().find((key) => key.id === Number(sub2apiKeyIdMatch[1]))?.name
+    : ''
+  const taskProviderName = taskProvider === 'fal'
+    ? 'fal.ai'
+    : taskProvider === 'sub2api'
+    ? 'Sub2API'
+    : taskProvider
+    ? 'OpenAI'
+    : hostText('未知', 'Unknown')
+  const taskProfileName = taskProvider === 'sub2api'
+    ? sub2apiKeyName || task.apiProfileName?.replace(/^sub2api #(\d+)$/, 'API Key #$1') || hostText('API Key', 'API Key')
+    : task.apiProfileName || hostText('未知', 'Unknown')
+  const taskModel = task.apiModel || hostText('未知', 'Unknown')
   const showSourceInfo = Boolean(task.apiProvider || task.apiProfileName || task.apiModel)
   const isFalReconnecting = task.status === 'error' && task.falRecoverable
   const isCustomReconnecting = task.status === 'error' && task.customRecoverable
@@ -956,7 +970,7 @@ export default function DetailModal() {
             </h3>
             {showSourceInfo && (
               <div className="mb-2 rounded-lg bg-gray-50 px-3 py-2 text-xs dark:bg-white/[0.03]">
-                <span className="text-gray-400 dark:text-gray-500">来源</span>
+                <span className="text-gray-400 dark:text-gray-500">{hostText('来源', 'Source')}</span>
                 <br />
                 <span className="font-medium text-gray-700 dark:text-gray-200">{taskProviderName}</span>
                 <span className="text-gray-400 dark:text-gray-500"> · {taskProfileName} · {taskModel}</span>

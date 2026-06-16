@@ -15,10 +15,12 @@ import ConfirmDialog from './components/ConfirmDialog'
 import Toast from './components/Toast'
 import MaskEditorModal from './components/MaskEditorModal'
 import ImageContextMenu from './components/ImageContextMenu'
+import LoginRequiredDialog from './components/LoginRequiredDialog'
 import { FavoriteCollectionPickerModal, FavoriteCollectionsView, ManageCollectionsModal } from './components/FavoriteCollections'
 import { useGlobalClickSuppression } from './lib/clickSuppression'
 import { applySub2APISettings, fetchSub2APIEligibleKeys, fetchSub2APISettings } from './lib/sub2api'
-import { applyHostDocumentChrome, subscribeHostLocaleChange } from './lib/sub2apiHost'
+import { applyHostDocumentChrome } from './lib/sub2apiHost'
+import { subscribePlaygroundLocaleChange, translateStaticUi } from './lib/playgroundI18n'
 
 export default function App() {
   const setSettings = useStore((s) => s.setSettings)
@@ -26,16 +28,22 @@ export default function App() {
   const filterFavorite = useStore((s) => s.filterFavorite)
   const activeFavoriteCollectionId = useStore((s) => s.activeFavoriteCollectionId)
   const [, setHostLocaleVersion] = useState(0)
+  const [loginRequired, setLoginRequired] = useState(false)
   useGlobalClickSuppression()
 
   useEffect(() => {
     const updateHostChrome = () => {
       applyHostDocumentChrome()
       setHostLocaleVersion((version) => version + 1)
+      window.requestAnimationFrame(() => translateStaticUi())
     }
     updateHostChrome()
-    return subscribeHostLocaleChange(updateHostChrome)
+    return subscribePlaygroundLocaleChange(updateHostChrome)
   }, [])
+
+  useEffect(() => {
+    translateStaticUi()
+  })
 
   useEffect(() => {
     const searchParams = new URLSearchParams(window.location.search)
@@ -65,7 +73,9 @@ export default function App() {
       } catch (error) {
         const message = error instanceof Error ? error.message : String(error ?? '')
         console.warn('Failed to initialize sub2api playground:', error)
-        if (message.includes('401')) window.location.assign('/login')
+        if (message.includes('401') || message.toLowerCase().includes('unauthorized')) {
+          setLoginRequired(true)
+        }
       }
     })()
   }, [setSettings])
@@ -104,6 +114,7 @@ export default function App() {
       <Toast />
       <MaskEditorModal />
       <ImageContextMenu />
+      <LoginRequiredDialog open={loginRequired} />
     </>
   )
 }

@@ -6,16 +6,21 @@
 @tailwind utilities;
 
 :root {
-  --background: 0 0% 100%;
-  --foreground: 240 10% 10%;
-  --muted: 240 5% 96%;
-  --muted-foreground: 240 4% 46%;
-  --border: 240 6% 90%;
-  --input: 240 6% 90%;
-  --primary: 221 83% 53%;
+  --background: 38 100% 98%;
+  --foreground: 35 10% 17%;
+  --muted: 36 54% 94%;
+  --muted-foreground: 28 13% 45%;
+  --border: 31 33% 84%;
+  --input: 31 33% 84%;
+  --primary: 24 86% 55%;
   --primary-foreground: 0 0% 100%;
-  --sidebar: 240 5% 96%;
-  --sidebar-foreground: 240 10% 10%;
+  --sidebar: 38 76% 95%;
+  --sidebar-foreground: 35 10% 17%;
+  --pixel-ink: #302c27;
+  --pixel-paper: #fffaf2;
+  --pixel-accent: #f97316;
+  --pixel-accent-strong: #ea580c;
+  --pixel-muted: #7d7164;
   --font-ui-sans: 'HarmonyOS Sans SC', 'Noto Sans SC', 'PingFang SC', 'Microsoft YaHei', sans-serif;
   --font-mono: 'Maple Mono', 'Cascadia Code', 'SF Mono', Menlo, Consolas, monospace;
   --safe-area-top: env(safe-area-inset-top, 0px);
@@ -33,6 +38,13 @@ body {
   padding: 0;
   -webkit-user-select: none;
   user-select: none;
+  background:
+    linear-gradient(rgba(48, 44, 39, 0.035) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(48, 44, 39, 0.035) 1px, transparent 1px),
+    radial-gradient(circle at 10% 0%, rgba(251, 146, 60, 0.12), transparent 34%),
+    linear-gradient(135deg, #fffaf2 0%, #f7ead6 52%, #fff7ed 100%);
+  background-size: 24px 24px, 24px 24px, auto, auto;
+  color: var(--pixel-ink);
 }
 
 input,
@@ -71,20 +83,34 @@ body.drag-selecting * {
 
 @media (prefers-color-scheme: dark) {
   :root {
-    --background: 240 10% 4%;
-    --foreground: 0 0% 98%;
-    --muted: 240 4% 16%;
-    --muted-foreground: 240 5% 65%;
-    --border: 240 4% 22%;
-    --input: 240 4% 22%;
-    --primary: 217 91% 60%;
+    --background: 32 9% 11%;
+    --foreground: 33 23% 92%;
+    --muted: 32 9% 17%;
+    --muted-foreground: 35 14% 70%;
+    --border: 31 13% 29%;
+    --input: 31 13% 29%;
+    --primary: 25 95% 53%;
     --primary-foreground: 0 0% 100%;
-    --sidebar: 240 5% 12%;
-    --sidebar-foreground: 0 0% 98%;
+    --sidebar: 32 9% 14%;
+    --sidebar-foreground: 33 23% 92%;
+    --pixel-ink: #f1ede6;
+    --pixel-paper: #1f1d1a;
+    --pixel-accent: #fb923c;
+    --pixel-accent-strong: #f97316;
+    --pixel-muted: #d0c6b8;
   }
 
   * {
-    scrollbar-color: #3f3f46 transparent;
+    scrollbar-color: #7c5f44 transparent;
+  }
+
+  body {
+    background:
+      linear-gradient(rgba(241, 237, 230, 0.035) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(241, 237, 230, 0.035) 1px, transparent 1px),
+      radial-gradient(circle at 10% 0%, rgba(251, 146, 60, 0.14), transparent 34%),
+      linear-gradient(135deg, #151311 0%, #211d19 55%, #171412 100%);
+    background-size: 24px 24px, 24px 24px, auto, auto;
   }
 }
 
@@ -104,8 +130,38 @@ input[type="number"] {
 }
 
 @media (prefers-color-scheme: dark) {
-  ::-webkit-scrollbar-thumb { background: #3f3f46; }
-  ::-webkit-scrollbar-thumb:hover { background: #52525b; }
+  ::-webkit-scrollbar-thumb { background: #7c5f44; }
+  ::-webkit-scrollbar-thumb:hover { background: #9a6b43; }
+}
+
+header.safe-area-top {
+  background: color-mix(in srgb, var(--pixel-paper) 90%, transparent) !important;
+  border-bottom-color: color-mix(in srgb, var(--pixel-ink) 16%, transparent) !important;
+  box-shadow: 0 2px 0 color-mix(in srgb, var(--pixel-ink) 10%, transparent);
+}
+
+[data-home-main] {
+  min-height: calc(100vh - var(--safe-area-top));
+}
+
+.task-card-wrapper > div > div,
+.favorite-collection-card-wrapper > div,
+[data-input-bar] > div,
+.rounded-3xl,
+.rounded-2xl {
+  border-color: color-mix(in srgb, var(--pixel-ink) 14%, transparent);
+}
+
+.generating {
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--pixel-accent) 28%, transparent);
+}
+
+button:focus-visible,
+a:focus-visible,
+input:focus-visible,
+[contenteditable="true"]:focus-visible {
+  outline: 2px solid color-mix(in srgb, var(--pixel-accent) 58%, transparent);
+  outline-offset: 2px;
 }
 
 @keyframes pulse-border {

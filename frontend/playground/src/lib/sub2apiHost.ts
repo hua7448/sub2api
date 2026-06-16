@@ -22,6 +22,11 @@ export function getHostLocale(): Locale {
   return saved === 'zh' ? 'zh' : 'en'
 }
 
+export function setHostLocale(locale: Locale) {
+  window.localStorage.setItem(LOCALE_KEY, locale)
+  applyHostDocumentChrome()
+}
+
 export function hostText(zh: string, en: string): string {
   return getHostLocale() === 'zh' ? zh : en
 }

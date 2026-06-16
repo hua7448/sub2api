@@ -79,9 +79,10 @@ export function applySub2APISettings(settings: AppSettings, remote: Sub2APISetti
     remote.allowed_models.length === 0 || remote.allowed_models.includes(persistedProfile.model)
   )
   const model = (persistedModelAllowed ? persistedProfile.model : '') || remote.default_model || remote.allowed_models[0] || 'gpt-image-2'
+  const activeKey = activeKeyId ? keys.find((key) => key.id === activeKeyId) ?? null : null
   const profile: ApiProfile = {
     id: 'sub2api-default',
-    name: activeKeyId ? `sub2api #${activeKeyId}` : 'sub2api',
+    name: activeKey ? activeKey.name || `API Key #${activeKey.id}` : 'sub2api',
     provider: 'sub2api',
     baseUrl: '',
     apiKey: '',

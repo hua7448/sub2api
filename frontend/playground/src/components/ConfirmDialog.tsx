@@ -4,6 +4,7 @@ import { useCloseOnEscape } from '../hooks/useCloseOnEscape'
 import { usePreventBackgroundScroll } from '../hooks/usePreventBackgroundScroll'
 import { Checkbox } from './Checkbox'
 import { CopyIcon } from './icons'
+import { hostText } from '../lib/sub2apiHost'
 
 function renderMessage(message: string) {
   return message.split(/(`[^`]+`|「[^」]+」|\*\*[^*]+\*\*)/g).map((part, index) => {
@@ -80,11 +81,11 @@ export default function ConfirmDialog() {
   usePreventBackgroundScroll(Boolean(confirmDialog))
 
   if (!confirmDialog) return null
-  const isDestructive = confirmDialog.title.includes('删除') || confirmDialog.title.includes('清空')
+  const isDestructive = confirmDialog.title.includes('删除') || confirmDialog.title.includes('清空') || confirmDialog.title.toLowerCase().includes('delete') || confirmDialog.title.toLowerCase().includes('clear')
   const confirmTone = confirmDialog.tone ?? (isDestructive ? 'danger' : undefined)
   const confirmClassName = getActionButtonClass(confirmTone === 'danger' || confirmTone === 'warning' ? confirmTone : 'primary')
-  const confirmText = confirmDialog.confirmText ?? (isDestructive ? '确认删除' : '确认')
-  const cancelText = confirmDialog.cancelText ?? '取消'
+  const confirmText = confirmDialog.confirmText ?? (isDestructive ? hostText('确认删除', 'Confirm delete') : hostText('确认', 'Confirm'))
+  const cancelText = confirmDialog.cancelText ?? hostText('取消', 'Cancel')
   const customButtons = confirmDialog.buttons?.filter((button) => button.label.trim()) ?? []
 
   return (

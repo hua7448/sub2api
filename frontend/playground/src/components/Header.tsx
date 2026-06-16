@@ -6,24 +6,14 @@ import ViewportTooltip from './ViewportTooltip'
 import HelpModal from './HelpModal'
 import HistoryModal from './HistoryModal'
 import { useFavoriteCollectionTitle } from './FavoriteCollections'
-import { EditIcon, HelpCircleIcon, HistoryIcon, InstallIcon, SettingsIcon } from './icons'
+import { EditIcon, HelpCircleIcon, HistoryIcon, SettingsIcon } from './icons'
 import { getConsolePath, getHostSiteLogo, getHostSiteName, hostText } from '../lib/sub2apiHost'
-
-type BeforeInstallPromptEvent = Event & {
-  prompt: () => Promise<void>
-  userChoice: Promise<{ outcome: 'accepted' | 'dismissed'; platform: string }>
-}
-
-function isInstalledPwa() {
-  const nav = window.navigator as Navigator & { standalone?: boolean }
-  return window.matchMedia('(display-mode: standalone)').matches || nav.standalone === true
-}
+import { getPlaygroundLocale, setPlaygroundLocale } from '../lib/playgroundI18n'
 
 export default function Header() {
   const appMode = useStore((s) => s.appMode)
   const setAppMode = useStore((s) => s.setAppMode)
   const setShowSettings = useStore((s) => s.setShowSettings)
-  const setConfirmDialog = useStore((s) => s.setConfirmDialog)
   const agentMobileHeaderVisible = useStore((s) => s.agentMobileHeaderVisible)
   const agentConversations = useStore((s) => s.agentConversations)
   const activeAgentConversationId = useStore((s) => s.activeAgentConversationId)
@@ -33,8 +23,6 @@ export default function Header() {
   const favoriteCollectionTitle = useFavoriteCollectionTitle()
   const showFavoriteCollectionTitle = appMode === 'gallery' && Boolean(activeFavoriteCollectionId)
   const [showHelp, setShowHelp] = useState(false)
-  const [installPrompt, setInstallPrompt] = useState<BeforeInstallPromptEvent | null>(null)
-  const [isPwaInstalled, setIsPwaInstalled] = useState(isInstalledPwa)
   const [hintVisible, setHintVisible] = useState(false)
   const [scrollDirection, setScrollDirection] = useState<'up' | 'down'>('up')
   const [showHistoryModal, setShowHistoryModal] = useState(false)
@@ -85,66 +73,11 @@ export default function Header() {
     }
   }, [appMode, agentMobileHeaderVisible])
 
-  const installTooltip = useTooltip()
   const helpTooltip = useTooltip()
   const settingsTooltip = useTooltip()
-
-  useEffect(() => {
-    const handleBeforeInstallPrompt = (event: Event) => {
-      event.preventDefault()
-      setInstallPrompt(event as BeforeInstallPromptEvent)
-      setIsPwaInstalled(false)
-    }
-
-    const handleAppInstalled = () => {
-      setInstallPrompt(null)
-      setIsPwaInstalled(true)
-    }
-
-    window.addEventListener('beforeinstallprompt', handleBeforeInstallPrompt)
-    window.addEventListener('appinstalled', handleAppInstalled)
-
-    return () => {
-      window.removeEventListener('beforeinstallprompt', handleBeforeInstallPrompt)
-      window.removeEventListener('appinstalled', handleAppInstalled)
-    }
-  }, [])
-
-  const handleInstallClick = async () => {
-    if (installPrompt) {
-      const promptEvent = installPrompt
-      setInstallPrompt(null)
-
-      try {
-        await promptEvent.prompt()
-        const choice = await promptEvent.userChoice
-        setIsPwaInstalled(choice.outcome === 'accepted')
-      } catch {
-        setIsPwaInstalled(isInstalledPwa())
-      }
-    } else {
-      const isIos = /iPad|iPhone|iPod/.test(navigator.userAgent) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1)
-      if (isIos) {
-        setConfirmDialog({
-          title: hostText('安装为应用', 'Install app'),
-          message: hostText('在 Safari 浏览器中，点击底部「分享」按钮，选择「添加到主屏幕」即可安装此应用。', 'In Safari, tap Share, then choose Add to Home Screen.'),
-          showCancel: false,
-          confirmText: hostText('我知道了', 'OK'),
-          icon: 'info',
-          action: () => {},
-        })
-      } else {
-        setConfirmDialog({
-          title: hostText('安装为应用', 'Install app'),
-          message: hostText('请在浏览器的菜单中选择「添加到主屏幕」或「安装应用」。\n\n（如果在微信等内置浏览器中，请先在外部浏览器打开）', 'Choose Add to Home Screen or Install app from your browser menu.\n\nIf you are using an embedded browser, open this page in an external browser first.'),
-          showCancel: false,
-          confirmText: hostText('我知道了', 'OK'),
-          icon: 'info',
-          action: () => {},
-        })
-      }
-    }
-  }
+  const languageTooltip = useTooltip()
+  const currentLocale = getPlaygroundLocale()
+  const nextLocale = currentLocale === 'zh' ? 'en' : 'zh'
 
   return (
     <>
@@ -235,30 +168,25 @@ export default function Header() {
           <div className="flex items-center gap-1 shrink-0">
             <a
               href={consolePath}
-              className="hidden rounded-lg px-3 py-2 text-sm font-medium text-gray-600 transition hover:bg-gray-100 hover:text-gray-900 dark:text-gray-300 dark:hover:bg-gray-900 dark:hover:text-white sm:inline-flex"
+              className="hidden rounded-lg px-3 py-2 text-sm font-medium text-stone-600 transition hover:bg-amber-50 hover:text-stone-900 dark:text-stone-300 dark:hover:bg-amber-400/10 dark:hover:text-white sm:inline-flex"
             >
               {hostText('控制台', 'Console')}
             </a>
-            {!isPwaInstalled && (
-              <div
-                className="relative"
-                {...installTooltip.handlers}
+            <div className="relative" {...languageTooltip.handlers}>
+              <button
+                onClick={() => {
+                  dismissAllTooltips()
+                  setPlaygroundLocale(nextLocale)
+                }}
+                className="min-w-10 rounded-lg px-2 py-2 text-sm font-semibold text-stone-600 transition hover:bg-amber-50 hover:text-stone-900 dark:text-stone-300 dark:hover:bg-amber-400/10 dark:hover:text-white"
+                aria-label={hostText('切换语言', 'Switch language')}
               >
-                <button
-                  onClick={() => {
-                    dismissAllTooltips()
-                    handleInstallClick()
-                  }}
-                  className="p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-900 transition-colors"
-                  aria-label={hostText('安装为应用', 'Install app')}
-                >
-                  <InstallIcon className="w-5 h-5 text-gray-600 dark:text-gray-400" />
-                </button>
-                <ViewportTooltip visible={installTooltip.visible} className="whitespace-nowrap">
-                  {hostText('安装为应用', 'Install app')}
-                </ViewportTooltip>
-              </div>
-            )}
+                {currentLocale === 'zh' ? 'EN' : '中'}
+              </button>
+              <ViewportTooltip visible={languageTooltip.visible} className="whitespace-nowrap">
+                {hostText('切换到英文', 'Switch to Chinese')}
+              </ViewportTooltip>
+            </div>
             <div
               className="relative"
               {...helpTooltip.handlers}
@@ -268,10 +196,10 @@ export default function Header() {
                   dismissAllTooltips()
                   setShowHelp(true)
                 }}
-                className="p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-900 transition-colors"
+                className="p-2 rounded-lg hover:bg-amber-50 dark:hover:bg-amber-400/10 transition-colors"
                 aria-label={hostText('操作指南', 'Help')}
               >
-                <HelpCircleIcon className="w-5 h-5 text-gray-600 dark:text-gray-400" />
+                <HelpCircleIcon className="w-5 h-5 text-stone-600 dark:text-stone-400" />
               </button>
               <ViewportTooltip visible={helpTooltip.visible} className="whitespace-nowrap">
                 {hostText('操作指南', 'Help')}
@@ -283,10 +211,10 @@ export default function Header() {
             >
               <button
                 onClick={() => setShowSettings(true)}
-                className="p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-900 transition-colors"
+                className="p-2 rounded-lg hover:bg-amber-50 dark:hover:bg-amber-400/10 transition-colors"
                 aria-label={hostText('设置', 'Settings')}
               >
-                <SettingsIcon className="w-5 h-5 text-gray-600 dark:text-gray-400" />
+                <SettingsIcon className="w-5 h-5 text-stone-600 dark:text-stone-400" />
               </button>
               <ViewportTooltip visible={settingsTooltip.visible} className="whitespace-nowrap">
                 {hostText('设置', 'Settings')}
@@ -312,7 +240,7 @@ export default function Header() {
             </button>
             <a
               href={consolePath}
-              className="rounded-lg px-3 py-1.5 text-sm font-medium text-gray-500 transition hover:bg-white hover:text-gray-900 dark:hover:bg-white/10 dark:hover:text-white"
+              className="rounded-lg px-3 py-1.5 text-sm font-medium text-stone-500 transition hover:bg-white hover:text-stone-900 dark:hover:bg-white/10 dark:hover:text-white"
             >
               {hostText('控制台', 'Console')}
             </a>
