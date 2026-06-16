@@ -34,7 +34,7 @@ import Select from './Select'
 import { Checkbox } from './Checkbox'
 import ViewportTooltip from './ViewportTooltip'
 import { ChevronDownIcon, CloseIcon, CopyIcon, PlusIcon, TrashIcon, GithubIcon, ExportIcon, ImportIcon, DragHandleIcon, LinkIcon } from './icons'
-import { getCachedSub2APIEligibleKeys, getCachedSub2APISettings } from '../lib/sub2api'
+import { fetchSub2APIEligibleKeys, getCachedSub2APIEligibleKeys, getCachedSub2APISettings, type Sub2APIEligibleKey } from '../lib/sub2api'
 
 function newId(prefix: string) {
   return `${prefix}-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 7)}`
@@ -337,6 +337,8 @@ export default function SettingsModal() {
   const [clearTasks, setClearTasks] = useState(true)
   const [isImportingData, setIsImportingData] = useState(false)
   const [isImportingJson, setIsImportingJson] = useState(false)
+  const [sub2apiKeys, setSub2APIKeys] = useState<Sub2APIEligibleKey[]>(getCachedSub2APIEligibleKeys)
+  const [isRefreshingSub2APIKeys, setIsRefreshingSub2APIKeys] = useState(false)
   const [draggedProfileId, setDraggedProfileId] = useState<string | null>(null)
   const [dragOverProfileId, setDragOverProfileId] = useState<string | null>(null)
   const [dragDropPosition, setDragDropPosition] = useState<'before' | 'after' | null>(null)
@@ -367,7 +369,6 @@ export default function SettingsModal() {
   const apiProxyChecked = activeProfileApiProxyEligible && (apiProxyLocked || activeProfile.apiProxy)
   const apiProxyEnabled = apiProxyAvailable && activeProfileApiProxyEligible && apiProxyChecked
   const sub2apiSettings = getCachedSub2APISettings()
-  const sub2apiKeys = getCachedSub2APIEligibleKeys()
   const defaultProviderOrder = ['openai', 'fal', ...draft.customProviders.map(p => p.id)]
   const providerOrder = draft.providerOrder || defaultProviderOrder
 
@@ -413,6 +414,30 @@ export default function SettingsModal() {
 
   const wasSettingsOpenRef = useRef(false)
 
+  const refreshSub2APIKeys = useCallback(async () => {
+    setIsRefreshingSub2APIKeys(true)
+    try {
+      const keys = await fetchSub2APIEligibleKeys()
+      setSub2APIKeys(keys)
+      const currentKeyId = Number(getActiveApiProfile(useStore.getState().settings).sub2apiKeyId)
+      if ((!Number.isFinite(currentKeyId) || !keys.some((key) => key.id === currentKeyId)) && keys[0]) {
+        const normalized = normalizeSettings(useStore.getState().settings)
+        const nextSettings = normalizeSettings({
+          ...normalized,
+          profiles: normalized.profiles.map((profile) =>
+            profile.provider === 'sub2api' ? { ...profile, sub2apiKeyId: keys[0].id } : profile,
+          ),
+        })
+        setSettings(nextSettings)
+      }
+    } catch (error) {
+      const message = error instanceof Error ? error.message : '刷新 API Key 失败'
+      showToast(message, 'error')
+    } finally {
+      setIsRefreshingSub2APIKeys(false)
+    }
+  }, [setSettings, showToast])
+
   useEffect(() => {
     if (!showSettings) {
       wasSettingsOpenRef.current = false
@@ -437,7 +462,8 @@ export default function SettingsModal() {
     setDraft(nextDraft)
     setTimeoutInput(String(getActiveApiProfile(nextDraft).timeout))
     setAgentMaxToolRoundsInput(String(nextDraft.agentMaxToolRounds))
-  }, [apiProxyAvailable, apiProxyLocked, showSettings, settings, reusedTaskApiProfileId])
+    void refreshSub2APIKeys()
+  }, [apiProxyAvailable, apiProxyLocked, showSettings, settings, reusedTaskApiProfileId, refreshSub2APIKeys])
 
   useEffect(() => {
     setTimeoutInput(String(activeProfile.timeout))
@@ -1134,7 +1160,17 @@ export default function SettingsModal() {
         所有请求都通过当前登录态代理转发，不在浏览器保存真实 API Key。
       </div>
       <label className="block">
-        <span className="mb-1.5 block text-sm text-gray-600 dark:text-gray-300">API Key</span>
+        <span className="mb-1.5 flex items-center justify-between gap-3 text-sm text-gray-600 dark:text-gray-300">
+          <span>API Key</span>
+          <button
+            type="button"
+            onClick={() => { void refreshSub2APIKeys() }}
+            disabled={isRefreshingSub2APIKeys}
+            className="rounded-lg px-2 py-1 text-xs text-blue-600 transition hover:bg-blue-50 disabled:cursor-not-allowed disabled:opacity-60 dark:text-blue-300 dark:hover:bg-blue-500/10"
+          >
+            {isRefreshingSub2APIKeys ? '刷新中' : '刷新'}
+          </button>
+        </span>
         <Select
           value={activeProfile.sub2apiKeyId ?? sub2apiKeys[0]?.id ?? ''}
           onChange={(value) => updateActiveProfile({ sub2apiKeyId: Number(value) }, true)}
@@ -1142,9 +1178,12 @@ export default function SettingsModal() {
             label: `${key.name || `Key #${key.id}`}${key.group_name ? ` · ${key.group_name}` : ''}`,
             value: key.id,
           }))}
+          disabled={sub2apiKeys.length === 0}
           className="w-full rounded-xl border border-gray-200/70 bg-white/60 px-3 py-2.5 text-sm text-gray-700 outline-none transition focus:border-blue-300 dark:border-white/[0.08] dark:bg-white/[0.03] dark:text-gray-200 dark:focus:border-blue-500/50"
         />
-        <div className="mt-1.5 text-xs text-gray-500 dark:text-gray-500">只保存 Key ID；真实 Key 只在服务端用于转发和计费。</div>
+        <div className="mt-1.5 text-xs text-gray-500 dark:text-gray-500">
+          {sub2apiKeys.length === 0 ? '没有可用 Key：请确认 Key 属于当前用户、状态 active、未过期、额度未耗尽，且所属分组允许生图。' : '只保存 Key ID；真实 Key 只在服务端用于转发和计费。'}
+        </div>
       </label>
       <div className="grid gap-4 sm:grid-cols-2">
         <label className="block">

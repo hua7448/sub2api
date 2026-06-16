@@ -45,6 +45,8 @@ export default function App() {
       window.history.replaceState(null, '', nextUrl)
     }
 
+    initStore()
+
     void Promise.all([fetchSub2APISettings(), fetchSub2APIEligibleKeys()])
       .then(([remoteSettings, keys]) => {
         const baseSettings = applySub2APISettings(useStore.getState().settings, remoteSettings, keys)
@@ -55,8 +57,6 @@ export default function App() {
         console.warn('Failed to initialize sub2api playground:', error)
         if (String(error?.message ?? '').includes('401')) window.location.assign('/login')
       })
-
-    initStore()
   }, [setSettings])
 
   useEffect(() => {

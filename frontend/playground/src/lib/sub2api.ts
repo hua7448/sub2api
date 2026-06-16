@@ -26,6 +26,13 @@ const API_PREFIX = '/api/v1/image-playground'
 let cachedSettings: Sub2APISettings | null = null
 let cachedKeys: Sub2APIEligibleKey[] | null = null
 
+function authHeaders(init?: HeadersInit): Headers {
+  const headers = new Headers(init)
+  const token = typeof window !== 'undefined' ? window.localStorage.getItem('auth_token') : null
+  if (token && !headers.has('Authorization')) headers.set('Authorization', `Bearer ${token}`)
+  return headers
+}
+
 async function readJSON<T>(response: Response): Promise<T> {
   const payload = await response.json().catch(() => null)
   if (!response.ok) {
@@ -36,13 +43,13 @@ async function readJSON<T>(response: Response): Promise<T> {
 }
 
 export async function fetchSub2APISettings(): Promise<Sub2APISettings> {
-  const response = await fetch(`${API_PREFIX}/settings`, { credentials: 'same-origin' })
+  const response = await fetch(`${API_PREFIX}/settings`, { credentials: 'same-origin', headers: authHeaders() })
   cachedSettings = await readJSON<Sub2APISettings>(response)
   return cachedSettings
 }
 
 export async function fetchSub2APIEligibleKeys(): Promise<Sub2APIEligibleKey[]> {
-  const response = await fetch(`${API_PREFIX}/eligible-keys`, { credentials: 'same-origin' })
+  const response = await fetch(`${API_PREFIX}/eligible-keys`, { credentials: 'same-origin', headers: authHeaders() })
   cachedKeys = await readJSON<Sub2APIEligibleKey[]>(response)
   return cachedKeys
 }
@@ -64,7 +71,8 @@ export function selectSub2APIKeyId(profile: ApiProfile): number {
 }
 
 export function applySub2APISettings(settings: AppSettings, remote: Sub2APISettings, keys: Sub2APIEligibleKey[]): AppSettings {
-  const activeKeyId = keys[0]?.id ?? null
+  const persistedKeyId = Number(settings.profiles?.find((profile) => profile.provider === 'sub2api')?.sub2apiKeyId)
+  const activeKeyId = keys.some((key) => key.id === persistedKeyId) ? persistedKeyId : keys[0]?.id ?? null
   const model = remote.default_model || remote.allowed_models[0] || 'gpt-image-2'
   const profile: ApiProfile = {
     id: 'sub2api-default',
@@ -118,8 +126,7 @@ export function assertSub2APIParams(params: TaskParams, settings: Sub2APISetting
 
 export async function proxySub2API(path: 'images/generations' | 'images/edits' | 'responses', profile: ApiProfile, init: RequestInit): Promise<Response> {
   const keyId = selectSub2APIKeyId(profile)
-  const headers = new Headers(init.headers)
-  headers.delete('Authorization')
+  const headers = authHeaders(init.headers)
   headers.delete('Proxy-Authorization')
   headers.delete('x-api-key')
   headers.delete('x-goog-api-key')
