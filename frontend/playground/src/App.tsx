@@ -16,6 +16,7 @@ import Toast from './components/Toast'
 import MaskEditorModal from './components/MaskEditorModal'
 import ImageContextMenu from './components/ImageContextMenu'
 import LoginRequiredDialog from './components/LoginRequiredDialog'
+import GenerationNavigationWarning from './components/GenerationNavigationWarning'
 import { FavoriteCollectionPickerModal, FavoriteCollectionsView, ManageCollectionsModal } from './components/FavoriteCollections'
 import { useGlobalClickSuppression } from './lib/clickSuppression'
 import { applySub2APISettings, fetchSub2APIEligibleKeys, fetchSub2APISettings } from './lib/sub2api'
@@ -112,6 +113,7 @@ export default function App() {
       <FavoriteCollectionPickerModal />
       <ManageCollectionsModal />
       <Toast />
+      <GenerationNavigationWarning />
       <MaskEditorModal />
       <ImageContextMenu />
       <LoginRequiredDialog open={loginRequired} />
