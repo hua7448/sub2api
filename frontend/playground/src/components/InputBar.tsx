@@ -13,10 +13,12 @@ import { collectAgentRoundOutputImageSlots } from '../lib/agentImageReferences'
 import { useHintTooltip } from '../hooks/useHintTooltip'
 import { useTooltip } from '../hooks/useTooltip'
 import { downloadImageEntriesAsZip, downloadImageIds, formatExportFileTime, getTaskOutputImageZipEntries } from '../lib/downloadImages'
+import { hostText } from '../lib/sub2apiHost'
 import Select from './Select'
 import SizePickerModal from './SizePickerModal'
 import ViewportTooltip from './ViewportTooltip'
-import { CloseIcon } from './icons'
+import PromptLibraryModal from './PromptLibraryModal'
+import { BookOpenIcon, CloseIcon } from './icons'
 
 
 function getMentionTagTextLength(el: Element) {
@@ -668,6 +670,8 @@ export default function InputBar() {
   const [isSingleLine, setIsSingleLine] = useState(true)
   const [submitHover, setSubmitHover] = useState(false)
   const [attachHover, setAttachHover] = useState(false)
+  const [promptLibraryHover, setPromptLibraryHover] = useState(false)
+  const [showPromptLibrary, setShowPromptLibrary] = useState(false)
   const [imageHintId, setImageHintId] = useState<string | null>(null)
   const [mobileCollapsed, setMobileCollapsed] = useState(false)
   const [showSizePicker, setShowSizePicker] = useState(false)
@@ -942,6 +946,22 @@ export default function InputBar() {
       textareaRef.current.focus()
     }
   }, [setPrompt])
+
+  const handleUsePromptPreset = useCallback((presetPrompt: string, mode: 'replace' | 'append') => {
+    const normalizedPreset = presetPrompt.trim()
+    if (!normalizedPreset) return
+    const nextPrompt = mode === 'append' && prompt.trim()
+      ? `${prompt.trimEnd()}\n\n${normalizedPreset}`
+      : normalizedPreset
+    isUserInputRef.current = false
+    setPrompt(nextPrompt)
+    window.setTimeout(() => {
+      if (textareaRef.current) {
+        textareaRef.current.focus()
+        setContentEditableCursor(textareaRef.current, nextPrompt.length)
+      }
+    }, 0)
+  }, [prompt, setPrompt])
 
   useEffect(() => {
     setOutputCompressionInput(
@@ -2177,6 +2197,12 @@ export default function InputBar() {
         />
       )}
 
+      <PromptLibraryModal
+        open={showPromptLibrary}
+        onClose={() => setShowPromptLibrary(false)}
+        onUse={handleUsePromptPreset}
+      />
+
       <div data-input-bar className="fixed bottom-4 sm:bottom-6 left-1/2 -translate-x-1/2 z-30 w-full max-w-4xl px-3 sm:px-4 transition-all duration-300">
         {showFavoriteCollectionBatchBar && (
           <div className="flex justify-center mb-3">
@@ -2468,6 +2494,21 @@ export default function InputBar() {
                 </div>
                 <div
                   className="relative"
+                  onMouseEnter={() => setPromptLibraryHover(true)}
+                  onMouseLeave={() => setPromptLibraryHover(false)}
+                >
+                  <ButtonTooltip visible={promptLibraryHover} text={hostText('提示词参考', 'Prompt Library')} />
+                  <button
+                    type="button"
+                    onClick={() => setShowPromptLibrary(true)}
+                    className="p-2.5 rounded-xl bg-gray-200 text-gray-500 shadow-sm transition-all hover:bg-gray-300 hover:shadow dark:bg-white/[0.06] dark:text-gray-300 dark:hover:bg-white/[0.1]"
+                    aria-label={hostText('提示词参考', 'Prompt Library')}
+                  >
+                    <BookOpenIcon className="w-5 h-5" />
+                  </button>
+                </div>
+                <div
+                  className="relative"
                   onMouseEnter={() => setSubmitHover(true)}
                   onMouseLeave={() => setSubmitHover(false)}
                 >
@@ -2573,6 +2614,14 @@ export default function InputBar() {
                     </>
                   )}
                 </div>
+                <button
+                  type="button"
+                  onClick={() => setShowPromptLibrary(true)}
+                  className="flex-shrink-0 rounded-xl bg-gray-200 p-2.5 text-gray-500 shadow-sm transition-all hover:bg-gray-300 dark:bg-white/[0.06] dark:text-gray-300 dark:hover:bg-white/[0.1]"
+                  aria-label={hostText('提示词参考', 'Prompt Library')}
+                >
+                  <BookOpenIcon className="w-5 h-5" />
+                </button>
                 <div
                   className="relative flex-1"
                   onMouseEnter={() => setSubmitHover(true)}
