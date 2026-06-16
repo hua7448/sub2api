@@ -1500,6 +1500,26 @@ export default {
       failedToLoad: '加载仪表盘数据失败'
     },
 
+    imageGallery: {
+      title: '生图广场设置',
+      description: '配置内嵌 Image Playground 的可用模型、参数和 Agent 能力。',
+      saveSettings: '保存设置',
+      featureToggles: '功能开关',
+      enableUserEntry: '启用用户入口',
+      enableAgentMode: '启用 Agent 模式',
+      allowAgentWebSearch: '允许 Agent Web Search',
+      modelParameterLimits: '模型与参数限制',
+      defaultModel: '默认模型',
+      maxGenerationCount: '最大生成数量',
+      allowedModels: '允许模型',
+      allowedSizes: '允许尺寸',
+      allowedQuality: '允许质量',
+      allowedOutputFormats: '允许输出格式',
+      maxUploadMb: '最大上传 MB',
+      loadFailed: '加载生图广场设置失败',
+      saveFailed: '保存失败'
+    },
+
     backup: {
       title: '数据库备份',
       description: '全量数据库备份到 S3 兼容存储，支持定时备份与恢复',
