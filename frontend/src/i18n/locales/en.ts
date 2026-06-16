@@ -1479,6 +1479,26 @@ export default {
       failedToLoad: 'Failed to load dashboard statistics'
     },
 
+    imageGallery: {
+      title: 'Image Playground Settings',
+      description: 'Configure available models, parameters, and Agent capabilities for the embedded Image Playground.',
+      saveSettings: 'Save Settings',
+      featureToggles: 'Feature Toggles',
+      enableUserEntry: 'Enable user entry',
+      enableAgentMode: 'Enable Agent mode',
+      allowAgentWebSearch: 'Allow Agent Web Search',
+      modelParameterLimits: 'Model and Parameter Limits',
+      defaultModel: 'Default model',
+      maxGenerationCount: 'Max generation count',
+      allowedModels: 'Allowed models',
+      allowedSizes: 'Allowed sizes',
+      allowedQuality: 'Allowed quality',
+      allowedOutputFormats: 'Allowed output formats',
+      maxUploadMb: 'Max upload MB',
+      loadFailed: 'Failed to load Image Playground settings',
+      saveFailed: 'Failed to save settings'
+    },
+
     backup: {
       title: 'Database Backup',
       description: 'Full database backup to S3-compatible storage with scheduled backup and restore',
