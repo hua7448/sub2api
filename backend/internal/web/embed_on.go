@@ -99,7 +99,7 @@ func (s *FrontendServer) Middleware() gin.HandlerFunc {
 
 		if isImagePlaygroundPath(cleanPath) {
 			if isImagePlaygroundIndexRoute(cleanPath) {
-				s.serveStaticFile(c, "image-playground/index.html")
+				s.serveStaticContent(c, "image-playground/index.html", "text/html; charset=utf-8")
 				return
 			}
 			if !s.fileExists(cleanPath) {
@@ -142,6 +142,21 @@ func (s *FrontendServer) serveStaticFile(c *gin.Context, cleanPath string) {
 	c.Request.URL.Path = "/" + cleanPath
 	s.fileServer.ServeHTTP(c.Writer, c.Request)
 	c.Request.URL.Path = originalPath
+	c.Abort()
+}
+
+func (s *FrontendServer) serveStaticContent(c *gin.Context, cleanPath, contentType string) {
+	if s.tryServeOverride(c, cleanPath) {
+		return
+	}
+	content, err := fs.ReadFile(s.distFS, cleanPath)
+	if err != nil {
+		c.String(http.StatusNotFound, "Image playground asset not found")
+		c.Abort()
+		return
+	}
+	c.Header("Cache-Control", "no-cache")
+	c.Data(http.StatusOK, contentType, content)
 	c.Abort()
 }
 
@@ -290,7 +305,7 @@ func ServeEmbeddedFrontend() gin.HandlerFunc {
 
 		if isImagePlaygroundPath(cleanPath) {
 			if isImagePlaygroundIndexRoute(cleanPath) {
-				serveStaticFile(c, fileServer, overrideDir, "image-playground/index.html")
+				serveStaticContent(c, distFS, overrideDir, "image-playground/index.html", "text/html; charset=utf-8")
 				return
 			}
 			if fileExistsInFS(distFS, cleanPath) {
@@ -340,6 +355,21 @@ func serveStaticFile(c *gin.Context, fileServer http.Handler, overrideDir, clean
 	c.Request.URL.Path = "/" + cleanPath
 	fileServer.ServeHTTP(c.Writer, c.Request)
 	c.Request.URL.Path = originalPath
+	c.Abort()
+}
+
+func serveStaticContent(c *gin.Context, distFS fs.FS, overrideDir, cleanPath, contentType string) {
+	if tryServeOverrideFile(c, overrideDir, cleanPath) {
+		return
+	}
+	content, err := fs.ReadFile(distFS, cleanPath)
+	if err != nil {
+		c.String(http.StatusNotFound, "Image playground asset not found")
+		c.Abort()
+		return
+	}
+	c.Header("Cache-Control", "no-cache")
+	c.Data(http.StatusOK, contentType, content)
 	c.Abort()
 }
 
