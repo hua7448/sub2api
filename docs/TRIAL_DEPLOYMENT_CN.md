@@ -50,9 +50,12 @@ cd /root/sub2api-src
 git fetch origin
 git checkout feature/image-gallery
 git pull --ff-only origin feature/image-gallery
-git rev-parse --short HEAD
 
-docker build -t sub2api-test:image-playground-20260616 .
+TRIAL_TAG="$(git rev-parse --short HEAD)"
+TRIAL_IMAGE="sub2api-test:image-playground-${TRIAL_TAG}"
+echo "$TRIAL_IMAGE"
+
+docker build -t "$TRIAL_IMAGE" .
 ```
 
 如果只是复用已经构建好的镜像，可以跳过 `docker build`。
@@ -68,6 +71,9 @@ docker inspect -f '{{range .Config.Env}}{{println .}}{{end}}' sub2api-image-gall
 
 docker rm -f sub2api-image-gallery-trial
 
+TRIAL_TAG="$(git rev-parse --short HEAD)"
+TRIAL_IMAGE="sub2api-test:image-playground-${TRIAL_TAG}"
+
 docker run -d \
   --name sub2api-image-gallery-trial \
   --restart unless-stopped \
@@ -79,16 +85,19 @@ docker run -d \
   -e DATABASE_HOST=sub2api-image-gallery-postgres-trial \
   -e REDIS_HOST=sub2api-image-gallery-redis-trial \
   -e AUTO_SETUP=true \
-  sub2api-test:image-playground-20260616
+  "$TRIAL_IMAGE"
 ```
 
 ## 健康检查
 
 ```bash
 docker ps | grep sub2api
+docker inspect -f '{{.Config.Image}}' sub2api-image-gallery-trial
 curl -fsS http://127.0.0.1:4146/health && echo
 docker logs --tail=100 sub2api-image-gallery-trial
 ```
+
+`docker inspect` 输出必须等于刚才的 `TRIAL_IMAGE`，例如 `sub2api-test:image-playground-ac8950aa`。如果仍显示旧 tag，说明 4146 trial 容器没有用新镜像启动。
 
 ## 生图广场测试清单
 
@@ -122,6 +131,7 @@ http://服务器IP:4146/image-playground/index.html
 验证：
 
 - 页面能打开，不返回 404。
+- 输入框旁有提示词参考按钮，点击后出现提示词库。
 - 设置里没有真实 API Key 输入框。
 - 设置里没有 Base URL 输入框。
 - KEY 下拉只显示当前登录用户自己的可用 KEY。
