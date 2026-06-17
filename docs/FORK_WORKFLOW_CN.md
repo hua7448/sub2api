@@ -272,6 +272,8 @@ services:
 
 当前服务器固定的 4146 隔离试运行环境、容器名、更新命令和测试清单见 `docs/TRIAL_DEPLOYMENT_CN.md`。后续 agent 工作应优先按该文档执行，确保测试环境与正式 4145、正式 PostgreSQL、正式 Redis 隔离。
 
+生图广场相关开发、测试、热修发布、提示词库、下载/离页保护、KEY 下拉排查和上线公告模板见 `docs/IMAGE_PLAYGROUND_RUNBOOK_CN.md`。涉及该模块时，先读专项 runbook，再按本发布规范执行。
+
 试运行可以使用服务器手动构建镜像：
 
 ```bash

@@ -60,19 +60,35 @@ docker build -t "$TRIAL_IMAGE" .
 
 如果只是复用已经构建好的镜像，可以跳过 `docker build`。
 
+替换 trial 容器前必须确认镜像真实存在，避免 `docker run` 尝试从远端拉取本地测试镜像：
+
+```bash
+docker image inspect "$TRIAL_IMAGE" >/dev/null || {
+  echo "本地不存在 $TRIAL_IMAGE，请先 docker build -t \"$TRIAL_IMAGE\" ."
+  exit 1
+}
+```
+
 ## 替换 4146 trial 应用
 
 只替换应用容器，保留 trial 数据库和 Redis：
 
 ```bash
-TRIAL_NET="$(docker inspect -f '{{range $name, $_ := .NetworkSettings.Networks}}{{println $name}}{{end}}' sub2api-image-gallery-trial | head -n1)"
+TRIAL_NET="$(docker inspect -f '{{range $name, $_ := .NetworkSettings.Networks}}{{println $name}}{{end}}' sub2api-image-gallery-trial 2>/dev/null | head -n1)"
+test -n "$TRIAL_NET" || TRIAL_NET="$(docker inspect -f '{{range $name, $_ := .NetworkSettings.Networks}}{{println $name}}{{end}}' sub2api-image-gallery-postgres-trial | head -n1)"
+test -n "$TRIAL_NET" || { echo "TRIAL_NET 为空，先不要继续"; exit 1; }
 
 docker inspect -f '{{range .Config.Env}}{{println .}}{{end}}' sub2api-image-gallery-trial > /tmp/sub2api-image-gallery-trial.env
+test -s /tmp/sub2api-image-gallery-trial.env || { echo "/tmp/sub2api-image-gallery-trial.env 不存在，先不要继续"; exit 1; }
 
 docker rm -f sub2api-image-gallery-trial
 
 TRIAL_TAG="$(git rev-parse --short HEAD)"
 TRIAL_IMAGE="sub2api-test:image-playground-${TRIAL_TAG}"
+docker image inspect "$TRIAL_IMAGE" >/dev/null || {
+  echo "本地不存在 $TRIAL_IMAGE，请先 docker build -t \"$TRIAL_IMAGE\" ."
+  exit 1
+}
 
 docker run -d \
   --name sub2api-image-gallery-trial \
@@ -151,3 +167,11 @@ docker logs --tail=200 sub2api-image-gallery-trial
 docker inspect -f '{{range .Config.Env}}{{println .}}{{end}}' sub2api-image-gallery-trial | grep -E 'DATABASE_|REDIS_|SERVER_|AUTO_SETUP'
 docker inspect -f '{{range $name, $_ := .NetworkSettings.Networks}}{{println $name}}{{end}}' sub2api-image-gallery-trial
 ```
+
+如果 `docker images` 里出现较多 `<none>` 悬空镜像，可以只清理 dangling 镜像：
+
+```bash
+docker image prune -f
+```
+
+不要使用带 volume 删除语义的清理命令。

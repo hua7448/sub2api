@@ -130,6 +130,8 @@ deploy/docker-compose.override.yml
 vite.config.js
 docs/*
 !docs/FORK_WORKFLOW_CN.md
+!docs/TRIAL_DEPLOYMENT_CN.md
+!docs/IMAGE_PLAYGROUND_RUNBOOK_CN.md
 !docs/PAYMENT.md
 !docs/PAYMENT_CN.md
 !docs/ADMIN_PAYMENT_INTEGRATION_API.md
