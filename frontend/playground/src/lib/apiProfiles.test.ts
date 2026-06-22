@@ -48,7 +48,7 @@ describe('mergeImportedSettings', () => {
       apiKey: 'imported-key',
       model: 'imported-model',
       timeout: 120,
-      apiMode: 'responses',
+      apiMode: 'images',
       codexCli: true,
       apiProxy: true,
     })
@@ -585,7 +585,7 @@ describe('custom providers', () => {
     expect(clamped.profiles[0].streamPartialImages).toBe(3)
   })
 
-  it('preserves sub2api profile mode, model, timeout, and streaming options', () => {
+  it('normalizes sub2api profile to Images API and preserves model, timeout, and streaming options', () => {
     const settings = normalizeSettings({
       profiles: [{
         id: 'sub2api-default',
@@ -622,7 +622,7 @@ describe('custom providers', () => {
       sub2apiKeyId: 7,
       model: 'gpt-5.5',
       timeout: 300,
-      apiMode: 'responses',
+      apiMode: 'images',
       codexCli: false,
       apiProxy: false,
       streamImages: false,
@@ -654,7 +654,7 @@ describe('custom providers', () => {
 
   it('keeps active custom providers in Images API mode when legacy apiMode is responses', () => {
     const settings = normalizeSettings({
-      apiMode: 'responses',
+      apiMode: 'images',
       customProviders: [{ id: 'custom-json', name: 'Custom JSON', submit: { path: 'images/generations' } }],
       activeProfileId: 'custom-profile',
       profiles: [{

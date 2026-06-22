@@ -11,6 +11,7 @@ import { dismissAllTooltips } from '../lib/tooltipDismiss'
 import { downloadImageEntriesAsZip, downloadImageIds, getImageZipEntries } from '../lib/downloadImages'
 import { isAgentTaskPromptPending } from '../lib/taskPromptDisplay'
 import { replaceImageMentionsForApi } from '../lib/promptImageMentions'
+import { resolveLocalImageSource } from '../lib/localImageSource'
 import { CloseIcon, CodeIcon, CopyIcon, DownloadIcon, EditIcon, LinkIcon, TrashIcon } from './icons'
 import { getCachedSub2APIEligibleKeys } from '../lib/sub2api'
 import { hostText } from '../lib/sub2apiHost'
@@ -351,7 +352,7 @@ export default function DetailModal() {
 
   const handleCopyInputImage = async () => {
     const imgId = allInputImageIds[0]
-    const src = imgId ? imageSrcs[imgId] : ''
+    const src = await resolveLocalImageSource(imgId) ?? (imgId ? imageSrcs[imgId] : '')
     if (!src) return
     try {
       await copyImageSourceToClipboard(src)

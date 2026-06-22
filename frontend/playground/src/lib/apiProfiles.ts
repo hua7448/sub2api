@@ -488,7 +488,6 @@ function validateImportedProfileRecord(input: unknown) {
 export function normalizeSettings(input: Partial<AppSettings> | unknown): AppSettings {
   const record = input && typeof input === 'object' ? input as Record<string, unknown> : {}
   const customProviders: CustomProviderDefinition[] = []
-  const legacyApiMode: ApiMode = record.apiMode === 'responses' ? 'responses' : 'images'
   const persistedProfile = Array.isArray(record.profiles) && record.profiles[0] && typeof record.profiles[0] === 'object'
     ? record.profiles[0] as Record<string, unknown>
     : {}
@@ -504,7 +503,7 @@ export function normalizeSettings(input: Partial<AppSettings> | unknown): AppSet
     sub2apiKeyId: typeof persistedProfile.sub2apiKeyId === 'number' ? persistedProfile.sub2apiKeyId : null,
     model: persistedProfileModel || (typeof record.model === 'string' && record.model.trim() ? record.model : DEFAULT_IMAGES_MODEL),
     timeout: persistedProfileTimeout ?? (typeof record.timeout === 'number' && Number.isFinite(record.timeout) ? record.timeout : DEFAULT_API_TIMEOUT),
-    apiMode: legacyApiMode,
+    apiMode: 'images',
     codexCli: false,
     apiProxy: false,
     responseFormatB64Json: record.responseFormatB64Json === true ? true : undefined,
@@ -519,7 +518,7 @@ export function normalizeSettings(input: Partial<AppSettings> | unknown): AppSet
     baseUrl: '',
     apiKey: '',
     sub2apiKeyId: typeof persistedProfile.sub2apiKeyId === 'number' ? persistedProfile.sub2apiKeyId : legacyProfile.sub2apiKeyId ?? null,
-    apiMode: persistedProfile.apiMode === 'responses' ? 'responses' : 'images',
+    apiMode: 'images',
     codexCli: false,
     apiProxy: false,
     streamImages: typeof persistedProfile.streamImages === 'boolean' ? persistedProfile.streamImages : true,
