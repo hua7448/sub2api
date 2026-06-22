@@ -1,8 +1,9 @@
 import React, { useEffect, useState, useRef } from 'react'
-import { useStore, addImageFromUrl, ensureImageCached } from '../store'
+import { useStore, addImageFromUrl } from '../store'
 import { copyImageSourceToClipboard, getClipboardFailureMessage } from '../lib/clipboard'
 import { downloadImageEntriesAsZip, downloadImageIds, formatExportFileTime, getImageZipEntries } from '../lib/downloadImages'
 import { suppressGlobalClicks } from '../lib/clickSuppression'
+import { resolveLocalImageSourceOrFallback } from '../lib/localImageSource'
 import { CopyIcon, DownloadIcon, EditIcon } from './icons'
 
 export default function ImageContextMenu() {
@@ -77,8 +78,7 @@ export default function ImageContextMenu() {
   if (!menuInfo) return null
 
   const getOriginalImageSrc = async () => {
-    if (!menuInfo.imageId) return menuInfo.src
-    return await ensureImageCached(menuInfo.imageId) ?? menuInfo.src
+    return await resolveLocalImageSourceOrFallback(menuInfo.imageId, menuInfo.src)
   }
 
   const handleCopy = async (e: React.MouseEvent) => {

@@ -23,6 +23,7 @@ export async function copyImageSourceToClipboard(src: string | Promise<string | 
   const resolvedSrc = await Promise.resolve(src)
   if (!resolvedSrc) throw new Error('Image source is not available')
   const res = await fetch(resolvedSrc)
+  if (!res.ok) throw new Error(`Image source fetch failed: HTTP ${res.status}`)
   const blob = await res.blob()
   await writeImageBlobToClipboard(blob)
 }

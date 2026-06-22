@@ -92,6 +92,39 @@ func TestOpenAIGatewayServiceParseOpenAIImagesRequest_MultipartEdit(t *testing.T
 	require.Equal(t, OpenAIImagesCapabilityNative, parsed.RequiredCapability)
 }
 
+func TestOpenAIGatewayServiceParseOpenAIImagesRequest_MultipartEditImageArrayField(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+
+	var body bytes.Buffer
+	writer := multipart.NewWriter(&body)
+	require.NoError(t, writer.WriteField("model", "gpt-image-2"))
+	require.NoError(t, writer.WriteField("prompt", "use references"))
+
+	part, err := writer.CreateFormFile("image[]", "source-1.png")
+	require.NoError(t, err)
+	_, err = part.Write([]byte("fake-image-1"))
+	require.NoError(t, err)
+	part, err = writer.CreateFormFile("image[1]", "source-2.png")
+	require.NoError(t, err)
+	_, err = part.Write([]byte("fake-image-2"))
+	require.NoError(t, err)
+	require.NoError(t, writer.Close())
+
+	req := httptest.NewRequest(http.MethodPost, "/v1/images/edits", bytes.NewReader(body.Bytes()))
+	req.Header.Set("Content-Type", writer.FormDataContentType())
+	rec := httptest.NewRecorder()
+	c, _ := gin.CreateTestContext(rec)
+	c.Request = req
+
+	svc := &OpenAIGatewayService{}
+	parsed, err := svc.ParseOpenAIImagesRequest(c, body.Bytes())
+	require.NoError(t, err)
+	require.NotNil(t, parsed)
+	require.Len(t, parsed.Uploads, 2)
+	require.Equal(t, "image[]", parsed.Uploads[0].FieldName)
+	require.Equal(t, "image[1]", parsed.Uploads[1].FieldName)
+}
+
 func TestOpenAIImagesRequestModerationBody_JSONEditIncludesInputImageURLs(t *testing.T) {
 	parsed := &OpenAIImagesRequest{
 		Endpoint:       openAIImagesEditsEndpoint,

@@ -1199,14 +1199,10 @@ export default function SettingsModal() {
       <div className="grid gap-4 sm:grid-cols-2">
         <label className="block">
           <span className="mb-1.5 block text-sm text-gray-600 dark:text-gray-300">{hostText('API 接口', 'API mode')}</span>
-          <Select
-            value={activeProfile.apiMode ?? DEFAULT_SETTINGS.apiMode}
-            onChange={(value) => updateActiveProfile({ apiMode: value as AppSettings['apiMode'] }, true)}
-            options={[
-              { label: 'Images API', value: 'images' },
-              { label: 'Responses API', value: 'responses' },
-            ]}
-            className="w-full rounded-xl border border-gray-200/70 bg-white/60 px-3 py-2.5 text-sm text-gray-700 outline-none transition focus:border-blue-300 dark:border-white/[0.08] dark:bg-white/[0.03] dark:text-gray-200 dark:focus:border-blue-500/50"
+          <input
+            value="Images API"
+            readOnly
+            className="w-full rounded-xl border border-gray-200/70 bg-gray-50/80 px-3 py-2.5 text-sm text-gray-500 outline-none dark:border-white/[0.08] dark:bg-white/[0.03] dark:text-gray-400"
           />
         </label>
         <label className="block">

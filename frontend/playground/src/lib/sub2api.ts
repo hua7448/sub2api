@@ -74,7 +74,6 @@ export function applySub2APISettings(settings: AppSettings, remote: Sub2APISetti
   const persistedProfile = settings.profiles?.find((profile) => profile.provider === 'sub2api')
   const persistedKeyId = Number(persistedProfile?.sub2apiKeyId)
   const activeKeyId = keys.some((key) => key.id === persistedKeyId) ? persistedKeyId : keys[0]?.id ?? null
-  const apiMode = persistedProfile?.apiMode === 'responses' ? 'responses' : 'images'
   const persistedModelAllowed = persistedProfile?.model && (
     remote.allowed_models.length === 0 || remote.allowed_models.includes(persistedProfile.model)
   )
@@ -89,7 +88,7 @@ export function applySub2APISettings(settings: AppSettings, remote: Sub2APISetti
     sub2apiKeyId: activeKeyId,
     model,
     timeout: 600,
-    apiMode,
+    apiMode: 'images',
     codexCli: false,
     apiProxy: false,
     responseFormatB64Json: true,
@@ -102,7 +101,7 @@ export function applySub2APISettings(settings: AppSettings, remote: Sub2APISetti
     baseUrl: '',
     apiKey: '',
     model,
-    apiMode: profile.apiMode,
+    apiMode: 'images',
     codexCli: false,
     apiProxy: false,
     agentWebSearch: remote.agent_web_search_enabled ? settings.agentWebSearch : false,

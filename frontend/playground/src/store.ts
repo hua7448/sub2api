@@ -4610,15 +4610,24 @@ export async function editOutputs(task: TaskRecord) {
   if (!task.outputImages?.length) return
 
   let added = 0
+  let failed = 0
   for (const imgId of task.outputImages) {
     if (inputImages.find((i) => i.id === imgId)) continue
-    const dataUrl = await ensureImageCached(imgId)
+    const dataUrl = await ensureImageCached(imgId).catch(() => undefined)
     if (dataUrl) {
       addInputImage({ id: imgId, dataUrl })
       added++
+    } else {
+      failed++
     }
   }
-  showToast(`已添加 ${added} 张输出图到输入`, 'success')
+  if (failed > 0 && added === 0) {
+    showToast('编辑输出失败：图片原始数据已丢失', 'error')
+  } else if (failed > 0) {
+    showToast(`已添加 ${added} 张输出图到输入，${failed} 张读取失败`, 'error')
+  } else {
+    showToast(`已添加 ${added} 张输出图到输入`, 'success')
+  }
 }
 
 /** 删除多条任务 */
