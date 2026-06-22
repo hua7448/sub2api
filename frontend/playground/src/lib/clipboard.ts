@@ -21,10 +21,10 @@ export async function copyImageSourceToClipboard(src: string | Promise<string | 
   const resolvedSrc = await Promise.resolve(src)
   if (!resolvedSrc) throw new Error('Image source is not available')
 
-  const clipboardWrite = navigator.clipboard?.write as ((items: ClipboardItem[]) => Promise<void>) | undefined
-  if (clipboardWrite && typeof ClipboardItem !== 'undefined') {
+  const clipboard = navigator.clipboard
+  if (clipboard?.write && typeof ClipboardItem !== 'undefined') {
     const blob = await imageSourceToBlob(resolvedSrc)
-    await writeImageBlobToClipboard(blob, clipboardWrite)
+    await writeImageBlobToClipboard(blob, (items) => clipboard.write(items))
     return
   }
 
