@@ -1,3 +1,5 @@
+import { dataUrlToBlob } from './canvasImage'
+
 export async function copyTextToClipboard(text: string) {
   let asyncClipboardError: unknown = null
 
@@ -16,16 +18,19 @@ export async function copyTextToClipboard(text: string) {
 }
 
 export async function copyImageSourceToClipboard(src: string | Promise<string | undefined>) {
-  if (!navigator.clipboard?.write || typeof ClipboardItem === 'undefined') {
-    throw new Error('Clipboard image API is not available')
-  }
-
   const resolvedSrc = await Promise.resolve(src)
   if (!resolvedSrc) throw new Error('Image source is not available')
-  const res = await fetch(resolvedSrc)
-  if (!res.ok) throw new Error(`Image source fetch failed: HTTP ${res.status}`)
-  const blob = await res.blob()
-  await writeImageBlobToClipboard(blob)
+
+  const clipboardWrite = navigator.clipboard?.write as ((items: ClipboardItem[]) => Promise<void>) | undefined
+  if (clipboardWrite && typeof ClipboardItem !== 'undefined') {
+    const blob = await imageSourceToBlob(resolvedSrc)
+    await writeImageBlobToClipboard(blob, clipboardWrite)
+    return
+  }
+
+  if (copyImageWithExecCommand(resolvedSrc)) return
+
+  throw new Error('当前浏览器不支持图像剪贴板写入，请使用下载按钮保存图片')
 }
 
 export function getClipboardFailureMessage(fallback: string, err: unknown) {
@@ -61,7 +66,45 @@ function copyTextWithExecCommand(text: string) {
   }
 }
 
-async function writeImageBlobToClipboard(blob: Blob) {
+async function imageSourceToBlob(src: string): Promise<Blob> {
+  if (src.startsWith('data:')) return dataUrlToBlob(src)
+  const res = await fetch(src)
+  if (!res.ok) throw new Error(`Image source fetch failed: HTTP ${res.status}`)
+  return await res.blob()
+}
+
+function copyImageWithExecCommand(src: string) {
+  const container = document.createElement('div')
+  container.contentEditable = 'true'
+  container.style.position = 'fixed'
+  container.style.left = '-9999px'
+  container.style.top = '0'
+  container.style.width = '1px'
+  container.style.height = '1px'
+  container.style.overflow = 'hidden'
+
+  const image = document.createElement('img')
+  image.src = src
+  container.appendChild(image)
+  document.body.appendChild(container)
+
+  const selection = window.getSelection()
+  const range = document.createRange()
+
+  try {
+    range.selectNode(image)
+    selection?.removeAllRanges()
+    selection?.addRange(range)
+    return document.execCommand('copy')
+  } catch {
+    return false
+  } finally {
+    selection?.removeAllRanges()
+    document.body.removeChild(container)
+  }
+}
+
+async function writeImageBlobToClipboard(blob: Blob, clipboardWrite: (items: ClipboardItem[]) => Promise<void>) {
   if (!blob.type.startsWith('image/')) throw new Error('Clipboard item is not an image')
 
   const clipboardItems: Record<string, Blob | Promise<Blob>> = {}
@@ -81,7 +124,7 @@ async function writeImageBlobToClipboard(blob: Blob) {
     throw new Error('当前浏览器不支持图像剪贴板写入')
   }
 
-  await navigator.clipboard.write([
+  await clipboardWrite([
     new ClipboardItem(clipboardItems),
   ])
 }

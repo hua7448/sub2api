@@ -5104,13 +5104,19 @@ export async function createInputImageFromFile(file: File): Promise<InputImage |
 
 /** 添加图片到输入（右键菜单）—— 支持 data/blob/http URL */
 export async function addImageFromUrl(src: string): Promise<void> {
-  const res = await fetch(src)
-  const blob = await res.blob()
-  if (!blob.type.startsWith('image/')) throw new Error('不是有效的图片')
-  const dataUrl = await blobToDataUrl(blob)
+  const dataUrl = src.startsWith('data:')
+    ? src
+    : await fetchImageSourceAsDataUrl(src)
   const id = await storeImage(dataUrl, 'upload')
   cacheImage(id, dataUrl)
   useStore.getState().addInputImage({ id, dataUrl })
+}
+
+async function fetchImageSourceAsDataUrl(src: string): Promise<string> {
+  const res = await fetch(src)
+  const blob = await res.blob()
+  if (!blob.type.startsWith('image/')) throw new Error('不是有效的图片')
+  return await blobToDataUrl(blob)
 }
 
 function fileToDataUrl(file: File): Promise<string> {
