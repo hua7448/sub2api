@@ -1134,6 +1134,7 @@ export default {
     card: {
       sitePrice: 'Our Price',
       officialPrice: 'Official Price',
+      priceFormula: 'Formula: official price * group rate x{rate}, shown at 1:1 USD parity',
       savings: 'Save {percent}',
       source: 'Source',
       group: 'Group',

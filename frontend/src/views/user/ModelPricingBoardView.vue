@@ -117,9 +117,15 @@
                       <div class="text-xs font-medium uppercase tracking-[0.14em] text-gray-500 dark:text-gray-400">
                         {{ row.label }}
                       </div>
+                      <div class="mt-2 text-xs font-semibold text-primary-700 dark:text-primary-300">
+                        {{ t('modelPricing.card.sitePrice') }}
+                      </div>
                       <div class="mt-2 text-2xl font-black text-primary-700 dark:text-primary-300">
                         {{ formatTokenPrice(row.sitePrice) }}
                       </div>
+                      <p class="mt-2 max-w-md text-xs leading-relaxed text-gray-500 dark:text-gray-400">
+                        {{ t('modelPricing.card.priceFormula', { rate: formatRate(item.rate_multiplier) }) }}
+                      </p>
                       <div
                         v-if="row.officialPrice != null"
                         class="mt-2 flex flex-wrap items-center gap-2 text-sm text-gray-400 dark:text-gray-500"
@@ -210,20 +216,20 @@ const appStore = useAppStore()
 const items = ref<ModelPricingBoardItem[]>([])
 const loading = ref(false)
 const searchQuery = ref('')
-const activeCategory = ref<PricingCategory>('claude')
+const activeCategory = ref<PricingCategory>('codex')
 
 const categoryTabs = computed(() => [
+  {
+    value: 'codex' as const,
+    label: t('modelPricing.tabs.codex'),
+    activeClass: 'bg-primary-600 text-[#fffaf2] shadow-sm dark:bg-primary-400 dark:text-primary-950',
+    inactiveClass: 'text-primary-800/70 hover:text-primary-950 dark:text-primary-200/70 dark:hover:text-primary-100',
+  },
   {
     value: 'claude' as const,
     label: t('modelPricing.tabs.claude'),
     activeClass: 'bg-amber-500 text-amber-950 shadow-sm',
     inactiveClass: 'text-amber-900/70 hover:text-amber-950 dark:text-amber-200/70 dark:hover:text-amber-100',
-  },
-  {
-    value: 'codex' as const,
-    label: t('modelPricing.tabs.codex'),
-    activeClass: 'bg-gray-900 text-white shadow-sm dark:bg-gray-100 dark:text-gray-900',
-    inactiveClass: 'text-gray-600 hover:text-gray-900 dark:text-gray-300 dark:hover:text-white',
   },
 ])
 
@@ -315,7 +321,7 @@ function categoryBadgeClass(item: ModelPricingBoardItem): string {
     return 'border-amber-200 bg-amber-50 text-amber-800 dark:border-amber-900/60 dark:bg-amber-950/30 dark:text-amber-200'
   }
   if (category === 'codex') {
-    return 'border-gray-300 bg-gray-900 text-white dark:border-dark-500 dark:bg-gray-100 dark:text-gray-900'
+    return 'border-primary-200 bg-primary-100 text-primary-800 dark:border-primary-800 dark:bg-primary-950/40 dark:text-primary-200'
   }
   return 'border-primary-200 bg-primary-50 text-primary-800 dark:border-primary-900/60 dark:bg-primary-950/30 dark:text-primary-200'
 }

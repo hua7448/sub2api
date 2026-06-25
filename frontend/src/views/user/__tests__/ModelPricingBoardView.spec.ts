@@ -42,7 +42,9 @@ vi.mock('vue-i18n', async () => {
     'modelPricing.emptyState.codex': 'No Codex discount models available',
     'modelPricing.emptyStateDescription.claude': 'No Anthropic pricing cards match the current filters.',
     'modelPricing.emptyStateDescription.codex': 'No Codex pricing cards match the current filters.',
+    'modelPricing.card.sitePrice': 'Our Price',
     'modelPricing.card.officialPrice': 'Official Price',
+    'modelPricing.card.priceFormula': 'Formula: official price * group rate x{rate}, shown at 1:1 USD parity',
     'modelPricing.card.savings': 'Save {percent}',
     'modelPricing.card.group': 'Group',
     'modelPricing.card.channel': 'Channel',
@@ -170,16 +172,13 @@ describe('ModelPricingBoardView', () => {
 
     await flushPromises()
 
-    expect(wrapper.text()).toContain('claude-sonnet-4')
-    expect(wrapper.text()).not.toContain('codex-mini-latest')
-    expect(wrapper.text()).not.toContain('gpt-5.5')
-
-    await wrapper.get('[data-testid="model-pricing-tab-codex"]').trigger('click')
-    await flushPromises()
+    const tabs = wrapper.findAll('[data-testid^="model-pricing-tab-"]')
+    expect(tabs.map((tab) => tab.text())).toEqual(['Codex', 'Claude'])
 
     expect(wrapper.text()).toContain('codex-mini-latest')
     expect(wrapper.text()).toContain('gpt-5.5')
     expect(wrapper.text()).not.toContain('claude-sonnet-4')
+    expect(wrapper.text()).toContain('Formula: official price * group rate x1.2, shown at 1:1 USD parity')
 
     await wrapper.get('input[type="text"]').setValue('internal')
     await flushPromises()
@@ -190,6 +189,13 @@ describe('ModelPricingBoardView', () => {
     await flushPromises()
     expect(wrapper.text()).toContain('No Codex discount models available')
     expect(wrapper.text()).not.toContain('claude-sonnet-4')
+
+    await wrapper.get('input[type="text"]').setValue('')
+    await wrapper.get('[data-testid="model-pricing-tab-claude"]').trigger('click')
+    await flushPromises()
+
+    expect(wrapper.text()).toContain('claude-sonnet-4')
+    expect(wrapper.text()).not.toContain('codex-mini-latest')
   })
 
   it('hides savings badge when official price is missing for a pricing row', async () => {

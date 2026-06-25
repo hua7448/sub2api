@@ -1138,6 +1138,7 @@ export default {
     card: {
       sitePrice: '站内价',
       officialPrice: '官方价',
+      priceFormula: '核算方式：官方定价 × 分组倍率 x{rate}，按 1:1 美元口径展示',
       savings: '省 {percent}',
       source: '来源',
       group: '分组',
