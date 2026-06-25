@@ -78,6 +78,12 @@ func RegisterUserRoutes(
 			channels.GET("/available", h.AvailableChannel.List)
 		}
 
+		// 用户模型价格看板（非管理员接口）
+		modelPricing := authenticated.Group("/model-pricing")
+		{
+			modelPricing.GET("/board", h.ModelPricingBoard.Board)
+		}
+
 		// 使用记录
 		usage := authenticated.Group("/usage")
 		{

@@ -351,17 +351,27 @@ const (
 	// =========================
 
 	// SettingKeyChannelMonitorEnabled is a DB-backed soft switch for the channel monitor feature.
-	// When false: runner skips scheduling and user-facing endpoints return an empty list.
+	// When false: runner skips scheduling. User visibility is controlled separately by
+	// SettingKeyChannelStatusPublicEnabled.
 	SettingKeyChannelMonitorEnabled = "channel_monitor_enabled"
 
 	// SettingKeyChannelMonitorDefaultIntervalSeconds controls the default interval (seconds)
 	// pre-filled when creating a new channel monitor from the admin UI. Range: [15, 3600].
 	SettingKeyChannelMonitorDefaultIntervalSeconds = "channel_monitor_default_interval_seconds"
 
+	// SettingKeyChannelStatusPublicEnabled controls whether authenticated non-admin users
+	// can see the read-only channel status page and user-facing status APIs. Defaults to
+	// false (opt-in) and does not affect monitor scheduling/admin APIs.
+	SettingKeyChannelStatusPublicEnabled = "channel_status_public_enabled"
+
 	// SettingKeyAvailableChannelsEnabled is a DB-backed soft switch for the "Available Channels"
 	// user-facing aggregate view. When false: user endpoint returns an empty list and the
 	// sidebar entry is hidden. Defaults to false (opt-in feature).
 	SettingKeyAvailableChannelsEnabled = "available_channels_enabled"
+
+	// SettingKeyModelPricingBoardEnabled controls the user-facing model pricing board.
+	// Defaults to false (opt-in).
+	SettingKeyModelPricingBoardEnabled = "model_pricing_board_enabled"
 
 	// =========================
 	// Overload Cooldown (529)

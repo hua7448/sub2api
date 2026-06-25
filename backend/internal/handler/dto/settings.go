@@ -241,8 +241,14 @@ type SystemSettings struct {
 	ChannelMonitorEnabled                bool `json:"channel_monitor_enabled"`
 	ChannelMonitorDefaultIntervalSeconds int  `json:"channel_monitor_default_interval_seconds"`
 
+	// User-facing channel status visibility switch
+	ChannelStatusPublicEnabled bool `json:"channel_status_public_enabled"`
+
 	// Available Channels feature switch (user-facing aggregate view)
 	AvailableChannelsEnabled bool `json:"available_channels_enabled"`
+
+	// Model Pricing Board feature switch (user-facing)
+	ModelPricingBoardEnabled bool `json:"model_pricing_board_enabled"`
 
 	// 风控中心功能开关
 	RiskControlEnabled bool `json:"risk_control_enabled"`
@@ -321,7 +327,11 @@ type PublicSettings struct {
 	ChannelMonitorEnabled                bool `json:"channel_monitor_enabled"`
 	ChannelMonitorDefaultIntervalSeconds int  `json:"channel_monitor_default_interval_seconds"`
 
+	ChannelStatusPublicEnabled bool `json:"channel_status_public_enabled"`
+
 	AvailableChannelsEnabled bool `json:"available_channels_enabled"`
+
+	ModelPricingBoardEnabled bool `json:"model_pricing_board_enabled"`
 
 	AffiliateEnabled bool `json:"affiliate_enabled"`
 

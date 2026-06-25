@@ -5446,6 +5446,18 @@
               <Toggle v-model="form.channel_monitor_enabled" />
             </div>
 
+            <div class="flex items-center justify-between">
+              <div>
+                <label class="text-sm font-medium text-gray-700 dark:text-gray-300">
+                  {{ t('admin.settings.features.channelMonitor.publicEnabled') }}
+                </label>
+                <p class="mt-0.5 text-xs text-gray-500 dark:text-gray-400">
+                  {{ t('admin.settings.features.channelMonitor.publicEnabledHint') }}
+                </p>
+              </div>
+              <Toggle v-model="form.channel_status_public_enabled" />
+            </div>
+
             <div v-if="form.channel_monitor_enabled">
               <label class="input-label">
                 {{ t('admin.settings.features.channelMonitor.defaultInterval') }}
@@ -5494,6 +5506,18 @@
                 </p>
               </div>
               <Toggle v-model="form.available_channels_enabled" />
+            </div>
+
+            <div class="flex items-center justify-between">
+              <div>
+                <label class="text-sm font-medium text-gray-700 dark:text-gray-300">
+                  {{ t('admin.settings.features.availableChannels.pricingBoardEnabled') }}
+                </label>
+                <p class="mt-0.5 text-xs text-gray-500 dark:text-gray-400">
+                  {{ t('admin.settings.features.availableChannels.pricingBoardEnabledHint') }}
+                </p>
+              </div>
+              <Toggle v-model="form.model_pricing_board_enabled" />
             </div>
           </div>
         </div>
@@ -7848,8 +7872,10 @@ const form = reactive<SettingsForm>({
   // Channel Monitor feature switch
   channel_monitor_enabled: true,
   channel_monitor_default_interval_seconds: 60,
+  channel_status_public_enabled: false,
   // Available Channels feature switch
   available_channels_enabled: false,
+  model_pricing_board_enabled: false,
   // Affiliate (邀请返利) feature switch
   affiliate_enabled: false,
   // Allow user view error requests
@@ -9015,8 +9041,10 @@ async function saveSettings() {
       channel_monitor_enabled: form.channel_monitor_enabled,
       channel_monitor_default_interval_seconds:
         Number(form.channel_monitor_default_interval_seconds) || 60,
+      channel_status_public_enabled: form.channel_status_public_enabled,
       // Available Channels feature switch
       available_channels_enabled: form.available_channels_enabled,
+      model_pricing_board_enabled: form.model_pricing_board_enabled,
       // Affiliate (邀请返利) feature switch
       affiliate_enabled: form.affiliate_enabled,
       allow_user_view_error_requests: form.allow_user_view_error_requests,

@@ -612,8 +612,14 @@ export interface SystemSettings {
   channel_monitor_enabled: boolean;
   channel_monitor_default_interval_seconds: number;
 
+  // User-facing channel status visibility switch
+  channel_status_public_enabled: boolean;
+
   // Available Channels feature switch
   available_channels_enabled: boolean;
+
+  // Model Pricing Board feature switch
+  model_pricing_board_enabled: boolean;
 
   // Affiliate (邀请返利) feature switch
   affiliate_enabled: boolean;
@@ -853,8 +859,14 @@ export interface UpdateSettingsRequest {
   channel_monitor_enabled?: boolean;
   channel_monitor_default_interval_seconds?: number;
 
+  // User-facing channel status visibility switch
+  channel_status_public_enabled?: boolean;
+
   // Available Channels feature switch
   available_channels_enabled?: boolean;
+
+  // Model Pricing Board feature switch
+  model_pricing_board_enabled?: boolean;
 
   // Affiliate (邀请返利) feature switch
   affiliate_enabled?: boolean;

@@ -265,6 +265,18 @@ const routes: RouteRecordRaw[] = [
     }
   },
   {
+    path: '/model-pricing',
+    name: 'ModelPricingBoard',
+    component: () => import('@/views/user/ModelPricingBoardView.vue'),
+    meta: {
+      requiresAuth: true,
+      requiresAdmin: false,
+      title: 'Model Pricing',
+      titleKey: 'modelPricing.title',
+      descriptionKey: 'modelPricing.description'
+    }
+  },
+  {
     path: '/profile',
     name: 'Profile',
     component: () => import('@/views/user/ProfileView.vue'),

@@ -390,6 +390,7 @@ export default {
     groups: 'Groups',
     channels: 'Channels',
     availableChannels: 'Available Channels',
+    modelPricing: 'Model Pricing',
     subscriptions: 'Subscriptions',
     accounts: 'Accounts',
     proxies: 'Proxies',
@@ -1107,6 +1108,31 @@ export default {
       intervals: 'Tiered Pricing',
       unitPerMillion: '/ 1M tokens',
       unitPerRequest: '/ request'
+    }
+  },
+
+  modelPricing: {
+    title: 'Model Pricing',
+    description: 'Your lowest available model prices compared with official rates',
+    searchPlaceholder: 'Search models, platforms, groups or channels...',
+    empty: 'No visible model prices',
+    loadError: 'Failed to load model pricing',
+    userRate: 'User rate',
+    unitPerMillion: '/ 1M tokens',
+    columns: {
+      model: 'Model ID',
+      platform: 'Platform',
+      source: 'Source',
+      input: 'Input',
+      output: 'Output',
+      cacheRead: 'Cache Read',
+      official: 'Official Standard',
+      savings: 'Savings'
+    },
+    official: {
+      input: 'Input',
+      output: 'Output',
+      cacheRead: 'Cache'
     }
   },
 
@@ -5462,10 +5488,12 @@ export default {
       features: {
         channelMonitor: {
           title: 'Channel Monitor',
-          description: 'Periodically probe configured channels and surface availability / latency to users. Turning it off stops the scheduler and returns an empty list on the user page.',
+          description: 'Periodically probe configured channels and record availability / latency. User visibility is controlled separately below.',
           configureLink: 'Configure monitors in Channel Management > Channel Monitor',
           enabled: 'Enable Channel Monitor',
           enabledHint: 'Disabling stops background checks; existing history is preserved.',
+          publicEnabled: 'Show Channel Status to Users',
+          publicEnabledHint: 'When off, the user sidebar entry is hidden and user status APIs return no monitor data.',
           defaultInterval: 'Default check interval (seconds)',
           defaultIntervalHint: 'Pre-fills the interval when creating a new monitor; each monitor can override it. Range 15 – 3600.',
         },
@@ -5475,6 +5503,8 @@ export default {
           configureLink: 'Configure model pricing in Channel Management > Channel Pricing',
           enabled: 'Enable Available Channels',
           enabledHint: 'When off, the sidebar entry is hidden and the endpoint returns an empty list.',
+          pricingBoardEnabled: 'Enable Model Pricing Board',
+          pricingBoardEnabledHint: 'Shows users their lowest accessible token-model price alongside official standard rates. Disabled by default.',
         },
         riskControl: {
           title: 'Risk Control',

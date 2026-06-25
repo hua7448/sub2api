@@ -299,7 +299,9 @@ func (h *SettingHandler) GetSettings(c *gin.Context) {
 		ChannelMonitorEnabled:                settings.ChannelMonitorEnabled,
 		ChannelMonitorDefaultIntervalSeconds: settings.ChannelMonitorDefaultIntervalSeconds,
 
-		AvailableChannelsEnabled: settings.AvailableChannelsEnabled,
+		ChannelStatusPublicEnabled: settings.ChannelStatusPublicEnabled,
+		AvailableChannelsEnabled:   settings.AvailableChannelsEnabled,
+		ModelPricingBoardEnabled:   settings.ModelPricingBoardEnabled,
 
 		AffiliateEnabled: settings.AffiliateEnabled,
 
@@ -645,8 +647,14 @@ type UpdateSettingsRequest struct {
 	ChannelMonitorEnabled                *bool `json:"channel_monitor_enabled"`
 	ChannelMonitorDefaultIntervalSeconds *int  `json:"channel_monitor_default_interval_seconds"`
 
+	// User-facing channel status visibility switch
+	ChannelStatusPublicEnabled *bool `json:"channel_status_public_enabled"`
+
 	// Available Channels feature switch (user-facing)
 	AvailableChannelsEnabled *bool `json:"available_channels_enabled"`
+
+	// Model Pricing Board feature switch (user-facing)
+	ModelPricingBoardEnabled *bool `json:"model_pricing_board_enabled"`
 
 	// Affiliate (邀请返利) feature switch
 	AffiliateEnabled *bool `json:"affiliate_enabled"`
@@ -1787,11 +1795,23 @@ func (h *SettingHandler) UpdateSettings(c *gin.Context) {
 			}
 			return previousSettings.ChannelMonitorDefaultIntervalSeconds
 		}(),
+		ChannelStatusPublicEnabled: func() bool {
+			if req.ChannelStatusPublicEnabled != nil {
+				return *req.ChannelStatusPublicEnabled
+			}
+			return previousSettings.ChannelStatusPublicEnabled
+		}(),
 		AvailableChannelsEnabled: func() bool {
 			if req.AvailableChannelsEnabled != nil {
 				return *req.AvailableChannelsEnabled
 			}
 			return previousSettings.AvailableChannelsEnabled
+		}(),
+		ModelPricingBoardEnabled: func() bool {
+			if req.ModelPricingBoardEnabled != nil {
+				return *req.ModelPricingBoardEnabled
+			}
+			return previousSettings.ModelPricingBoardEnabled
 		}(),
 		AffiliateEnabled: func() bool {
 			if req.AffiliateEnabled != nil {
@@ -2137,7 +2157,9 @@ func (h *SettingHandler) UpdateSettings(c *gin.Context) {
 		ChannelMonitorEnabled:                updatedSettings.ChannelMonitorEnabled,
 		ChannelMonitorDefaultIntervalSeconds: updatedSettings.ChannelMonitorDefaultIntervalSeconds,
 
-		AvailableChannelsEnabled: updatedSettings.AvailableChannelsEnabled,
+		ChannelStatusPublicEnabled: updatedSettings.ChannelStatusPublicEnabled,
+		AvailableChannelsEnabled:   updatedSettings.AvailableChannelsEnabled,
+		ModelPricingBoardEnabled:   updatedSettings.ModelPricingBoardEnabled,
 
 		AffiliateEnabled: updatedSettings.AffiliateEnabled,
 
@@ -2625,8 +2647,14 @@ func diffSettings(before *service.SystemSettings, after *service.SystemSettings,
 	if before.ChannelMonitorDefaultIntervalSeconds != after.ChannelMonitorDefaultIntervalSeconds {
 		changed = append(changed, "channel_monitor_default_interval_seconds")
 	}
+	if before.ChannelStatusPublicEnabled != after.ChannelStatusPublicEnabled {
+		changed = append(changed, "channel_status_public_enabled")
+	}
 	if before.AvailableChannelsEnabled != after.AvailableChannelsEnabled {
 		changed = append(changed, "available_channels_enabled")
+	}
+	if before.ModelPricingBoardEnabled != after.ModelPricingBoardEnabled {
+		changed = append(changed, "model_pricing_board_enabled")
 	}
 	if before.AffiliateEnabled != after.AffiliateEnabled {
 		changed = append(changed, "affiliate_enabled")

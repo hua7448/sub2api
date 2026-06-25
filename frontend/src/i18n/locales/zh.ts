@@ -390,6 +390,7 @@ export default {
     groups: '分组管理',
     channels: '渠道管理',
     availableChannels: '可用渠道',
+    modelPricing: '模型价格',
     subscriptions: '订阅管理',
     accounts: '账号管理',
     proxies: 'IP管理',
@@ -1111,6 +1112,31 @@ export default {
       intervals: '阶梯定价',
       unitPerMillion: '/ 1M token',
       unitPerRequest: '/ 次'
+    }
+  },
+
+  modelPricing: {
+    title: '模型价格',
+    description: '按您当前可访问分组计算的最低模型价格与官方标准价对比',
+    searchPlaceholder: '搜索模型、平台、分组或渠道...',
+    empty: '暂无可见模型价格',
+    loadError: '加载模型价格失败',
+    userRate: '专属倍率',
+    unitPerMillion: '/ 1M tokens',
+    columns: {
+      model: '模型 ID',
+      platform: '平台',
+      source: '来源',
+      input: '输入价格',
+      output: '输出价格',
+      cacheRead: '缓存读取',
+      official: '官方标准价',
+      savings: '节省幅度'
+    },
+    official: {
+      input: '输入',
+      output: '输出',
+      cacheRead: '缓存'
     }
   },
 
@@ -5622,10 +5648,12 @@ export default {
       features: {
         channelMonitor: {
           title: '渠道监控',
-          description: '定期对配置的渠道发起健康检查，向用户展示可用性与延迟。关闭后调度器停止扫描，用户端列表为空。',
+          description: '定期对配置的渠道发起健康检查并记录可用性与延迟。是否向用户展示由下方独立开关控制。',
           configureLink: '前往 渠道管理 > 渠道监控 配置监控项',
           enabled: '启用渠道监控',
           enabledHint: '关闭后后台不再执行定时检测，已有数据保留。',
+          publicEnabled: '向用户展示渠道状态',
+          publicEnabledHint: '关闭后用户端侧边栏入口隐藏，用户侧状态接口不返回监控数据。',
           defaultInterval: '默认检测间隔（秒）',
           defaultIntervalHint: '新建渠道监控时表单的默认值，可被单个渠道覆盖。范围 15 – 3600 秒。',
         },
@@ -5635,6 +5663,8 @@ export default {
           configureLink: '前往 渠道管理 > 渠道定价 配置模型价格',
           enabled: '启用可用渠道',
           enabledHint: '关闭后用户端侧边栏入口隐藏，接口返回空数组。',
+          pricingBoardEnabled: '启用模型价格看板',
+          pricingBoardEnabledHint: '向用户展示其当前可访问 token 模型的最低站内价、官方标准价和节省幅度。默认关闭。',
         },
         riskControl: {
           title: '风控中心',
