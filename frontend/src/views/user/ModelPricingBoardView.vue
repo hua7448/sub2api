@@ -246,7 +246,7 @@ const emptyStateDescription = computed(() => t(`modelPricing.emptyStateDescripti
 
 function classifyItem(item: Pick<ModelPricingBoardItem, 'platform' | 'model_id'>): PricingCategory | null {
   if (item.platform === 'anthropic') return 'claude'
-  if (item.platform === 'openai' && item.model_id.toLowerCase().includes('codex')) return 'codex'
+  if (item.platform === 'openai') return 'codex'
   return null
 }
 

@@ -137,12 +137,12 @@ describe('ModelPricingBoardView', () => {
           cache_read_savings: null,
         },
         {
-          model_id: 'gpt-4.1',
+          model_id: 'gpt-5.5',
           platform: 'openai',
           group_id: 3,
-          group_name: 'General',
+          group_name: 'Codex GPT',
           channel_id: 30,
-          channel_name: 'GPT Public',
+          channel_name: 'OpenAI Codex',
           rate_multiplier: 1,
           user_rate_overridden: false,
           site_input_price: 0.000001,
@@ -172,18 +172,19 @@ describe('ModelPricingBoardView', () => {
 
     expect(wrapper.text()).toContain('claude-sonnet-4')
     expect(wrapper.text()).not.toContain('codex-mini-latest')
-    expect(wrapper.text()).not.toContain('gpt-4.1')
+    expect(wrapper.text()).not.toContain('gpt-5.5')
 
     await wrapper.get('[data-testid="model-pricing-tab-codex"]').trigger('click')
     await flushPromises()
 
     expect(wrapper.text()).toContain('codex-mini-latest')
+    expect(wrapper.text()).toContain('gpt-5.5')
     expect(wrapper.text()).not.toContain('claude-sonnet-4')
-    expect(wrapper.text()).not.toContain('gpt-4.1')
 
     await wrapper.get('input[type="text"]').setValue('internal')
     await flushPromises()
     expect(wrapper.text()).toContain('codex-mini-latest')
+    expect(wrapper.text()).not.toContain('gpt-5.5')
 
     await wrapper.get('input[type="text"]').setValue('claude alpha')
     await flushPromises()
