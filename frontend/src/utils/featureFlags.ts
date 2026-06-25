@@ -109,6 +109,11 @@ export const FeatureFlags = {
     mode: 'opt-in',
     label: 'Model Pricing Board',
   }),
+  purchaseSubscription: defineFlag({
+    key: 'purchase_subscription_enabled',
+    mode: 'opt-in',
+    label: 'External Recharge',
+  }),
   payment: defineFlag({
     key: 'payment_enabled',
     mode: 'opt-out',

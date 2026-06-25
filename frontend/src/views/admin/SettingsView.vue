@@ -5532,6 +5532,45 @@
         <div class="card">
           <div class="border-b border-gray-100 px-6 py-4 dark:border-dark-700">
             <h2 class="text-lg font-semibold text-gray-900 dark:text-white">
+              {{ t('admin.settings.features.externalRecharge.title') }}
+            </h2>
+            <p class="mt-1 text-sm text-gray-500 dark:text-gray-400">
+              {{ t('admin.settings.features.externalRecharge.description') }}
+            </p>
+          </div>
+          <div class="space-y-5 p-6">
+            <div class="flex items-center justify-between gap-4">
+              <div>
+                <label class="text-sm font-medium text-gray-700 dark:text-gray-300">
+                  {{ t('admin.settings.features.externalRecharge.enabled') }}
+                </label>
+                <p class="mt-0.5 text-xs text-gray-500 dark:text-gray-400">
+                  {{ t('admin.settings.features.externalRecharge.enabledHint') }}
+                </p>
+              </div>
+              <Toggle v-model="form.purchase_subscription_enabled" />
+            </div>
+
+            <div>
+              <label class="mb-2 block text-sm font-medium text-gray-700 dark:text-gray-300">
+                {{ t('admin.settings.features.externalRecharge.url') }}
+              </label>
+              <input
+                v-model="form.purchase_subscription_url"
+                type="url"
+                class="input font-mono text-sm"
+                :placeholder="t('admin.settings.features.externalRecharge.urlPlaceholder')"
+              />
+              <p class="mt-1.5 text-xs text-gray-500 dark:text-gray-400">
+                {{ t('admin.settings.features.externalRecharge.urlHint') }}
+              </p>
+            </div>
+          </div>
+        </div>
+
+        <div class="card">
+          <div class="border-b border-gray-100 px-6 py-4 dark:border-dark-700">
+            <h2 class="text-lg font-semibold text-gray-900 dark:text-white">
               {{ t('admin.settings.features.riskControl.title') }}
             </h2>
             <p class="mt-1 text-sm text-gray-500 dark:text-gray-400">
@@ -7702,6 +7741,8 @@ const form = reactive<SettingsForm>({
   home_content: "",
   backend_mode_enabled: false,
   hide_ccs_import_button: false,
+  purchase_subscription_enabled: false,
+  purchase_subscription_url: "",
   payment_enabled: false,
   risk_control_enabled: false,
   cyber_session_block_enabled: false,
@@ -8820,6 +8861,18 @@ async function saveSettings() {
     // Optional URL fields: auto-clear invalid values so they don't cause backend 400 errors
     if (!isValidHttpUrl(form.frontend_url)) form.frontend_url = "";
     if (!isValidHttpUrl(form.doc_url)) form.doc_url = "";
+    form.purchase_subscription_url = form.purchase_subscription_url.trim();
+    if (
+      form.purchase_subscription_url &&
+      !isValidHttpUrl(form.purchase_subscription_url)
+    ) {
+      appStore.showError(t("admin.settings.features.externalRecharge.urlInvalid"));
+      return;
+    }
+    if (form.purchase_subscription_enabled && !form.purchase_subscription_url) {
+      appStore.showError(t("admin.settings.features.externalRecharge.urlRequired"));
+      return;
+    }
     syncWeChatConnectMode();
     const wechatStoredMode = deriveWeChatConnectStoredMode(
       form.wechat_connect_open_enabled,
@@ -8870,6 +8923,8 @@ async function saveSettings() {
       home_content: form.home_content,
       backend_mode_enabled: form.backend_mode_enabled,
       hide_ccs_import_button: form.hide_ccs_import_button,
+      purchase_subscription_enabled: form.purchase_subscription_enabled,
+      purchase_subscription_url: form.purchase_subscription_url,
       table_default_page_size: form.table_default_page_size,
       table_page_size_options: form.table_page_size_options,
       custom_menu_items: form.custom_menu_items,

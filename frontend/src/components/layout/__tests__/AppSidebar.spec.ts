@@ -30,3 +30,12 @@ describe('AppSidebar header styles', () => {
     expect(sidebarBrandBlockMatch?.[0]).not.toContain('overflow: hidden;')
   })
 })
+
+describe('AppSidebar external recharge entry', () => {
+  it('opens the configured purchase subscription URL in a new tab', () => {
+    expect(componentSource).toContain('purchase_subscription_url')
+    expect(componentSource).toContain("t('nav.rechargeNow')")
+    expect(componentSource).toContain('target="_blank"')
+    expect(componentSource).toContain('rel="noopener noreferrer"')
+  })
+})

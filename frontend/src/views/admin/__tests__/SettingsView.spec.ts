@@ -171,6 +171,15 @@ vi.mock("vue-i18n", async () => {
     "admin.settings.features.userChannelPages.channelStatusEnabledHint": "只影响用户侧页面与侧边栏入口，不影响后台监控任务继续运行。",
     "admin.settings.features.userChannelPages.modelPricingEnabled": "启用模型价格",
     "admin.settings.features.userChannelPages.modelPricingEnabledHint": "向用户展示站内优惠价、官方价和节省幅度的价格卡片。",
+    "admin.settings.features.externalRecharge.title": "外部充值入口",
+    "admin.settings.features.externalRecharge.description": "在用户侧边栏展示“点我去充值”菜单，点击后在新页签打开配置的充值页面。",
+    "admin.settings.features.externalRecharge.enabled": "显示点我去充值入口",
+    "admin.settings.features.externalRecharge.enabledHint": "仅控制外部充值链接入口，不影响内置支付页和订单功能。",
+    "admin.settings.features.externalRecharge.url": "充值页面链接",
+    "admin.settings.features.externalRecharge.urlPlaceholder": "https://example.com/recharge",
+    "admin.settings.features.externalRecharge.urlHint": "必须是完整的 http(s) 链接；用户点击菜单后会在新页签打开。",
+    "admin.settings.features.externalRecharge.urlInvalid": "充值页面链接必须是完整的 http(s) 链接",
+    "admin.settings.features.externalRecharge.urlRequired": "启用外部充值入口时必须填写充值页面链接",
     "admin.settings.site.uploadImage": "上传图片",
     "admin.settings.site.remove": "移除",
     "admin.settings.platformQuota.platform": "平台",
@@ -319,6 +328,8 @@ const baseSettingsResponse = {
   doc_url: "",
   home_content: "",
   hide_ccs_import_button: false,
+  purchase_subscription_enabled: false,
+  purchase_subscription_url: "",
   table_default_page_size: 20,
   table_page_size_options: [10, 20, 50, 100],
   backend_mode_enabled: false,
@@ -816,6 +827,17 @@ describe("admin SettingsView payment visible method controls", () => {
     expect(wrapper.text()).toContain("向用户展示渠道状态");
     expect(wrapper.text()).toContain("启用模型价格");
     expect(wrapper.text()).toContain("只影响用户侧页面与侧边栏入口，不影响后台监控任务继续运行");
+  });
+
+  it("renders external recharge link controls with new-tab copy", async () => {
+    const wrapper = mountView();
+
+    await flushPromises();
+
+    expect(wrapper.text()).toContain("外部充值入口");
+    expect(wrapper.text()).toContain("显示点我去充值入口");
+    expect(wrapper.text()).toContain("充值页面链接");
+    expect(wrapper.text()).toContain("用户点击菜单后会在新页签打开");
   });
 });
 
