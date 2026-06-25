@@ -161,6 +161,16 @@ vi.mock("vue-i18n", async () => {
     "admin.settings.payment.findProvider": "查看支持的支付方式",
     "admin.settings.openaiExperimentalScheduler.title": "OpenAI 实验调度策略",
     "admin.settings.openaiExperimentalScheduler.description": "默认关闭。开启后仅影响本网关在 OpenAI 账号间的实验性调度选择逻辑，不代表上游 OpenAI 官方能力。",
+    "admin.settings.features.userChannelPages.title": "用户侧渠道页面",
+    "admin.settings.features.userChannelPages.description": "独立控制【可用渠道】【渠道状态】【模型价格】三个用户入口，不影响后端价格计算或监控任务。",
+    "admin.settings.features.userChannelPages.pricingConfigureLink": "前往 渠道管理 > 渠道定价 配置模型价格",
+    "admin.settings.features.userChannelPages.monitorConfigureLink": "前往 渠道管理 > 渠道监控 配置监控项",
+    "admin.settings.features.userChannelPages.availableChannelsEnabled": "启用可用渠道",
+    "admin.settings.features.userChannelPages.availableChannelsEnabledHint": "向用户展示当前可访问的渠道与分组聚合视图。",
+    "admin.settings.features.userChannelPages.channelStatusEnabled": "向用户展示渠道状态",
+    "admin.settings.features.userChannelPages.channelStatusEnabledHint": "只影响用户侧页面与侧边栏入口，不影响后台监控任务继续运行。",
+    "admin.settings.features.userChannelPages.modelPricingEnabled": "启用模型价格",
+    "admin.settings.features.userChannelPages.modelPricingEnabledHint": "向用户展示站内优惠价、官方价和节省幅度的价格卡片。",
     "admin.settings.site.uploadImage": "上传图片",
     "admin.settings.site.remove": "移除",
     "admin.settings.platformQuota.platform": "平台",
@@ -441,6 +451,7 @@ function mountView() {
         ProxySelector: true,
         ImageUpload: ImageUploadStub,
         BackupSettings: true,
+        RouterLink: { template: '<a><slot /></a>' },
       },
     },
   });
@@ -751,6 +762,7 @@ describe("admin SettingsView payment visible method controls", () => {
           ProxySelector: true,
           ImageUpload: ImageUploadStub,
           BackupSettings: true,
+          RouterLink: { template: '<a><slot /></a>' },
         },
       },
     });
@@ -792,6 +804,18 @@ describe("admin SettingsView payment visible method controls", () => {
     expect(paymentHelpImageUpload).toBeDefined();
     expect(paymentHelpImageUpload?.attributes("data-upload-label")).toBe("上传图片");
     expect(paymentHelpImageUpload?.attributes("data-remove-label")).toBe("移除");
+  });
+
+  it("groups user-facing channel page toggles together with user-only channel status copy", async () => {
+    const wrapper = mountView();
+
+    await flushPromises();
+
+    expect(wrapper.text()).toContain("用户侧渠道页面");
+    expect(wrapper.text()).toContain("启用可用渠道");
+    expect(wrapper.text()).toContain("向用户展示渠道状态");
+    expect(wrapper.text()).toContain("启用模型价格");
+    expect(wrapper.text()).toContain("只影响用户侧页面与侧边栏入口，不影响后台监控任务继续运行");
   });
 });
 

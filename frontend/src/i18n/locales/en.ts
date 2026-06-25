@@ -1119,6 +1119,31 @@ export default {
     loadError: 'Failed to load model pricing',
     userRate: 'User rate',
     unitPerMillion: '/ 1M tokens',
+    tabs: {
+      claude: 'Claude',
+      codex: 'Codex'
+    },
+    emptyState: {
+      claude: 'No Claude discount models available',
+      codex: 'No Codex discount models available'
+    },
+    emptyStateDescription: {
+      claude: 'No Anthropic pricing cards match the current filters.',
+      codex: 'No Codex pricing cards match the current filters.'
+    },
+    card: {
+      sitePrice: 'Our Price',
+      officialPrice: 'Official Price',
+      savings: 'Save {percent}',
+      source: 'Source',
+      group: 'Group',
+      channel: 'Channel',
+      rateLabel: 'Rate',
+      rate: 'x{rate} rate',
+      input: 'Input',
+      output: 'Output',
+      cacheRead: 'Cache Read'
+    },
     columns: {
       model: 'Model ID',
       platform: 'Platform',
@@ -5496,6 +5521,18 @@ export default {
           publicEnabledHint: 'When off, the user sidebar entry is hidden and user status APIs return no monitor data.',
           defaultInterval: 'Default check interval (seconds)',
           defaultIntervalHint: 'Pre-fills the interval when creating a new monitor; each monitor can override it. Range 15 – 3600.',
+        },
+        userChannelPages: {
+          title: 'User Channel Pages',
+          description: 'Control the three user-facing channel entry pages independently without changing backend pricing or monitor jobs.',
+          pricingConfigureLink: 'Configure channel pricing in Channel Management > Channel Pricing',
+          monitorConfigureLink: 'Configure monitors in Channel Management > Channel Monitor',
+          availableChannelsEnabled: 'Enable Available Channels',
+          availableChannelsEnabledHint: 'Shows users the channels and groups they can currently access.',
+          channelStatusEnabled: 'Show Channel Status to Users',
+          channelStatusEnabledHint: 'Only affects the user-facing status page and sidebar entry. Background monitor jobs keep running.',
+          modelPricingEnabled: 'Enable Model Pricing',
+          modelPricingEnabledHint: 'Shows discount pricing cards with your site price, official price and savings comparison.',
         },
         availableChannels: {
           title: 'Available Channels',

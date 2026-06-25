@@ -1123,6 +1123,31 @@ export default {
     loadError: '加载模型价格失败',
     userRate: '专属倍率',
     unitPerMillion: '/ 1M tokens',
+    tabs: {
+      claude: 'Claude',
+      codex: 'Codex'
+    },
+    emptyState: {
+      claude: '当前暂无 Claude 优惠模型',
+      codex: '当前暂无 Codex 优惠模型'
+    },
+    emptyStateDescription: {
+      claude: '当前筛选条件下没有可展示的 Anthropic 价格卡片。',
+      codex: '当前筛选条件下没有可展示的 Codex 价格卡片。'
+    },
+    card: {
+      sitePrice: '站内价',
+      officialPrice: '官方价',
+      savings: '省 {percent}',
+      source: '来源',
+      group: '分组',
+      channel: '渠道',
+      rateLabel: '倍率',
+      rate: 'x{rate} 倍率',
+      input: '输入',
+      output: '输出',
+      cacheRead: '缓存读取'
+    },
     columns: {
       model: '模型 ID',
       platform: '平台',
@@ -5656,6 +5681,18 @@ export default {
           publicEnabledHint: '关闭后用户端侧边栏入口隐藏，用户侧状态接口不返回监控数据。',
           defaultInterval: '默认检测间隔（秒）',
           defaultIntervalHint: '新建渠道监控时表单的默认值，可被单个渠道覆盖。范围 15 – 3600 秒。',
+        },
+        userChannelPages: {
+          title: '用户侧渠道页面',
+          description: '独立控制【可用渠道】【渠道状态】【模型价格】三个用户入口，不影响后端价格计算或监控任务。',
+          pricingConfigureLink: '前往 渠道管理 > 渠道定价 配置模型价格',
+          monitorConfigureLink: '前往 渠道管理 > 渠道监控 配置监控项',
+          availableChannelsEnabled: '启用可用渠道',
+          availableChannelsEnabledHint: '向用户展示当前可访问的渠道与分组聚合视图。',
+          channelStatusEnabled: '向用户展示渠道状态',
+          channelStatusEnabledHint: '只影响用户侧页面与侧边栏入口，不影响后台监控任务继续运行。',
+          modelPricingEnabled: '启用模型价格',
+          modelPricingEnabledHint: '向用户展示站内优惠价、官方价和节省幅度的价格卡片。',
         },
         availableChannels: {
           title: '可用渠道',

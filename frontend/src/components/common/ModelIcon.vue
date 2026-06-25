@@ -165,7 +165,8 @@ const iconKey = computed(() => {
   // OpenAI models
   if (modelLower.startsWith('gpt') || modelLower.startsWith('o1') ||
       modelLower.startsWith('o3') || modelLower.startsWith('o4') ||
-      modelLower.includes('chatgpt') || modelLower.includes('dall-e') ||
+      modelLower.includes('chatgpt') || modelLower.includes('codex') ||
+      modelLower.includes('dall-e') ||
       modelLower.includes('whisper') || modelLower.includes('tts-1') ||
       modelLower.includes('text-embedding-3') || modelLower.includes('text-moderation') ||
       modelLower.includes('babbage') || modelLower.includes('davinci') ||

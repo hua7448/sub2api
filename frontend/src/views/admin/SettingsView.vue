@@ -5446,18 +5446,6 @@
               <Toggle v-model="form.channel_monitor_enabled" />
             </div>
 
-            <div class="flex items-center justify-between">
-              <div>
-                <label class="text-sm font-medium text-gray-700 dark:text-gray-300">
-                  {{ t('admin.settings.features.channelMonitor.publicEnabled') }}
-                </label>
-                <p class="mt-0.5 text-xs text-gray-500 dark:text-gray-400">
-                  {{ t('admin.settings.features.channelMonitor.publicEnabledHint') }}
-                </p>
-              </div>
-              <Toggle v-model="form.channel_status_public_enabled" />
-            </div>
-
             <div v-if="form.channel_monitor_enabled">
               <label class="input-label">
                 {{ t('admin.settings.features.channelMonitor.defaultInterval') }}
@@ -5480,29 +5468,36 @@
         <div class="card">
           <div class="border-b border-gray-100 px-6 py-4 dark:border-dark-700">
             <h2 class="text-lg font-semibold text-gray-900 dark:text-white">
-              {{ t('admin.settings.features.availableChannels.title') }}
+              {{ t('admin.settings.features.userChannelPages.title') }}
             </h2>
             <p class="mt-1 text-sm text-gray-500 dark:text-gray-400">
-              {{ t('admin.settings.features.availableChannels.description') }}
+              {{ t('admin.settings.features.userChannelPages.description') }}
             </p>
-            <p class="mt-1.5 text-xs">
+            <div class="mt-1.5 flex flex-wrap gap-x-4 gap-y-2 text-xs">
               <router-link
                 to="/admin/channels/pricing"
                 class="inline-flex items-center gap-1 text-primary-600 hover:underline dark:text-primary-400"
               >
-                {{ t('admin.settings.features.availableChannels.configureLink') }}
+                {{ t('admin.settings.features.userChannelPages.pricingConfigureLink') }}
                 <span aria-hidden="true">→</span>
               </router-link>
-            </p>
+              <router-link
+                to="/admin/channels/monitor"
+                class="inline-flex items-center gap-1 text-primary-600 hover:underline dark:text-primary-400"
+              >
+                {{ t('admin.settings.features.userChannelPages.monitorConfigureLink') }}
+                <span aria-hidden="true">→</span>
+              </router-link>
+            </div>
           </div>
           <div class="space-y-5 p-6">
             <div class="flex items-center justify-between">
               <div>
                 <label class="text-sm font-medium text-gray-700 dark:text-gray-300">
-                  {{ t('admin.settings.features.availableChannels.enabled') }}
+                  {{ t('admin.settings.features.userChannelPages.availableChannelsEnabled') }}
                 </label>
                 <p class="mt-0.5 text-xs text-gray-500 dark:text-gray-400">
-                  {{ t('admin.settings.features.availableChannels.enabledHint') }}
+                  {{ t('admin.settings.features.userChannelPages.availableChannelsEnabledHint') }}
                 </p>
               </div>
               <Toggle v-model="form.available_channels_enabled" />
@@ -5511,10 +5506,22 @@
             <div class="flex items-center justify-between">
               <div>
                 <label class="text-sm font-medium text-gray-700 dark:text-gray-300">
-                  {{ t('admin.settings.features.availableChannels.pricingBoardEnabled') }}
+                  {{ t('admin.settings.features.userChannelPages.channelStatusEnabled') }}
                 </label>
                 <p class="mt-0.5 text-xs text-gray-500 dark:text-gray-400">
-                  {{ t('admin.settings.features.availableChannels.pricingBoardEnabledHint') }}
+                  {{ t('admin.settings.features.userChannelPages.channelStatusEnabledHint') }}
+                </p>
+              </div>
+              <Toggle v-model="form.channel_status_public_enabled" />
+            </div>
+
+            <div class="flex items-center justify-between">
+              <div>
+                <label class="text-sm font-medium text-gray-700 dark:text-gray-300">
+                  {{ t('admin.settings.features.userChannelPages.modelPricingEnabled') }}
+                </label>
+                <p class="mt-0.5 text-xs text-gray-500 dark:text-gray-400">
+                  {{ t('admin.settings.features.userChannelPages.modelPricingEnabledHint') }}
                 </p>
               </div>
               <Toggle v-model="form.model_pricing_board_enabled" />
