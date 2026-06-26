@@ -144,7 +144,9 @@ git commit -m "sync: merge upstream main YYYY-MM-DD"
 
 ## 官方迭代跟踪准则
 
-当需要“跟踪官方更新”时，先判断官方变更类型，再决定是否同步和发布。生产永远只更新到本 fork 验证过的 SmartAPI 稳定 tag，不直接跟随 upstream、origin/main 或 `latest`。
+当需要“跟踪官方更新”时，先判断官方基线版本和变更类型，再决定是否同步和发布。生产永远只更新到本 fork 验证过的 SmartAPI 稳定 tag，不直接跟随 upstream、origin/main 或 `latest`。
+
+默认只有官方发布新的基线版本 tag（例如从 `v0.1.138` 到 `v0.1.139`）时，才认为需要进入常规 upstream 同步评估。同一官方基线内的 upstream 零散提交默认不合并；如确认为安全修复、严重 bugfix 或影响核心可用性，必须明确说明这是同基线紧急例外，并仍按同步分支、验证和 4146 试运行流程执行。
 
 检查官方差异：
 
@@ -181,7 +183,7 @@ git diff --stat main..upstream/main
 建议节奏：
 
 - 普通官方更新：每周检查一次。
-- 安全修复、严重 bugfix、影响核心可用性的 upstream 更新：当天同步、当天 4146 试运行。
+- 安全修复、严重 bugfix、影响核心可用性的 upstream 更新：可作为同基线紧急例外，当天同步、当天 4146 试运行。
 - 无明确收益的 upstream 大改：先记录差异和风险，不急于发布到生产。
 
 ## 镜像发布
