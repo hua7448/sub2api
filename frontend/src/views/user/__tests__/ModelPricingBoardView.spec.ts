@@ -48,6 +48,7 @@ vi.mock('vue-i18n', async () => {
     'modelPricing.card.sitePrice': 'Our Price',
     'modelPricing.card.officialPrice': 'Official Price',
     'modelPricing.card.priceFormula': 'Formula: official price * group rate x{rate}, shown at 1:1 USD parity',
+    'modelPricing.card.priceFormulaDomestic': 'Formula: official price * group rate x{rate}, shown with ¥ parity for domestic models',
     'modelPricing.card.savings': 'Save {percent}',
     'modelPricing.card.group': 'Group',
     'modelPricing.card.channel': 'Channel',
@@ -162,9 +163,9 @@ describe('ModelPricingBoardView', () => {
         },
         {
           model_id: 'kimi-k2.7-code',
-          platform: 'kimi',
+          platform: 'anthropic',
           group_id: 4,
-          group_name: 'Domestic Anthropic',
+          group_name: 'Domestic Gateway',
           channel_id: 40,
           channel_name: 'Kimi Channel',
           rate_multiplier: 1,
@@ -195,7 +196,7 @@ describe('ModelPricingBoardView', () => {
     await flushPromises()
 
     const tabs = wrapper.findAll('[data-testid^="model-pricing-tab-"]')
-    expect(tabs.map((tab) => tab.text())).toEqual(['Codex', 'Claude', 'Domestic'])
+    expect(tabs.map((tab) => tab.text())).toEqual(['Codex', 'Domestic', 'Claude'])
 
     expect(wrapper.text()).toContain('codex-mini-latest')
     expect(wrapper.text()).toContain('gpt-5.5')
@@ -223,7 +224,10 @@ describe('ModelPricingBoardView', () => {
     await wrapper.get('[data-testid="model-pricing-tab-domestic"]').trigger('click')
     await flushPromises()
     expect(wrapper.text()).toContain('kimi-k2.7-code')
-    expect(wrapper.text()).toContain('Kimi')
+    expect(wrapper.get('[data-testid="model-pricing-provider-kimi-k2.7-code"]').text()).toBe('Kimi')
+    expect(wrapper.text()).toContain('¥0.95 / 1M tokens')
+    expect(wrapper.text()).toContain('Formula: official price * group rate x1, shown with ¥ parity for domestic models')
+    expect(wrapper.text()).not.toContain('$0.95 / 1M tokens')
     expect(wrapper.text()).not.toContain('claude-sonnet-4')
   })
 

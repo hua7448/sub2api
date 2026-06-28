@@ -334,11 +334,12 @@ func (s *BillingService) initFallbackPricing() {
 	// Source: https://docs.z.ai/guides/overview/pricing (USD per 1M tokens)
 	// 注意：CacheReadPricePerToken 即"缓存命中"价格，CacheCreationPricePerToken 留空（智谱未公开写入价，按 0 处理）。
 	// GLM-4.6 与 GLM-4.5 在 z.ai 国际版上定价一致；GLM-4.5 国内按 ¥0.8/¥2，汇率换算后约 $0.112/$0.28，与国际版 $0.6/$2.2 不同，本分支采用国际版 USD 口径与现有 Claude/GPT 一致。
-	// GLM-5.2 Source: https://bigmodel.cn/pricing (¥8/¥28/¥2 per MTok, USD converted at 1 USD ≈ 7.2 RMB).
+	// GLM-5.2 Source: https://bigmodel.cn/pricing (¥8/¥28/¥2 per MTok).
+	// The billing system treats one CNY pricing unit as one site credit unit, matching the model-pricing board display.
 	s.fallbackPrices["glm-5.2"] = &ModelPricing{
-		InputPricePerToken:     (8.0 / 7.2) * 1e-6,
-		OutputPricePerToken:    (28.0 / 7.2) * 1e-6,
-		CacheReadPricePerToken: (2.0 / 7.2) * 1e-6,
+		InputPricePerToken:     8.0e-6,
+		OutputPricePerToken:    28.0e-6,
+		CacheReadPricePerToken: 2.0e-6,
 		SupportsCacheBreakdown: false,
 	}
 	s.fallbackPrices["glm-5.1"] = &ModelPricing{

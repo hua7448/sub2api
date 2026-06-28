@@ -386,13 +386,13 @@ func TestGetFallbackPricing_FamilyMatching(t *testing.T) {
 			expectedCacheRead: floatPtr(2.8e-9),
 		},
 
-		// ---- 智谱 GLM（z.ai USD 口径）----
+		// ---- 智谱 GLM（GLM-5.2 uses domestic CNY-equivalent site units; older z.ai entries use USD口径）----
 		{
 			name:              "glm 5.2 flagship",
 			model:             "glm-5.2",
-			expectedInput:     (8.0 / 7.2) * 1e-6,
-			expectedOutput:    floatPtr((28.0 / 7.2) * 1e-6),
-			expectedCacheRead: floatPtr((2.0 / 7.2) * 1e-6),
+			expectedInput:     8.0e-6,
+			expectedOutput:    floatPtr(28.0e-6),
+			expectedCacheRead: floatPtr(2.0e-6),
 		},
 		{
 			name:              "glm 5.1 flagship",
@@ -481,9 +481,9 @@ func TestGetFallbackPricing_FamilyMatching(t *testing.T) {
 		{
 			name:              "glm 5.2 vs glm 5 ordering (verbatim 5.2)",
 			model:             "glm-5.2",
-			expectedInput:     (8.0 / 7.2) * 1e-6,
-			expectedOutput:    floatPtr((28.0 / 7.2) * 1e-6),
-			expectedCacheRead: floatPtr((2.0 / 7.2) * 1e-6),
+			expectedInput:     8.0e-6,
+			expectedOutput:    floatPtr(28.0e-6),
+			expectedCacheRead: floatPtr(2.0e-6),
 		},
 		{
 			name:              "glm 5.1 vs glm 5 ordering (verbatim 5.1)",

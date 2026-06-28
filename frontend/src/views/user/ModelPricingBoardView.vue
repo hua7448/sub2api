@@ -84,8 +84,8 @@
                         {{ item.model_id }}
                       </h2>
                       <div class="mt-1 flex flex-wrap items-center gap-2">
-                        <span :class="platformBadgeClass(item.platform)">
-                          {{ platformLabel(item.platform) }}
+                        <span :class="platformBadgeClass(item)" :data-testid="`model-pricing-provider-${item.model_id}`">
+                          {{ modelVendorLabel(item) }}
                         </span>
                         <span
                           v-if="item.user_rate_overridden"
@@ -121,10 +121,10 @@
                         {{ t('modelPricing.card.sitePrice') }}
                       </div>
                       <div class="mt-2 text-2xl font-black text-primary-700 dark:text-primary-300">
-                        {{ formatTokenPrice(row.sitePrice) }}
+                        {{ formatTokenPrice(row.sitePrice, item) }}
                       </div>
                       <p class="mt-2 max-w-md text-xs leading-relaxed text-gray-500 dark:text-gray-400">
-                        {{ t('modelPricing.card.priceFormula', { rate: formatRate(item.rate_multiplier) }) }}
+                        {{ priceFormulaText(item) }}
                       </p>
                       <div
                         v-if="row.officialPrice != null"
@@ -132,7 +132,7 @@
                       >
                         <span>{{ t('modelPricing.card.officialPrice') }}</span>
                         <span class="line-through">
-                          {{ formatTokenPrice(row.officialPrice) }}
+                          {{ formatTokenPrice(row.officialPrice, item) }}
                         </span>
                       </div>
                     </div>
@@ -198,7 +198,6 @@ import ModelIcon from '@/components/common/ModelIcon.vue'
 import modelPricingAPI, { type ModelPricingBoardItem } from '@/api/modelPricing'
 import { useAppStore } from '@/stores/app'
 import { extractApiErrorMessage } from '@/utils/apiError'
-import { formatScaled } from '@/utils/pricing'
 
 type PricingCategory = 'claude' | 'codex' | 'domestic'
 
@@ -226,16 +225,16 @@ const categoryTabs = computed(() => [
     inactiveClass: 'text-primary-800/70 hover:text-primary-950 dark:text-primary-200/70 dark:hover:text-primary-100',
   },
   {
-    value: 'claude' as const,
-    label: t('modelPricing.tabs.claude'),
-    activeClass: 'bg-amber-500 text-amber-950 shadow-sm',
-    inactiveClass: 'text-amber-900/70 hover:text-amber-950 dark:text-amber-200/70 dark:hover:text-amber-100',
-  },
-  {
     value: 'domestic' as const,
     label: t('modelPricing.tabs.domestic'),
     activeClass: 'bg-emerald-600 text-white shadow-sm dark:bg-emerald-400 dark:text-emerald-950',
     inactiveClass: 'text-emerald-800/70 hover:text-emerald-950 dark:text-emerald-200/70 dark:hover:text-emerald-100',
+  },
+  {
+    value: 'claude' as const,
+    label: t('modelPricing.tabs.claude'),
+    activeClass: 'bg-amber-500 text-amber-950 shadow-sm',
+    inactiveClass: 'text-amber-900/70 hover:text-amber-950 dark:text-amber-200/70 dark:hover:text-amber-100',
   },
 ])
 
@@ -300,8 +299,25 @@ function pricingRows(item: ModelPricingBoardItem): PricingRow[] {
   return rows.filter((row) => row.sitePrice != null)
 }
 
-function formatTokenPrice(value: number | null): string {
-  return `${formatScaled(value, 1_000_000)} ${t('modelPricing.unitPerMillion')}`
+function formatTokenPrice(value: number | null, item: ModelPricingBoardItem): string {
+  if (value == null) return `- ${t('modelPricing.unitPerMillion')}`
+  const symbol = isDomesticModel(item) ? '¥' : '$'
+  return `${symbol}${formatPriceAmount(value * 1_000_000)} ${t('modelPricing.unitPerMillion')}`
+}
+
+function formatPriceAmount(value: number): string {
+  if (!Number.isFinite(value)) return '-'
+  const abs = Math.abs(value)
+  const maximumFractionDigits = abs > 0 && abs < 0.01 ? 6 : 4
+  return value.toLocaleString(undefined, {
+    minimumFractionDigits: 0,
+    maximumFractionDigits,
+  })
+}
+
+function priceFormulaText(item: ModelPricingBoardItem): string {
+  const key = isDomesticModel(item) ? 'modelPricing.card.priceFormulaDomestic' : 'modelPricing.card.priceFormula'
+  return t(key, { rate: formatRate(item.rate_multiplier) })
 }
 
 function formatSavings(value: number | null): string {
@@ -311,6 +327,18 @@ function formatSavings(value: number | null): string {
 
 function formatRate(value: number): string {
   return Number.isFinite(value) ? value.toFixed(4).replace(/\.?0+$/, '') : '-'
+}
+
+function modelVendorLabel(item: Pick<ModelPricingBoardItem, 'platform' | 'model_id'>): string {
+  const platform = item.platform.toLowerCase()
+  const model = item.model_id.toLowerCase()
+  const combined = `${platform} ${model}`
+  if (combined.includes('deepseek')) return 'DeepSeek'
+  if (combined.includes('zhipu') || combined.includes('chatglm') || combined.includes('glm')) return 'GLM'
+  if (combined.includes('kimi') || combined.includes('moonshot')) return 'Kimi'
+  if (combined.includes('minimax')) return 'MiniMax'
+  if (combined.includes('doubao')) return 'Doubao'
+  return platformLabel(item.platform)
 }
 
 function platformLabel(platform: string): string {
@@ -323,16 +351,12 @@ function platformLabel(platform: string): string {
   return t(`monitorCommon.providers.${platform}`, platform)
 }
 
-function platformBadgeClass(platform: string): string {
+function platformBadgeClass(item: Pick<ModelPricingBoardItem, 'platform' | 'model_id'>): string {
   const base = 'inline-flex rounded-full border px-2.5 py-1 text-xs font-medium'
-  if (isDomesticModel(itemLike(platform))) return `${base} border-emerald-200 bg-emerald-50 text-emerald-800 dark:border-emerald-900/60 dark:bg-emerald-950/30 dark:text-emerald-200`
-  if (platform === 'anthropic') return `${base} border-amber-200 bg-amber-50 text-amber-800 dark:border-amber-900/60 dark:bg-amber-950/30 dark:text-amber-200`
-  if (platform === 'openai') return `${base} border-gray-300 bg-gray-100 text-gray-800 dark:border-dark-600 dark:bg-dark-700 dark:text-gray-200`
+  if (isDomesticModel(item)) return `${base} border-emerald-200 bg-emerald-50 text-emerald-800 dark:border-emerald-900/60 dark:bg-emerald-950/30 dark:text-emerald-200`
+  if (item.platform === 'anthropic') return `${base} border-amber-200 bg-amber-50 text-amber-800 dark:border-amber-900/60 dark:bg-amber-950/30 dark:text-amber-200`
+  if (item.platform === 'openai') return `${base} border-gray-300 bg-gray-100 text-gray-800 dark:border-dark-600 dark:bg-dark-700 dark:text-gray-200`
   return `${base} border-primary-200 bg-primary-50 text-primary-800 dark:border-primary-900/60 dark:bg-primary-950/30 dark:text-primary-200`
-}
-
-function itemLike(platform: string): Pick<ModelPricingBoardItem, 'platform' | 'model_id'> {
-  return { platform, model_id: platform }
 }
 
 function categoryLabel(item: ModelPricingBoardItem): string {

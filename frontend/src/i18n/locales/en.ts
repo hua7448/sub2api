@@ -1139,6 +1139,7 @@ export default {
       sitePrice: 'Our Price',
       officialPrice: 'Official Price',
       priceFormula: 'Formula: official price * group rate x{rate}, shown at 1:1 USD parity',
+      priceFormulaDomestic: 'Formula: official price * group rate x{rate}, shown with ¥ parity for domestic models',
       savings: 'Save {percent}',
       source: 'Source',
       group: 'Group',

@@ -18,7 +18,8 @@ var modelPricingBoardBasePlatforms = map[string]struct{}{
 }
 
 // ModelPricingBoardItem is one row in the user-facing model pricing board.
-// Prices are stored per token in USD; the frontend formats them as USD / 1M tokens.
+// Prices are stored per token in the platform's nominal pricing unit; the frontend formats
+// OpenAI/Anthropic as USD and domestic model families as CNY-equivalent site units.
 type ModelPricingBoardItem struct {
 	ModelID                string
 	Platform               string
