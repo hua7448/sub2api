@@ -12,7 +12,7 @@ const (
 	ModelPricingBoardProviderOpenAI    = PlatformOpenAI
 )
 
-var modelPricingBoardAllowedPlatforms = map[string]struct{}{
+var modelPricingBoardBasePlatforms = map[string]struct{}{
 	ModelPricingBoardProviderAnthropic: {},
 	ModelPricingBoardProviderOpenAI:    {},
 }
@@ -62,6 +62,7 @@ type ModelPricingBoardService struct {
 	groupProvider     modelPricingBoardGroupProvider
 	userGroupRateRepo UserGroupRateRepository
 	pricingService    *PricingService
+	billingService    *BillingService
 }
 
 func NewModelPricingBoardService(
@@ -69,12 +70,14 @@ func NewModelPricingBoardService(
 	groupProvider modelPricingBoardGroupProvider,
 	userGroupRateRepo UserGroupRateRepository,
 	pricingService *PricingService,
+	billingService *BillingService,
 ) *ModelPricingBoardService {
 	return &ModelPricingBoardService{
 		channelService:    channelService,
 		groupProvider:     groupProvider,
 		userGroupRateRepo: userGroupRateRepo,
 		pricingService:    pricingService,
+		billingService:    billingService,
 	}
 }
 
@@ -92,7 +95,7 @@ func (s *ModelPricingBoardService) BuildUserBoard(ctx context.Context, userID in
 	allowedGroups := make(map[int64]struct{}, len(userGroups))
 	for i := range userGroups {
 		g := userGroups[i]
-		if _, ok := modelPricingBoardAllowedPlatforms[g.Platform]; ok {
+		if isModelPricingBoardBasePlatform(g.Platform) {
 			allowedGroups[g.ID] = struct{}{}
 		}
 	}
@@ -124,7 +127,7 @@ func (s *ModelPricingBoardService) BuildUserBoard(ctx context.Context, userID in
 			continue
 		}
 		for _, model := range ch.SupportedModels {
-			if _, ok := modelPricingBoardAllowedPlatforms[model.Platform]; !ok {
+			if !isModelPricingBoardPlatform(model.Platform, model.Name) {
 				continue
 			}
 			if model.Pricing == nil {
@@ -137,7 +140,7 @@ func (s *ModelPricingBoardService) BuildUserBoard(ctx context.Context, userID in
 			if mode != BillingModeToken {
 				continue
 			}
-			groups := visibleGroupsByPlatform[model.Platform]
+			groups := groupsForPricingBoardModel(visibleGroupsByPlatform, model.Platform, model.Name)
 			if len(groups) == 0 {
 				continue
 			}
@@ -183,12 +186,56 @@ func visiblePricingBoardGroups(groups []AvailableGroupRef, allowed map[int64]str
 		if _, ok := allowed[group.ID]; !ok {
 			continue
 		}
-		if _, ok := modelPricingBoardAllowedPlatforms[group.Platform]; !ok {
+		if !isModelPricingBoardBasePlatform(group.Platform) {
 			continue
 		}
 		out[group.Platform] = append(out[group.Platform], group)
 	}
 	return out
+}
+
+func groupsForPricingBoardModel(groupsByPlatform map[string][]AvailableGroupRef, platform, modelID string) []AvailableGroupRef {
+	if groups := groupsByPlatform[platform]; len(groups) > 0 {
+		return groups
+	}
+	if !isDomesticModelID(modelID) {
+		return nil
+	}
+	var out []AvailableGroupRef
+	seen := make(map[int64]struct{})
+	for _, groups := range groupsByPlatform {
+		for _, group := range groups {
+			if _, ok := seen[group.ID]; ok {
+				continue
+			}
+			seen[group.ID] = struct{}{}
+			out = append(out, group)
+		}
+	}
+	return out
+}
+
+func isModelPricingBoardBasePlatform(platform string) bool {
+	_, ok := modelPricingBoardBasePlatforms[platform]
+	return ok
+}
+
+func isModelPricingBoardPlatform(platform, modelID string) bool {
+	if isModelPricingBoardBasePlatform(platform) {
+		return true
+	}
+	return isDomesticModelID(modelID)
+}
+
+func isDomesticModelID(modelID string) bool {
+	model := strings.ToLower(strings.TrimSpace(modelID))
+	return strings.Contains(model, "deepseek") ||
+		strings.Contains(model, "glm") ||
+		strings.Contains(model, "chatglm") ||
+		strings.Contains(model, "kimi") ||
+		strings.Contains(model, "moonshot") ||
+		strings.Contains(model, "minimax") ||
+		strings.Contains(model, "doubao")
 }
 
 func effectiveGroupRate(group AvailableGroupRef, userRates map[int64]float64) (float64, bool) {
@@ -200,9 +247,32 @@ func effectiveGroupRate(group AvailableGroupRef, userRates map[int64]float64) (f
 
 func (s *ModelPricingBoardService) lookupOfficialPricing(modelID string) *LiteLLMModelPricing {
 	if s == nil || s.pricingService == nil {
+		return s.lookupFallbackOfficialPricing(modelID)
+	}
+	if pricing := s.pricingService.GetModelPricing(modelID); pricing != nil {
+		return pricing
+	}
+	return s.lookupFallbackOfficialPricing(modelID)
+}
+
+func (s *ModelPricingBoardService) lookupFallbackOfficialPricing(modelID string) *LiteLLMModelPricing {
+	if s == nil || s.billingService == nil {
 		return nil
 	}
-	return s.pricingService.GetModelPricing(modelID)
+	pricing, err := s.billingService.GetModelPricing(modelID)
+	if err != nil || pricing == nil {
+		return nil
+	}
+	return &LiteLLMModelPricing{
+		InputCostPerToken:               pricing.InputPricePerToken,
+		OutputCostPerToken:              pricing.OutputPricePerToken,
+		CacheReadInputTokenCost:         pricing.CacheReadPricePerToken,
+		SupportsPromptCaching:           pricing.CacheReadPricePerToken > 0,
+		LongContextInputTokenThreshold:  pricing.LongContextInputThreshold,
+		LongContextInputCostMultiplier:  pricing.LongContextInputMultiplier,
+		LongContextOutputCostMultiplier: pricing.LongContextOutputMultiplier,
+		Mode:                            "chat",
+	}
 }
 
 func (c modelPricingBoardCandidate) toItem() ModelPricingBoardItem {

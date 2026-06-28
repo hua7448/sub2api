@@ -200,7 +200,7 @@ import { useAppStore } from '@/stores/app'
 import { extractApiErrorMessage } from '@/utils/apiError'
 import { formatScaled } from '@/utils/pricing'
 
-type PricingCategory = 'claude' | 'codex'
+type PricingCategory = 'claude' | 'codex' | 'domestic'
 
 interface PricingRow {
   key: 'input' | 'output' | 'cacheRead'
@@ -231,6 +231,12 @@ const categoryTabs = computed(() => [
     activeClass: 'bg-amber-500 text-amber-950 shadow-sm',
     inactiveClass: 'text-amber-900/70 hover:text-amber-950 dark:text-amber-200/70 dark:hover:text-amber-100',
   },
+  {
+    value: 'domestic' as const,
+    label: t('modelPricing.tabs.domestic'),
+    activeClass: 'bg-emerald-600 text-white shadow-sm dark:bg-emerald-400 dark:text-emerald-950',
+    inactiveClass: 'text-emerald-800/70 hover:text-emerald-950 dark:text-emerald-200/70 dark:hover:text-emerald-100',
+  },
 ])
 
 const categorizedItems = computed(() =>
@@ -242,6 +248,7 @@ const filteredItems = computed(() => {
   if (!q) return categorizedItems.value
   return categorizedItems.value.filter((item) =>
     item.model_id.toLowerCase().includes(q) ||
+    item.platform.toLowerCase().includes(q) ||
     item.group_name.toLowerCase().includes(q) ||
     item.channel_name.toLowerCase().includes(q),
   )
@@ -251,9 +258,18 @@ const emptyStateTitle = computed(() => t(`modelPricing.emptyState.${activeCatego
 const emptyStateDescription = computed(() => t(`modelPricing.emptyStateDescription.${activeCategory.value}`))
 
 function classifyItem(item: Pick<ModelPricingBoardItem, 'platform' | 'model_id'>): PricingCategory | null {
+  if (isDomesticModel(item)) return 'domestic'
   if (item.platform === 'anthropic') return 'claude'
   if (item.platform === 'openai') return 'codex'
   return null
+}
+
+function isDomesticModel(item: Pick<ModelPricingBoardItem, 'platform' | 'model_id'>): boolean {
+  const platform = item.platform.toLowerCase()
+  const model = item.model_id.toLowerCase()
+  return ['deepseek', 'zhipu', 'glm', 'kimi', 'moonshot', 'minimax', 'doubao'].some((needle) =>
+    platform.includes(needle) || model.includes(needle),
+  )
 }
 
 function pricingRows(item: ModelPricingBoardItem): PricingRow[] {
@@ -298,20 +314,32 @@ function formatRate(value: number): string {
 }
 
 function platformLabel(platform: string): string {
+  const normalized = platform.toLowerCase()
+  if (normalized === 'deepseek') return 'DeepSeek'
+  if (normalized === 'zhipu' || normalized === 'glm') return 'GLM'
+  if (normalized === 'kimi' || normalized === 'moonshot') return 'Kimi'
+  if (normalized === 'minimax') return 'MiniMax'
+  if (normalized === 'doubao') return 'Doubao'
   return t(`monitorCommon.providers.${platform}`, platform)
 }
 
 function platformBadgeClass(platform: string): string {
   const base = 'inline-flex rounded-full border px-2.5 py-1 text-xs font-medium'
+  if (isDomesticModel(itemLike(platform))) return `${base} border-emerald-200 bg-emerald-50 text-emerald-800 dark:border-emerald-900/60 dark:bg-emerald-950/30 dark:text-emerald-200`
   if (platform === 'anthropic') return `${base} border-amber-200 bg-amber-50 text-amber-800 dark:border-amber-900/60 dark:bg-amber-950/30 dark:text-amber-200`
   if (platform === 'openai') return `${base} border-gray-300 bg-gray-100 text-gray-800 dark:border-dark-600 dark:bg-dark-700 dark:text-gray-200`
   return `${base} border-primary-200 bg-primary-50 text-primary-800 dark:border-primary-900/60 dark:bg-primary-950/30 dark:text-primary-200`
+}
+
+function itemLike(platform: string): Pick<ModelPricingBoardItem, 'platform' | 'model_id'> {
+  return { platform, model_id: platform }
 }
 
 function categoryLabel(item: ModelPricingBoardItem): string {
   const category = classifyItem(item)
   if (category === 'claude') return t('modelPricing.tabs.claude')
   if (category === 'codex') return t('modelPricing.tabs.codex')
+  if (category === 'domestic') return t('modelPricing.tabs.domestic')
   return platformLabel(item.platform)
 }
 
@@ -322,6 +350,9 @@ function categoryBadgeClass(item: ModelPricingBoardItem): string {
   }
   if (category === 'codex') {
     return 'border-primary-200 bg-primary-100 text-primary-800 dark:border-primary-800 dark:bg-primary-950/40 dark:text-primary-200'
+  }
+  if (category === 'domestic') {
+    return 'border-emerald-200 bg-emerald-50 text-emerald-800 dark:border-emerald-900/60 dark:bg-emerald-950/30 dark:text-emerald-200'
   }
   return 'border-primary-200 bg-primary-50 text-primary-800 dark:border-primary-900/60 dark:bg-primary-950/30 dark:text-primary-200'
 }

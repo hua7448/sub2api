@@ -1126,15 +1126,18 @@ export default {
     unitPerMillion: '/ 1M tokens',
     tabs: {
       claude: 'Claude',
-      codex: 'Codex'
+      codex: 'Codex',
+      domestic: '国产模型'
     },
     emptyState: {
       claude: '当前暂无 Claude 优惠模型',
-      codex: '当前暂无 Codex 优惠模型'
+      codex: '当前暂无 Codex 优惠模型',
+      domestic: '当前暂无国产模型价格'
     },
     emptyStateDescription: {
       claude: '当前筛选条件下没有可展示的 Anthropic 价格卡片。',
-      codex: '当前筛选条件下没有可展示的 Codex 价格卡片。'
+      codex: '当前筛选条件下没有可展示的 Codex 价格卡片。',
+      domestic: '请在渠道模型定价中配置 DeepSeek、GLM、Kimi 等模型后查看。'
     },
     card: {
       sitePrice: '站内价',
