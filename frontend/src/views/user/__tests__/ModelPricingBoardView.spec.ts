@@ -38,13 +38,17 @@ vi.mock('vue-i18n', async () => {
     'modelPricing.userRate': 'User rate',
     'modelPricing.tabs.claude': 'Claude',
     'modelPricing.tabs.codex': 'Codex',
+    'modelPricing.tabs.domestic': 'Domestic',
     'modelPricing.emptyState.claude': 'No Claude discount models available',
     'modelPricing.emptyState.codex': 'No Codex discount models available',
+    'modelPricing.emptyState.domestic': 'No domestic model prices available',
     'modelPricing.emptyStateDescription.claude': 'No Anthropic pricing cards match the current filters.',
     'modelPricing.emptyStateDescription.codex': 'No Codex pricing cards match the current filters.',
+    'modelPricing.emptyStateDescription.domestic': 'Configure DeepSeek, GLM, Kimi, or similar models in channel pricing to show them here.',
     'modelPricing.card.sitePrice': 'Our Price',
     'modelPricing.card.officialPrice': 'Official Price',
     'modelPricing.card.priceFormula': 'Formula: official price * group rate x{rate}, shown at 1:1 USD parity',
+    'modelPricing.card.priceFormulaDomestic': 'Formula: official price * group rate x{rate}, shown with ¥ parity for domestic models',
     'modelPricing.card.savings': 'Save {percent}',
     'modelPricing.card.group': 'Group',
     'modelPricing.card.channel': 'Channel',
@@ -157,6 +161,25 @@ describe('ModelPricingBoardView', () => {
           output_savings: 0.166,
           cache_read_savings: null,
         },
+        {
+          model_id: 'kimi-k2.7-code',
+          platform: 'anthropic',
+          group_id: 4,
+          group_name: 'Domestic Gateway',
+          channel_id: 40,
+          channel_name: 'Kimi Channel',
+          rate_multiplier: 1,
+          user_rate_overridden: false,
+          site_input_price: 0.00000095,
+          site_output_price: 0.000004,
+          site_cache_read_price: 0.00000019,
+          official_input_price: 0.00000095,
+          official_output_price: 0.000004,
+          official_cache_read_price: 0.00000019,
+          input_savings: 0,
+          output_savings: 0,
+          cache_read_savings: 0,
+        },
       ],
     })
 
@@ -173,11 +196,12 @@ describe('ModelPricingBoardView', () => {
     await flushPromises()
 
     const tabs = wrapper.findAll('[data-testid^="model-pricing-tab-"]')
-    expect(tabs.map((tab) => tab.text())).toEqual(['Codex', 'Claude'])
+    expect(tabs.map((tab) => tab.text())).toEqual(['Codex', 'Domestic', 'Claude'])
 
     expect(wrapper.text()).toContain('codex-mini-latest')
     expect(wrapper.text()).toContain('gpt-5.5')
     expect(wrapper.text()).not.toContain('claude-sonnet-4')
+    expect(wrapper.text()).not.toContain('kimi-k2.7-code')
     expect(wrapper.text()).toContain('Formula: official price * group rate x1.2, shown at 1:1 USD parity')
 
     await wrapper.get('input[type="text"]').setValue('internal')
@@ -196,6 +220,15 @@ describe('ModelPricingBoardView', () => {
 
     expect(wrapper.text()).toContain('claude-sonnet-4')
     expect(wrapper.text()).not.toContain('codex-mini-latest')
+
+    await wrapper.get('[data-testid="model-pricing-tab-domestic"]').trigger('click')
+    await flushPromises()
+    expect(wrapper.text()).toContain('kimi-k2.7-code')
+    expect(wrapper.get('[data-testid="model-pricing-provider-kimi-k2.7-code"]').text()).toBe('Kimi')
+    expect(wrapper.text()).toContain('¥0.95 / 1M tokens')
+    expect(wrapper.text()).toContain('Formula: official price * group rate x1, shown with ¥ parity for domestic models')
+    expect(wrapper.text()).not.toContain('$0.95 / 1M tokens')
+    expect(wrapper.text()).not.toContain('claude-sonnet-4')
   })
 
   it('hides savings badge when official price is missing for a pricing row', async () => {

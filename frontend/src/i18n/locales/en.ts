@@ -1122,20 +1122,24 @@ export default {
     unitPerMillion: '/ 1M tokens',
     tabs: {
       claude: 'Claude',
-      codex: 'Codex'
+      codex: 'Codex',
+      domestic: 'Domestic'
     },
     emptyState: {
       claude: 'No Claude discount models available',
-      codex: 'No Codex discount models available'
+      codex: 'No Codex discount models available',
+      domestic: 'No domestic model prices available'
     },
     emptyStateDescription: {
       claude: 'No Anthropic pricing cards match the current filters.',
-      codex: 'No Codex pricing cards match the current filters.'
+      codex: 'No Codex pricing cards match the current filters.',
+      domestic: 'Configure DeepSeek, GLM, Kimi, or similar models in channel pricing to show them here.'
     },
     card: {
       sitePrice: 'Our Price',
       officialPrice: 'Official Price',
       priceFormula: 'Formula: official price * group rate x{rate}, shown at 1:1 USD parity',
+      priceFormulaDomestic: 'Formula: official price * group rate x{rate}, shown with ¥ parity for domestic models',
       savings: 'Save {percent}',
       source: 'Source',
       group: 'Group',

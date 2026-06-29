@@ -334,6 +334,15 @@ func (s *BillingService) initFallbackPricing() {
 	// Source: https://docs.z.ai/guides/overview/pricing (USD per 1M tokens)
 	// 注意：CacheReadPricePerToken 即"缓存命中"价格，CacheCreationPricePerToken 留空（智谱未公开写入价，按 0 处理）。
 	// GLM-4.6 与 GLM-4.5 在 z.ai 国际版上定价一致；GLM-4.5 国内按 ¥0.8/¥2，汇率换算后约 $0.112/$0.28，与国际版 $0.6/$2.2 不同，本分支采用国际版 USD 口径与现有 Claude/GPT 一致。
+	// GLM-5.2 Source: https://bigmodel.cn/pricing (¥8/¥28/¥2 per MTok).
+	// GLM-5-Turbo Source: https://docs.z.ai/guides/overview/pricing ($1.20/$4.00/$0.24 per MTok).
+	// The billing system treats one CNY pricing unit as one site credit unit, matching the model-pricing board display.
+	s.fallbackPrices["glm-5.2"] = &ModelPricing{
+		InputPricePerToken:     8.0e-6,
+		OutputPricePerToken:    28.0e-6,
+		CacheReadPricePerToken: 2.0e-6,
+		SupportsCacheBreakdown: false,
+	}
 	s.fallbackPrices["glm-5.1"] = &ModelPricing{
 		InputPricePerToken:     1.4e-6, // $1.40 per MTok
 		OutputPricePerToken:    4.4e-6, // $4.40 per MTok
@@ -419,14 +428,27 @@ func (s *BillingService) initFallbackPricing() {
 	s.fallbackPrices["kimi-k2.6"] = &ModelPricing{
 		InputPricePerToken:     0.95e-6, // $0.95 per MTok (cache miss)
 		OutputPricePerToken:    4e-6,    // $4.00 per MTok
-		CacheReadPricePerToken: 0.15e-6, // $0.15 per MTok (cache hit, ¥1.10)
+		CacheReadPricePerToken: 0.16e-6, // $0.16 per MTok (cache hit)
+		SupportsCacheBreakdown: false,
+	}
+	// Source: https://platform.kimi.ai/docs/pricing/chat-k27-code
+	s.fallbackPrices["kimi-k2.7-code"] = &ModelPricing{
+		InputPricePerToken:     0.95e-6,
+		OutputPricePerToken:    4e-6,
+		CacheReadPricePerToken: 0.19e-6,
+		SupportsCacheBreakdown: false,
+	}
+	s.fallbackPrices["kimi-k2.7-code-highspeed"] = &ModelPricing{
+		InputPricePerToken:     1.90e-6,
+		OutputPricePerToken:    8e-6,
+		CacheReadPricePerToken: 0.38e-6,
 		SupportsCacheBreakdown: false,
 	}
 	// kimi-for-coding 走 Kimi Coding endpoint，按当前 K2.6 coding 档位兜底计费。
 	s.fallbackPrices["kimi-for-coding"] = &ModelPricing{
 		InputPricePerToken:     0.95e-6,
 		OutputPricePerToken:    4e-6,
-		CacheReadPricePerToken: 0.15e-6,
+		CacheReadPricePerToken: 0.19e-6,
 		SupportsCacheBreakdown: false,
 	}
 	s.fallbackPrices["kimi-k2.5"] = &ModelPricing{
@@ -554,8 +576,11 @@ func (s *BillingService) getFallbackPricing(model string) *ModelPricing {
 	// 匹配策略：长 key 优先（具体模型 → 系列 / 厂商），未知型号不回退以避免误计价。
 	// 与 DeepSeek 一样采用"白名单"语义：未在本表命中的国产模型 alias 一律不返回兜底价。
 
-	// 智谱 GLM（z.ai 公开 SKU：glm-5.1 / glm-5 / glm-5-turbo / glm-4.7 / glm-4.6 / glm-4.5 等）
+	// 智谱 GLM（z.ai / bigmodel.cn 公开 SKU：glm-5.2 / glm-5.1 / glm-5 / glm-5-turbo / glm-4.7 / glm-4.6 / glm-4.5 等）
 	// 匹配顺序：先判别最高 tier，再依次降级。
+	if strings.Contains(modelLower, "glm-5.2") || strings.Contains(modelLower, "glm-5-2") {
+		return s.fallbackPrices["glm-5.2"]
+	}
 	if strings.Contains(modelLower, "glm-5.1") {
 		return s.fallbackPrices["glm-5.1"]
 	}
@@ -596,8 +621,17 @@ func (s *BillingService) getFallbackPricing(model string) *ModelPricing {
 		return s.fallbackPrices["glm-4-32b-0414-128k"]
 	}
 
-	// 月之暗面 Kimi（kimi-k2.6 / kimi-for-coding / kimi-k2.5 / kimi-k2-thinking / kimi-k2）
+	// 月之暗面 Kimi（kimi-k2.7-code / kimi-k2.6 / kimi-for-coding / kimi-k2.5 / kimi-k2-thinking / kimi-k2）
 	// K2-0905 / K2-0711 官方未保留定价，不进入 fallback。
+	if (strings.Contains(modelLower, "kimi-k2.7") || strings.Contains(modelLower, "kimi-k2-7") ||
+		strings.Contains(modelLower, "kimi-2.7") || strings.Contains(modelLower, "kimi-2-7")) &&
+		(strings.Contains(modelLower, "highspeed") || strings.Contains(modelLower, "high-speed")) {
+		return s.fallbackPrices["kimi-k2.7-code-highspeed"]
+	}
+	if strings.Contains(modelLower, "kimi-k2.7") || strings.Contains(modelLower, "kimi-k2-7") ||
+		strings.Contains(modelLower, "kimi-2.7") || strings.Contains(modelLower, "kimi-2-7") {
+		return s.fallbackPrices["kimi-k2.7-code"]
+	}
 	if strings.Contains(modelLower, "kimi-for-coding") {
 		return s.fallbackPrices["kimi-for-coding"]
 	}

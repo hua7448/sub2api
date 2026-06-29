@@ -386,7 +386,14 @@ func TestGetFallbackPricing_FamilyMatching(t *testing.T) {
 			expectedCacheRead: floatPtr(2.8e-9),
 		},
 
-		// ---- 智谱 GLM（z.ai USD 口径）----
+		// ---- 智谱 GLM（GLM-5.2 uses domestic CNY-equivalent site units; older z.ai entries use USD口径）----
+		{
+			name:              "glm 5.2 flagship",
+			model:             "glm-5.2",
+			expectedInput:     8.0e-6,
+			expectedOutput:    floatPtr(28.0e-6),
+			expectedCacheRead: floatPtr(2.0e-6),
+		},
 		{
 			name:              "glm 5.1 flagship",
 			model:             "glm-5.1",
@@ -472,6 +479,13 @@ func TestGetFallbackPricing_FamilyMatching(t *testing.T) {
 		},
 		// 关键：5.1 必须先于 5 匹配（避免被 glm-5 抢走）
 		{
+			name:              "glm 5.2 vs glm 5 ordering (verbatim 5.2)",
+			model:             "glm-5.2",
+			expectedInput:     8.0e-6,
+			expectedOutput:    floatPtr(28.0e-6),
+			expectedCacheRead: floatPtr(2.0e-6),
+		},
+		{
 			name:              "glm 5.1 vs glm 5 ordering (verbatim 5.1)",
 			model:             "glm-5.1",
 			expectedInput:     1.4e-6, // = glm-5.1 价格
@@ -492,14 +506,35 @@ func TestGetFallbackPricing_FamilyMatching(t *testing.T) {
 			model:             "kimi-k2.6",
 			expectedInput:     0.95e-6,
 			expectedOutput:    floatPtr(4e-6),
-			expectedCacheRead: floatPtr(0.15e-6),
+			expectedCacheRead: floatPtr(0.16e-6),
+		},
+		{
+			name:              "kimi k2.7 code",
+			model:             "kimi-k2.7-code",
+			expectedInput:     0.95e-6,
+			expectedOutput:    floatPtr(4e-6),
+			expectedCacheRead: floatPtr(0.19e-6),
+		},
+		{
+			name:              "kimi k2.7 code highspeed",
+			model:             "kimi-k2.7-code-highspeed",
+			expectedInput:     1.90e-6,
+			expectedOutput:    floatPtr(8e-6),
+			expectedCacheRead: floatPtr(0.38e-6),
+		},
+		{
+			name:              "kimi 2.7 high-speed alias",
+			model:             "kimi-2.7-code-high-speed",
+			expectedInput:     1.90e-6,
+			expectedOutput:    floatPtr(8e-6),
+			expectedCacheRead: floatPtr(0.38e-6),
 		},
 		{
 			name:              "kimi for coding explicit alias",
 			model:             "kimi-for-coding",
 			expectedInput:     0.95e-6,
 			expectedOutput:    floatPtr(4e-6),
-			expectedCacheRead: floatPtr(0.15e-6),
+			expectedCacheRead: floatPtr(0.19e-6),
 		},
 		{
 			name:              "kimi k2.5",
@@ -528,7 +563,7 @@ func TestGetFallbackPricing_FamilyMatching(t *testing.T) {
 			model:             "kimi-k2.6",
 			expectedInput:     0.95e-6, // = k2.6 不是 k2 的 0.56e-6
 			expectedOutput:    floatPtr(4e-6),
-			expectedCacheRead: floatPtr(0.15e-6),
+			expectedCacheRead: floatPtr(0.16e-6),
 		},
 		{
 			name:              "kimi k2 thinking hyphenated variant",
