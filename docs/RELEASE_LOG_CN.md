@@ -24,6 +24,12 @@
 - 后端完整测试：`go test ./...` 通过。
 - 前端完整构建：`pnpm --dir frontend run build` 通过。
 - 4146 试运行命令已给出，正式切换前必须完成试运行检查。
+- Release workflow：GitHub Actions `Release` run `28488231851` 成功。
+- Release 校验：
+  - `isPrerelease=false`
+  - `/releases/latest` 指向 `v0.1.141-smartapi.1`
+  - assets 包含 `checksums.txt`、`linux_amd64`、`linux_arm64`。
+  - GHCR API 查询因本地 GitHub token 缺少 `read:packages` scope 返回 403；workflow 的 GoReleaser 步骤已成功。
 
 ### 部署状态
 
@@ -33,6 +39,7 @@
   - `156_content_moderation_matched_keyword.sql`
   - `157_user_platform_quotas_add_grok.sql`
 - 生产发布前必须备份数据库，并确认 4146 试运行健康检查通过。
+- Agent 未直接执行服务器 4146 替换和正式 4145 切换；已给出按 `docs/FORK_WORKFLOW_CN.md` 和 `docs/TRIAL_DEPLOYMENT_CN.md` 执行的 4146 试运行命令。
 - 官方 `v0.1.141` 之后的 `upstream/main` 散提交未合并；其中 `fix(openai): preserve encrypted reasoning across turns on codex OAuth path` 可后续单独评估是否作为同基线紧急例外。
 
 ### 回滚提示
