@@ -491,7 +491,7 @@ export interface PaginationConfig {
 
 // ==================== API Key & Group Types ====================
 
-export type GroupPlatform = 'anthropic' | 'openai' | 'gemini' | 'antigravity'
+export type GroupPlatform = 'anthropic' | 'openai' | 'gemini' | 'antigravity' | 'grok'
 
 export type SubscriptionType = 'standard' | 'subscription'
 
@@ -694,7 +694,7 @@ export interface UpdateGroupRequest {
 
 // ==================== Account & Proxy Types ====================
 
-export type AccountPlatform = 'anthropic' | 'openai' | 'gemini' | 'antigravity'
+export type AccountPlatform = 'anthropic' | 'openai' | 'gemini' | 'antigravity' | 'grok'
 export type AccountType = 'oauth' | 'setup-token' | 'apikey' | 'upstream' | 'bedrock' | 'service_account'
 export type OAuthAddMethod = 'oauth' | 'setup-token'
 export type ProxyProtocol = 'http' | 'https' | 'socks5' | 'socks5h'
@@ -948,6 +948,13 @@ export interface AntigravityModelQuota {
   reset_time: string  // 重置时间 ISO8601
 }
 
+export interface GrokQuotaWindow {
+  limit?: number
+  remaining?: number
+  reset_unix?: number
+  reset_at?: string
+}
+
 export interface AccountUsageInfo {
   source?: 'passive' | 'active'
   updated_at: string | null
@@ -961,6 +968,15 @@ export interface AccountUsageInfo {
   gemini_pro_minute?: UsageProgress | null
   gemini_flash_minute?: UsageProgress | null
   antigravity_quota?: Record<string, AntigravityModelQuota> | null
+  grok_request_quota?: GrokQuotaWindow | null
+  grok_token_quota?: GrokQuotaWindow | null
+  grok_retry_after_seconds?: number | null
+  grok_entitlement_status?: string
+  grok_quota_snapshot_state?: string
+  grok_last_quota_probe_at?: string
+  grok_last_headers_seen_at?: string
+  grok_last_status_code?: number
+  grok_local_usage?: WindowStats | null
   ai_credits?: Array<{
     credit_type?: string
     amount?: number
@@ -1278,6 +1294,7 @@ export interface UsageLog {
 
   // User-Agent
   user_agent: string | null
+  ip_address?: string | null
 
   // Cache TTL Override
   cache_ttl_overridden: boolean
@@ -1310,9 +1327,6 @@ export interface AdminUsageLog extends UsageLog {
   // 渠道 ID 和计费等级（仅管理员可见）
   channel_id?: number | null
   billing_tier?: string | null
-
-  // 用户请求 IP（仅管理员可见）
-  ip_address?: string | null
 
   // 最小账号信息（仅管理员接口返回）
   account?: UsageLogAccountSummary
@@ -1456,6 +1470,9 @@ export interface UsageStatsResponse {
   total_actual_cost: number // 实际扣除
   average_duration_ms: number
   models?: Record<string, number>
+  endpoints?: EndpointStat[]
+  upstream_endpoints?: EndpointStat[]
+  endpoint_paths?: EndpointStat[]
 }
 
 // ==================== Trend & Chart Types ====================
@@ -1482,7 +1499,7 @@ export interface ModelStat {
   total_tokens: number
   cost: number // 标准计费
   actual_cost: number // 实际扣除
-  account_cost: number // 账号成本
+  account_cost?: number // 账号成本（仅管理员接口返回）
 }
 
 export interface EndpointStat {
@@ -1500,7 +1517,7 @@ export interface GroupStat {
   total_tokens: number
   cost: number // 标准计费
   actual_cost: number // 实际扣除
-  account_cost: number // 账号成本
+  account_cost?: number // 账号成本（仅管理员接口返回）
 }
 
 export interface UserBreakdownItem {
@@ -1675,8 +1692,10 @@ export interface UsageQueryParams {
   request_type?: UsageRequestType
   stream?: boolean
   billing_type?: number | null
+  billing_mode?: string | null
   start_date?: string
   end_date?: string
+  timezone?: string
   sort_by?: string
   sort_order?: 'asc' | 'desc'
 }
