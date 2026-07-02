@@ -24,8 +24,12 @@
 
 - 后端完整测试：`go test ./...` 通过。
 - 前端完整构建：`pnpm --dir frontend run build` 通过。
-- Release workflow：待 tag 推送后确认。
-- Release 校验：待 tag 推送后确认 `/releases/latest`、`isPrerelease=false`、release assets 和 GHCR 镜像。
+- Release workflow：GitHub Actions `Release` run `28559013060` 成功。
+- Release 校验：
+  - `isPrerelease=false`
+  - `/releases/latest` 指向 `v0.1.142-smartapi.1`
+  - assets 包含 `checksums.txt`、`linux_amd64`、`linux_arm64`、`darwin_amd64`、`darwin_arm64`、`windows_amd64`。
+  - GHCR 镜像 `ghcr.io/hua7448/sub2api:0.1.142-smartapi.1` 已由 GoReleaser 成功推送；本机无 `docker` / `skopeo`，未做本地 manifest inspect。
 - 4146 试运行命令已给出，正式切换前必须完成试运行检查。
 
 ### 部署状态
