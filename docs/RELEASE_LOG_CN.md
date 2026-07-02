@@ -1,5 +1,54 @@
 # SmartAPI 发布记录
 
+## v0.1.142-smartapi.1
+
+- 发布时间：2026-07-02
+- 官方基线：0.1.142
+- 发布分支：`release/v0.1.142-smartapi.1`
+- 同步分支：`sync/upstream-2026-07-02`
+- Release URL：https://github.com/hua7448/sub2api/releases/tag/v0.1.142-smartapi.1
+- 镜像：`ghcr.io/hua7448/sub2api:0.1.142-smartapi.1`
+
+### 本次变更
+
+- 同步官方 `v0.1.142` 基线更新，未合并官方 tag 之后 `upstream/main` 的同基线散提交。
+- 新增 OpenAI Spark 链接型影子账号：影子账号通过 `parent_account_id` 复用母账号凭据和代理，独立走 `spark` 配额维度与用量窗口。
+- 新增 Grok 媒体路由：支持 Grok 图像生成、图像编辑、视频生成和视频状态查询，并接入调度、鉴权、内容审核、错误透传和用量记录。
+- 适配 Claude Sonnet 5，并新增 Anthropic OAuth dateline 指纹归一化开关，默认抹除客户端日期句式隐写位。
+- 修复 OpenAI Codex OAuth 多轮 encrypted reasoning 保留问题，修复 `gpt-5.5-pro` 被错误归一化问题，并调整默认模型列表。
+- 修复账号列表分页 total 不准、订阅撤销软删除失效、五平台配额更新等官方问题。
+- 前端同步 Grok 图标与配色、用户使用记录“推理强度”默认列、登录协议提示 i18n 和多处 en/zh 文案修复。
+- 保留 SmartAPI 定制：fork 更新源、生图广场、Image Gallery、模型价格广场、国内模型/GLM 定价等。
+
+### 验证记录
+
+- 后端完整测试：`go test ./...` 通过。
+- 前端完整构建：`pnpm --dir frontend run build` 通过。
+- Release workflow：待 tag 推送后确认。
+- Release 校验：待 tag 推送后确认 `/releases/latest`、`isPrerelease=false`、release assets 和 GHCR 镜像。
+- 4146 试运行命令已给出，正式切换前必须完成试运行检查。
+
+### 部署状态
+
+- 本次变更包含数据库迁移：
+  - `154_account_spark_shadow.sql`
+  - `154a_account_spark_shadow_indexes_notx.sql`
+- 迁移会修改 `accounts` 表：
+  - 新增 `parent_account_id`
+  - 新增 `quota_dimension`
+  - 增加账号父子关系、维度合法性、禁止自指等约束
+  - 增加 `parent_account_id` 索引和每个母账号一个 active spark 影子账号的唯一索引
+- 生产发布前必须备份数据库，并确认 4146 试运行健康检查通过。
+- 因包含数据库约束和并发索引迁移，回滚前必须评估旧版本对新增列和约束的兼容性。
+- Agent 未直接执行服务器 4146 替换和正式 4145 切换；需按 `docs/FORK_WORKFLOW_CN.md` 和 `docs/TRIAL_DEPLOYMENT_CN.md` 先试运行再正式切换。
+
+### 回滚提示
+
+- 上一稳定版本：`v0.1.141-smartapi.1`
+- 回滚时只替换应用镜像 tag，不删除数据库、Redis、`data/` 或 Docker volume。
+- 严禁执行 `docker compose down -v`、删除生产数据目录或删除生产 volume。
+- 因包含数据库迁移，回滚前必须评估 `accounts.parent_account_id`、`accounts.quota_dimension`、相关 CHECK/FK 约束和并发索引是否影响旧版本运行。
+
 ## v0.1.141-smartapi.1
 
 - 发布时间：2026-07-01
