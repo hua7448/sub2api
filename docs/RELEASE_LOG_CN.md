@@ -25,7 +25,12 @@
 
 - 后端完整测试：首次 `go test ./...` 因下载 `github.com/tiktoken-go/tokenizer@v0.8.0` 超时失败；按规范使用本地代理重跑 `ALL_PROXY=http://127.0.0.1:7897 HTTPS_PROXY=http://127.0.0.1:7897 HTTP_PROXY=http://127.0.0.1:7897 GOPROXY=https://proxy.golang.org,direct go test ./...` 通过。
 - 前端完整构建：`pnpm --dir frontend run build` 通过。
-- Release workflow：待 GitHub Actions 执行。
+- Release workflow：GitHub Actions `Release` run `28595423046` 成功。
+- Release 校验：
+  - `isPrerelease=false`
+  - `/releases/latest` 指向 `v0.1.143-smartapi.1`
+  - assets 包含 `checksums.txt`、`linux_amd64`、`linux_arm64`、`darwin_amd64`、`darwin_arm64`、`windows_amd64`。
+  - GoReleaser 步骤成功；本机无 `docker` / `skopeo`，且当前 GitHub token 缺少 `read:packages` scope，未做本地 GHCR manifest/API 校验。
 - 4146 试运行：正式替换生产 4145 前必须完成试运行健康检查。
 
 ### 部署状态
