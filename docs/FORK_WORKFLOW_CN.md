@@ -433,3 +433,54 @@ docker volume rm <production-volume>
 - 已完成数据库备份
 - 已记录当前生产镜像 tag，具备回滚路径
 - 正式部署使用明确版本 tag，不使用 `latest`
+
+## 站点文档维护（site/）
+
+`site/` 是 SmartQ 客户使用文档站点（Next.js 静态站点）。
+
+### 目录说明
+
+| 路径 | 说明 |
+|------|------|
+| `site/lib/docs-data.ts` | 站点全局配置：主站、Base URL、QQ 群、工作时间、价格表、FAQ、导航 |
+| `site/components/docs/hero.tsx` | 首页首屏文案和终端展示 |
+| `site/components/docs/quick-start.tsx` | 快速开始四步卡片，含充值入口链接 |
+| `site/components/docs/pricing.tsx` | 充值套餐表和充值按钮 |
+| `site/components/docs/billing.tsx` | 计费说明 |
+| `site/components/docs/api-key-guide.tsx` | API Key 使用教程 |
+| `site/components/docs/codex-config.tsx` | Codex CLI/App 配置教程 |
+| `site/components/docs/claude-config.tsx` | Claude Code 配置教程，含 GLM 配置 |
+| `site/components/docs/kimi-config.tsx` | Kimi CLI 配置教程 |
+| `site/components/docs/faq-section.tsx` / `faq-accordion.tsx` | 常见问题（数据来自 `docs-data.ts`） |
+| `site/components/docs/contact.tsx` | 联系支持 |
+| `site/deploy/` | Dockerfile、nginx.conf、start.sh |
+
+### 修改流程
+
+1. 编辑对应组件或 `site/lib/docs-data.ts`
+2. 本地验证：
+   ```bash
+   cd site
+   pnpm install
+   pnpm build
+   pnpm dev --port 3002
+   ```
+3. 浏览器打开 `http://localhost:3002` 确认
+4. 提交：`feat(site): ...`
+
+### 常见修改映射
+
+- 改主站/Base URL/QQ 群/工作时间 → `site/lib/docs-data.ts`
+- 改价格 → `site/lib/docs-data.ts` 中的 `PRICING`
+- 改常见问题 → `site/lib/docs-data.ts` 中的 `FAQ`
+- 改导航 → `site/lib/docs-data.ts` 中的 `NAV_ITEMS`
+- 改 Kimi 下载链接 → `site/components/docs/kimi-config.tsx`
+- 改充值跳转链接 → `site/components/docs/pricing.tsx` 和 `site/components/docs/quick-start.tsx`
+- 改 Claude/Codex/GLM 配置示例 → `site/components/docs/claude-config.tsx` / `codex-config.tsx`
+
+### 注意事项
+
+- 站点使用 Next.js 15 + React 19 + Tailwind CSS 4
+- 构建产物输出到 `site/out/`，已加入根目录 `.gitignore`
+- API Key 等敏感信息必须脱敏，示例中使用 `sk-********************************`
+- 新增页面组件后需要在 `site/app/page.tsx` 中引入并渲染
