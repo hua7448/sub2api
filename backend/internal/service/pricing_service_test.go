@@ -152,6 +152,20 @@ func TestMergeMissingFallbackPricingAddsBundledKimiK27WithoutOverridingExisting(
 	require.InDelta(t, 1.3e-6, kimiK27.CacheReadInputTokenCost, 1e-12)
 }
 
+func TestMergeMissingFallbackPricingUsesBundledFallbackWithoutDiskConfig(t *testing.T) {
+	svc := &PricingService{}
+
+	got := svc.mergeMissingFallbackPricing(map[string]*LiteLLMModelPricing{
+		"kimi-k2.6": {InputCostPerToken: 0.954e-6, OutputCostPerToken: 3.961e-6},
+	})
+
+	kimiK27 := got["kimi-k2.7-code"]
+	require.NotNil(t, kimiK27)
+	require.InDelta(t, 6.5e-6, kimiK27.InputCostPerToken, 1e-12)
+	require.InDelta(t, 27e-6, kimiK27.OutputCostPerToken, 1e-12)
+	require.InDelta(t, 1.3e-6, kimiK27.CacheReadInputTokenCost, 1e-12)
+}
+
 func TestGetModelPricing_Gpt54MiniUsesDedicatedStaticFallbackWhenRemoteMissing(t *testing.T) {
 	svc := &PricingService{
 		pricingData: map[string]*LiteLLMModelPricing{

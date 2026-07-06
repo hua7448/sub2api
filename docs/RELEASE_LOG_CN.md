@@ -1,5 +1,41 @@
 # SmartAPI 发布记录
 
+## v0.1.145-smartapi.2
+
+- 发布时间：2026-07-06
+- 官方基线：0.1.145
+- 发布分支：`release/v0.1.145-smartapi.2`
+- Release URL：https://github.com/hua7448/sub2api/releases/tag/v0.1.145-smartapi.2
+- 镜像：`ghcr.io/hua7448/sub2api:0.1.145-smartapi.2`
+
+### 本次变更
+
+- 修复后台一键更新/二进制热更新后 Kimi K2.7 模型广场官方价仍显示 `¥4/M` 的问题。
+- 将 `backend/resources/model-pricing/model_prices_and_context_window.json` 通过 `go:embed` 编入 release 二进制；即使热更新只替换 `/app/sub2api`、没有同步 `/app/resources` 目录，也能拿到 SmartAPI bundled fallback 价格。
+- 价格服务现在会依次合并磁盘 fallback 与二进制内嵌 fallback 中缺失的模型条目；远程/持久化价格源仍优先，内嵌 fallback 只补缺失项。
+- 部署示例中的应用镜像改为明确 SmartAPI tag：`ghcr.io/hua7448/sub2api:0.1.145-smartapi.2`。
+
+### 验证记录
+
+- 后端相关测试：`go test ./resources ./internal/service -run 'TestMergeMissingFallbackPricing|TestDefaultPricingIncludesCodexAutoReview|TestModelPricingBoard|TestGetModelPricing'` 通过。
+- 后端价格测试：`go test ./internal/service -run 'Test.*Pricing'` 通过。
+- 后端完整测试：`go test ./...` 通过。
+- 前端完整构建：`pnpm --dir frontend run build` 通过（仅有既有 Vite chunk size / dynamic import、Browserslist 数据较旧、playground 依赖 build script approval 警告）。
+- 待执行：Release workflow。
+- 4146 试运行：正式替换生产 4145 前必须完成试运行健康检查。
+
+### 部署状态
+
+- 本次变更不包含数据库迁移。
+- 生产发布必须使用明确版本 tag：`ghcr.io/hua7448/sub2api:0.1.145-smartapi.2`，不得使用 `latest`。
+- 如果使用后台一键更新，更新后需确认运行版本为 `0.1.145-smartapi.2`，并刷新模型广场验证 `kimi-k2.7-code` 官方价显示为输入 `¥6.5/M`、输出 `¥27/M`、缓存读 `¥1.3/M`。
+
+### 回滚提示
+
+- 上一稳定版本：`v0.1.145-smartapi.1`
+- 回滚时只替换应用镜像 tag 或应用二进制，不删除数据库、Redis、`data/` 或 Docker volume。
+- 严禁执行 `docker compose down -v`、删除生产数据目录或删除生产 volume。
+
 ## v0.1.145-smartapi.1
 
 - 发布时间：2026-07-06
