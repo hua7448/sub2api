@@ -144,3 +144,8 @@ docs/*
 frontend/coverage/
 aicodex
 output/
+
+# sub2api-site
+/site/.next/
+/site/out/
+/site/node_modules/
