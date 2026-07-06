@@ -18,6 +18,7 @@ import (
 	"github.com/Wei-Shaw/sub2api/internal/pkg/logger"
 	"github.com/Wei-Shaw/sub2api/internal/pkg/openai"
 	"github.com/Wei-Shaw/sub2api/internal/util/urlvalidator"
+	"github.com/Wei-Shaw/sub2api/resources"
 	"go.uber.org/zap"
 )
 
@@ -465,29 +466,38 @@ func (s *PricingService) loadPricingData(filePath string) error {
 }
 
 func (s *PricingService) mergeMissingFallbackPricing(data map[string]*LiteLLMModelPricing) map[string]*LiteLLMModelPricing {
-	if len(data) == 0 || s == nil || s.cfg == nil || strings.TrimSpace(s.cfg.Pricing.FallbackFile) == "" {
+	if len(data) == 0 {
 		return data
 	}
 
-	fallbackBody, err := os.ReadFile(s.cfg.Pricing.FallbackFile)
-	if err != nil {
-		logger.LegacyPrintf("service.pricing", "[Pricing] Failed to read fallback pricing for merge: %v", err)
-		return data
+	var fallbackData []map[string]*LiteLLMModelPricing
+	if s != nil && s.cfg != nil && strings.TrimSpace(s.cfg.Pricing.FallbackFile) != "" {
+		fallbackBody, err := os.ReadFile(s.cfg.Pricing.FallbackFile)
+		if err != nil {
+			logger.LegacyPrintf("service.pricing", "[Pricing] Failed to read fallback pricing for merge: %v", err)
+		} else if pricing, err := s.parsePricingData(fallbackBody); err != nil {
+			logger.LegacyPrintf("service.pricing", "[Pricing] Failed to parse fallback pricing for merge: %v", err)
+		} else {
+			fallbackData = append(fallbackData, pricing)
+		}
 	}
-
-	fallbackData, err := s.parsePricingData(fallbackBody)
-	if err != nil {
-		logger.LegacyPrintf("service.pricing", "[Pricing] Failed to parse fallback pricing for merge: %v", err)
-		return data
+	if bundled := resources.ModelPricingFallbackJSON(); len(bundled) > 0 {
+		if pricing, err := s.parsePricingData(bundled); err != nil {
+			logger.LegacyPrintf("service.pricing", "[Pricing] Failed to parse bundled fallback pricing for merge: %v", err)
+		} else {
+			fallbackData = append(fallbackData, pricing)
+		}
 	}
 
 	merged := 0
-	for model, pricing := range fallbackData {
-		if _, ok := data[model]; ok {
-			continue
+	for _, pricingData := range fallbackData {
+		for model, pricing := range pricingData {
+			if _, ok := data[model]; ok {
+				continue
+			}
+			data[model] = pricing
+			merged++
 		}
-		data[model] = pricing
-		merged++
 	}
 	if merged > 0 {
 		logger.LegacyPrintf("service.pricing", "[Pricing] Merged %d missing models from fallback pricing", merged)
