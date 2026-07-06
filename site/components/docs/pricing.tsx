@@ -1,7 +1,9 @@
-import { Sparkles, Clock } from 'lucide-react'
+import { Sparkles, ExternalLink } from 'lucide-react'
 import { Section } from './section'
 import { PRICING } from '@/lib/docs-data'
 import { cn } from '@/lib/utils'
+
+const PAY_URL = 'https://pay.ldxp.cn/shop/PBQVKSJX'
 
 export function Pricing() {
   return (
@@ -9,16 +11,24 @@ export function Pricing() {
       id="pricing"
       eyebrow="Pricing"
       title="充值套餐"
-      description="站内额度以 USD 展示，充值使用人民币支付。基础口径为 1 元人民币对应 1 美元站内额度，大额套餐按折扣购买。"
+      description="站内额度以 USD 展示，充值使用人民币支付。点击下方按钮前往站内充值页面完成支付。"
     >
-      {/* 限时优惠横幅 */}
-      <div className="mb-6 flex items-center gap-3 rounded-lg border border-amber/30 bg-amber/10 px-4 py-3">
-        <Clock className="size-5 shrink-0 text-amber" />
-        <p className="text-sm text-amber">
-          <span className="font-semibold">限时优惠</span>
-          <span className="mx-2 text-amber/60">|</span>
-          试运行期间全部套餐享受折扣价，优惠随时可能调整
+      <div className="mb-6 flex flex-col gap-3 rounded-lg border border-primary/20 bg-primary/[0.06] px-4 py-3 sm:flex-row sm:items-center sm:justify-between">
+        <p className="text-sm text-foreground">
+          <span className="font-semibold">准备充值？</span>
+          <span className="ml-1 text-muted-foreground">
+            点击下方按钮前往充值页面，完成后额度会自动到账。
+          </span>
         </p>
+        <a
+          href={PAY_URL}
+          target="_blank"
+          rel="noreferrer"
+          className="inline-flex items-center justify-center gap-2 rounded-lg bg-primary px-4 py-2 text-sm font-medium text-primary-foreground transition-colors hover:bg-primary/80"
+        >
+          前往充值
+          <ExternalLink className="size-4" />
+        </a>
       </div>
 
       <div className="overflow-hidden rounded-xl border border-border bg-card/40">

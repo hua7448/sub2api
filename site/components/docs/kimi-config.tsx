@@ -4,7 +4,7 @@ import { CodeBlock } from './code-block'
 import { SimpleTabs } from './simple-tabs'
 import { SITE } from '@/lib/docs-data'
 
-const KIMI_DOWNLOAD_URL = 'https://www.moonshot.cn/kimi-cli'
+const KIMI_DOWNLOAD_URL = 'https://www.kimi.com/code/en?track_id=2bc73531-e0ca-4343-970b-be47ef19a0f7'
 
 const MACOS_INSTALL = `brew install node
 npm install -g kimi-cli@latest`

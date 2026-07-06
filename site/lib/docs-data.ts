@@ -63,7 +63,7 @@ export type FaqItem = {
 export const FAQ: FaqItem[] = [
   {
     q: 'SmartQ 支持哪些工具？',
-    a: '支持纯血 Claude Code 和 Codex。',
+    a: '支持 Claude Code、Codex、Kimi CLI 与 GLM。',
   },
   {
     q: '为什么创建了 API Key 但看不到使用配置？',
@@ -83,7 +83,7 @@ export const FAQ: FaqItem[] = [
   },
   {
     q: '充值后没有到账怎么办？',
-    a: '试运行阶段充值由客服人工处理，请联系 QQ 群：665886623。',
+    a: '充值通过站内支付页面完成，如遇到账延迟请联系 QQ 群：665886623。',
   },
   {
     q: 'API Key 泄露了怎么办？',

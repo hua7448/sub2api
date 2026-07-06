@@ -2,6 +2,8 @@ import { ClipboardCheck, KeyRound, UserPlus, Wallet } from 'lucide-react'
 import { Section } from './section'
 import { SITE } from '@/lib/docs-data'
 
+const PAY_URL = 'https://pay.ldxp.cn/shop/PBQVKSJX'
+
 const STEPS = [
   {
     icon: UserPlus,
@@ -10,8 +12,9 @@ const STEPS = [
   },
   {
     icon: Wallet,
-    title: '联系客服充值',
-    desc: `试运行阶段充值请联系客服 QQ：${SITE.qqGroup}。`,
+    title: '充值额度',
+    desc: '前往充值页面完成支付，额度自动到账。',
+    href: PAY_URL,
   },
   {
     icon: KeyRound,
@@ -31,16 +34,13 @@ export function QuickStart() {
       id="quick-start"
       eyebrow="Quick Start"
       title="快速开始"
-      description="四步即可开始使用。SmartQ 目前开放注册，试运行阶段充值请联系客服。"
+      description="四步即可开始使用。SmartQ 目前开放注册，充值后额度自动到账。"
     >
       <ol className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
         {STEPS.map((step, i) => {
           const Icon = step.icon
-          return (
-            <li
-              key={step.title}
-              className="group relative rounded-xl border border-border bg-card/50 p-5 transition-all duration-300 hover:-translate-y-1 hover:border-primary/30 hover:bg-card"
-            >
+          const content = (
+            <>
               <div className="flex items-center justify-between">
                 <span className="flex size-10 items-center justify-center rounded-lg border border-primary/20 bg-primary/10 text-primary transition-transform duration-300 group-hover:scale-110">
                   <Icon className="size-5" />
@@ -55,6 +55,31 @@ export function QuickStart() {
               <p className="mt-1.5 text-sm leading-relaxed text-muted-foreground">
                 {step.desc}
               </p>
+            </>
+          )
+          if (step.href) {
+            return (
+              <li
+                key={step.title}
+                className="group relative rounded-xl border border-border bg-card/50 p-5 transition-all duration-300 hover:-translate-y-1 hover:border-primary/30 hover:bg-card"
+              >
+                <a
+                  href={step.href}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="block"
+                >
+                  {content}
+                </a>
+              </li>
+            )
+          }
+          return (
+            <li
+              key={step.title}
+              className="group relative rounded-xl border border-border bg-card/50 p-5 transition-all duration-300 hover:-translate-y-1 hover:border-primary/30 hover:bg-card"
+            >
+              {content}
             </li>
           )
         })}
