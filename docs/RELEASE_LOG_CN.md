@@ -21,8 +21,20 @@
 - 后端价格测试：`go test ./internal/service -run 'Test.*Pricing'` 通过。
 - 后端完整测试：`go test ./...` 通过。
 - 前端完整构建：`pnpm --dir frontend run build` 通过（仅有既有 Vite chunk size / dynamic import、Browserslist 数据较旧、playground 依赖 build script approval 警告）。
-- 待执行：Release workflow。
+- Release workflow：GitHub Actions `Release` run `28804653488` 成功。
+- Release 校验：
+  - `isPrerelease=false`
+  - `/releases/latest` 指向 `v0.1.145-smartapi.2`
+  - assets 包含 `checksums.txt`、`linux_amd64`、`linux_arm64`、`darwin_amd64`、`darwin_arm64`、`windows_amd64`
 - 4146 试运行：正式替换生产 4145 前必须完成试运行健康检查。
+
+### 问题复盘
+
+- `v0.1.144-smartapi.2` 已把 Kimi K2.7 官方人民币价写入 bundled fallback JSON，但生产运行时优先读取持久化价格文件；旧持久化文件没有 Kimi K2.7，因此回退到代码兜底价，输出价被展示成 `¥4/M`。
+- `v0.1.145-smartapi.1` 增加了“从 bundled fallback JSON 补缺失条目”的逻辑，但该修复仍假设 `/app/resources/model-pricing/model_prices_and_context_window.json` 会随版本更新。
+- 实际后台一键更新/二进制热更新只替换 `/app/sub2api`，不会同步 `/app/resources`。因此 `.1` 在正式环境中仍可能读到旧 resources，Kimi K2.7 价格继续不生效。
+- `.2` 的最终修复是把 fallback JSON 用 `go:embed` 编进二进制；以后涉及一键更新必须假设“只有二进制会更新”，不能依赖 release archive 或容器内资源目录同步。
+- 后续凡是影响热更新行为的静态资源、模型价格、默认模板、规则表或内置配置，如果需要随二进制版本生效，必须内嵌到 Go binary，或提供明确的数据迁移/复制机制，并在发布说明中写明验证方法。
 
 ### 部署状态
 

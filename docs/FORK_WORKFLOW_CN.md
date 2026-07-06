@@ -194,6 +194,12 @@ git diff --stat main..upstream/main
 - 产物：`ghcr.io/hua7448/sub2api:<version>`
 - Release assets 必须包含各平台二进制压缩包和 `checksums.txt`，否则后台只能检查版本，不能完成热更新。
 - GoReleaser 配置必须保持 `prerelease: false`。如果 `-smartapi.<序号>` tag 被 GitHub 标成 prerelease，后台 `/releases/latest` 将看不到它。
+- 管理员后台一键更新/热更新只应假设会替换应用二进制 `/app/sub2api`；不要假设 release 压缩包中的 `deploy/*`、容器镜像中的 `/app/resources` 或其他静态资源会同步到现有生产容器。
+- 如果本次修复依赖模型价格、默认模板、规则表、内置 JSON/YAML 等静态资源随版本生效，必须满足至少一个条件：
+  - 通过 `go:embed` 或等效方式编进 Go 二进制；
+  - 提供明确的数据迁移/复制逻辑，把资源写入持久化目录；
+  - 明确要求生产重新拉取镜像并重建容器，而不是后台热更新，并在发布说明中写清楚。
+- 任何“fallback 文件已更新”的修复，都必须额外验证“只有二进制更新、磁盘 resources 仍旧”的场景。`v0.1.145-smartapi.1` 的 Kimi K2.7 价格修复曾因此在正式热更新后不生效，最终由 `v0.1.145-smartapi.2` 通过内嵌 fallback JSON 修复。
 
 本地或服务器手动构建只用于试运行，不作为正式发布来源。
 
