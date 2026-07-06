@@ -6,6 +6,7 @@ import (
 	"path/filepath"
 	"testing"
 
+	"github.com/Wei-Shaw/sub2api/internal/config"
 	"github.com/stretchr/testify/require"
 )
 
@@ -127,6 +128,28 @@ func TestDefaultPricingIncludesCodexAutoReview(t *testing.T) {
 	require.InDelta(t, 5e-6, got.InputCostPerToken, 1e-12)
 	require.InDelta(t, 3e-5, got.OutputCostPerToken, 1e-12)
 	require.InDelta(t, 5e-7, got.CacheReadInputTokenCost, 1e-12)
+}
+
+func TestMergeMissingFallbackPricingAddsBundledKimiK27WithoutOverridingExisting(t *testing.T) {
+	existingKimiK26 := &LiteLLMModelPricing{InputCostPerToken: 123e-6}
+	svc := &PricingService{
+		cfg: &config.Config{
+			Pricing: config.PricingConfig{
+				FallbackFile: filepath.Join("..", "..", "resources", "model-pricing", "model_prices_and_context_window.json"),
+			},
+		},
+	}
+
+	got := svc.mergeMissingFallbackPricing(map[string]*LiteLLMModelPricing{
+		"kimi-k2.6": existingKimiK26,
+	})
+
+	require.Same(t, existingKimiK26, got["kimi-k2.6"])
+	kimiK27 := got["kimi-k2.7-code"]
+	require.NotNil(t, kimiK27)
+	require.InDelta(t, 6.5e-6, kimiK27.InputCostPerToken, 1e-12)
+	require.InDelta(t, 27e-6, kimiK27.OutputCostPerToken, 1e-12)
+	require.InDelta(t, 1.3e-6, kimiK27.CacheReadInputTokenCost, 1e-12)
 }
 
 func TestGetModelPricing_Gpt54MiniUsesDedicatedStaticFallbackWhenRemoteMissing(t *testing.T) {

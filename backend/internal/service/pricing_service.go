@@ -319,6 +319,7 @@ func (s *PricingService) downloadPricingData() error {
 	if err != nil {
 		return fmt.Errorf("parse pricing data: %w", err)
 	}
+	data = s.mergeMissingFallbackPricing(data)
 
 	// 保存到本地文件
 	pricingFile := s.getPricingFilePath()
@@ -441,6 +442,7 @@ func (s *PricingService) loadPricingData(filePath string) error {
 	if err != nil {
 		return fmt.Errorf("parse pricing data: %w", err)
 	}
+	pricingData = s.mergeMissingFallbackPricing(pricingData)
 
 	// 计算哈希
 	hash := sha256.Sum256(data)
@@ -460,6 +462,37 @@ func (s *PricingService) loadPricingData(filePath string) error {
 
 	logger.LegacyPrintf("service.pricing", "[Pricing] Loaded %d models from %s", len(pricingData), filePath)
 	return nil
+}
+
+func (s *PricingService) mergeMissingFallbackPricing(data map[string]*LiteLLMModelPricing) map[string]*LiteLLMModelPricing {
+	if len(data) == 0 || s == nil || s.cfg == nil || strings.TrimSpace(s.cfg.Pricing.FallbackFile) == "" {
+		return data
+	}
+
+	fallbackBody, err := os.ReadFile(s.cfg.Pricing.FallbackFile)
+	if err != nil {
+		logger.LegacyPrintf("service.pricing", "[Pricing] Failed to read fallback pricing for merge: %v", err)
+		return data
+	}
+
+	fallbackData, err := s.parsePricingData(fallbackBody)
+	if err != nil {
+		logger.LegacyPrintf("service.pricing", "[Pricing] Failed to parse fallback pricing for merge: %v", err)
+		return data
+	}
+
+	merged := 0
+	for model, pricing := range fallbackData {
+		if _, ok := data[model]; ok {
+			continue
+		}
+		data[model] = pricing
+		merged++
+	}
+	if merged > 0 {
+		logger.LegacyPrintf("service.pricing", "[Pricing] Merged %d missing models from fallback pricing", merged)
+	}
+	return data
 }
 
 // useFallbackPricing 使用回退价格文件
@@ -796,6 +829,13 @@ func (s *PricingService) matchOpenAIModel(model string) *LiteLLMModelPricing {
 				Info(fmt.Sprintf("[Pricing] OpenAI fallback matched %s -> %s", model, "gpt-5.2-codex"))
 			return pricing
 		}
+	}
+
+	// GPT-5.6（sol / terra / luna）回退到 GPT-5.4 定价
+	if strings.HasPrefix(model, "gpt-5.6") {
+		logger.With(zap.String("component", "service.pricing")).
+			Info(fmt.Sprintf("[Pricing] OpenAI fallback matched %s -> %s", model, "gpt-5.4(static)"))
+		return openAIGPT54FallbackPricing
 	}
 
 	// GPT-5.5 回退到 GPT-5.4 定价

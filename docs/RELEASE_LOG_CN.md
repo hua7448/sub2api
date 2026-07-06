@@ -1,5 +1,46 @@
 # SmartAPI 发布记录
 
+## v0.1.145-smartapi.1
+
+- 发布时间：2026-07-06
+- 官方基线：0.1.145
+- 发布分支：`release/v0.1.145-smartapi.1`
+- 同步分支：`sync/upstream-2026-07-06`
+- Release URL：https://github.com/hua7448/sub2api/releases/tag/v0.1.145-smartapi.1
+- 镜像：`ghcr.io/hua7448/sub2api:0.1.145-smartapi.1`
+
+### 本次变更
+
+- 同步官方 `v0.1.145` 基线更新。
+- 新增 API Key 账号请求头覆写能力，并包含官方后续审计修复：补齐禁止名单、beta 头对称校验与批量清空防护。
+- 适配 OpenAI 新模型 `gpt-5.6-sol`、`gpt-5.6-terra`、`gpt-5.6-luna`。
+- 引入 OpenAI 高级调度器相关控制与审计修复：支持粘性加权、订阅优先、调度权值配置，并补充调度缓存与账号列表相关测试。
+- 支付侧同步 EasyPay 自定义支付方式、内置支付方式精确匹配、订阅 CNY 换算显式 opt-in 以及支付配置校验修复。
+- 继续保留 SmartAPI 定制：fork 更新源、明确 SmartAPI release tag、模型价格广场、用户侧渠道页面开关、外部充值入口、站点文档等。
+- 修复 Kimi K2.7 模型广场官方价显示：当生产持久化价格文件缺少镜像内新增模型条目时，运行时会把 bundled fallback JSON 中缺失的条目补入内存价格表，避免 `kimi-k2.7-code` 回退到旧的 `¥4/M` 展示口径。
+- 部署示例中的应用镜像改为明确 SmartAPI tag：`ghcr.io/hua7448/sub2api:0.1.145-smartapi.1`，避免生产环境误用 upstream `latest`。
+
+### 验证记录
+
+- 冲突解决：`backend/cmd/server/VERSION`、`frontend/src/components/layout/AppSidebar.vue`、`frontend/src/views/admin/__tests__/SettingsView.spec.ts` 已处理；保留 fork 侧边栏 logo 视觉风格，并吸收 upstream logo 回首页行为。
+- JSON 结构校验：`jq empty backend/resources/model-pricing/model_prices_and_context_window.json` 通过。
+- 后端相关测试：`go test ./internal/service -run 'TestMergeMissingFallbackPricing|TestDefaultPricingIncludesCodexAutoReview|TestModelPricingBoard|TestGetModelPricing|Test.*Pricing'` 通过。
+- 后端完整测试：`go test ./...` 通过。
+- 前端完整构建：`pnpm --dir frontend run build` 通过（仅有既有 Vite chunk size / dynamic import、Browserslist 数据较旧、playground 依赖 build script approval 警告）。
+- 4146 试运行：正式替换生产 4145 前必须完成试运行健康检查。
+
+### 部署状态
+
+- 本次变更不包含数据库迁移。
+- 生产发布必须使用明确版本 tag：`ghcr.io/hua7448/sub2api:0.1.145-smartapi.1`，不得使用 `latest`。
+- 生产替换前需先按 `docs/FORK_WORKFLOW_CN.md` 使用独立试运行容器和非生产端口 `4146` 验证登录、模型广场、Kimi K2.7 官方价、支付配置与 OpenAI/Anthropic 基本转发。
+
+### 回滚提示
+
+- 上一稳定版本：`v0.1.144-smartapi.2`
+- 回滚时只替换应用镜像 tag，不删除数据库、Redis、`data/` 或 Docker volume。
+- 严禁执行 `docker compose down -v`、删除生产数据目录或删除生产 volume。
+
 ## v0.1.144-smartapi.2
 
 - 发布时间：2026-07-06
