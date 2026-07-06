@@ -1,5 +1,40 @@
 # SmartAPI 发布记录
 
+## v0.1.144-smartapi.2
+
+- 发布时间：2026-07-06
+- 官方基线：0.1.144
+- 发布分支：`main`
+- Release URL：https://github.com/hua7448/sub2api/releases/tag/v0.1.144-smartapi.2
+- 镜像：`ghcr.io/hua7448/sub2api:0.1.144-smartapi.2`
+
+### 本次变更
+
+- 补充本地 fallback 模型定价 JSON：新增 `kimi-k2.7-code`、`kimi-k2.7-code-highspeed`、`kimi-for-coding`。
+- Kimi K2.7 Code 标准版按官方人民币价配置：输入缓存未命中 `¥6.50/M`、缓存命中 `¥1.30/M`、输出 `¥27.00/M`。
+- Kimi K2.7 Code HighSpeed 按标准版 2 倍配置：输入缓存未命中 `¥13.00/M`、缓存命中 `¥2.60/M`、输出 `¥54.00/M`。
+- `kimi-for-coding` 作为 Kimi Code 统一模型 ID，按 Kimi K2.7 Code 标准版价格兜底；Kimi 官方后续若在公开定价源中发布该模型或 K2.7 Code 的新定价，以官方最新定价为准。
+- 修正 Kimi fallback 注释，避免把 `kimi-for-coding` 误读为 K2.6 档位。
+- 包含 `v0.1.144-smartapi.1` 后已合入 `main` 的站点文档维护：新增 SmartQ 文档站点，更新 Kimi 下载链接和充值说明，并补充 `site/` 维护规范。
+
+### 验证记录
+
+- JSON 结构校验：`jq empty backend/resources/model-pricing/model_prices_and_context_window.json` 通过。
+- 后端相关测试：`go test ./internal/service -run 'Test.*Pricing|TestModelPricingBoard|TestCalculateCost|TestGetModelPricing'` 通过。
+- 前端完整构建：`pnpm --dir frontend run build` 通过（仅有既有 Vite chunk size / dynamic import 警告）。
+- 4146 试运行：正式替换生产 4145 前必须完成试运行健康检查。
+
+### 部署状态
+
+- 本次变更不包含数据库迁移。
+- 生产发布前仍需按 `docs/FORK_WORKFLOW_CN.md` 使用明确版本 tag，先部署 4146 试运行容器验证，再切换生产服务。
+
+### 回滚提示
+
+- 上一稳定版本：`v0.1.144-smartapi.1`
+- 回滚时只替换应用镜像 tag，不删除数据库、Redis、`data/` 或 Docker volume。
+- 严禁执行 `docker compose down -v`、删除生产数据目录或删除生产 volume。
+
 ## v0.1.143-smartapi.1
 
 - 发布时间：2026-07-02

@@ -451,7 +451,7 @@ func (s *BillingService) initFallbackPricing() {
 		CacheReadPricePerToken: 0.38e-6,
 		SupportsCacheBreakdown: false,
 	}
-	// kimi-for-coding 走 Kimi Coding endpoint，按当前 K2.6 coding 档位兜底计费。
+	// kimi-for-coding 走 Kimi Coding endpoint；K2.7 Code 可用时按 K2.7 Code 标准版档位兜底计费。
 	s.fallbackPrices["kimi-for-coding"] = &ModelPricing{
 		InputPricePerToken:     0.95e-6,
 		OutputPricePerToken:    4e-6,
