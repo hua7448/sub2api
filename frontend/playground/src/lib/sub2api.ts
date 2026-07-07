@@ -93,7 +93,7 @@ export function applySub2APISettings(settings: AppSettings, remote: Sub2APISetti
     apiProxy: false,
     responseFormatB64Json: true,
     streamImages: persistedProfile?.streamImages ?? true,
-    streamPartialImages: persistedProfile?.streamPartialImages ?? 1,
+    streamPartialImages: persistedProfile?.streamPartialImages ?? 2,
   }
 
   return {

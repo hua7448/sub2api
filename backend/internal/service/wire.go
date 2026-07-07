@@ -560,7 +560,7 @@ func ProvideImageGalleryService(repo ImageGalleryRepository, settingRepo Setting
 	}
 	svc.SetGatewayClient(&LocalImageGatewayClient{
 		BaseURL: fmt.Sprintf("http://%s:%d", host, port),
-		Client:  &http.Client{Timeout: 180 * time.Second},
+		Client:  &http.Client{Timeout: imageGalleryJobMaxDuration},
 	})
 	return svc
 }

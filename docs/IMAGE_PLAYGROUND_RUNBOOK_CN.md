@@ -5,6 +5,7 @@
 ## 核心边界
 
 - 生图广场是 `frontend/playground` 下的独立 React/Vite 子应用，不把 React 组件混入主站 Vue 应用。
+- 生图广场源码上游是 `https://github.com/CookSleep/gpt_image_playground.git`。本 fork 使用远端名 `playground-upstream` 单独跟踪它，不和 sub2api 官方 `upstream` 混用。
 - 主站入口只负责跳转 `/image-playground/index.html`，管理端仍使用 Vue 的生图广场设置页。
 - 浏览器永远不保存、不展示用户真实 API Key。playground 只能保存 `api_key_id`、模型和 UI 参数。
 - 前端只调用 `/api/v1/image-playground/...`，不能直接请求 `/v1/...`、外部 OpenAI 域名、自定义 Base URL 或自定义 provider。
@@ -26,6 +27,56 @@
 - 提示词库索引：`frontend/playground/src/data/promptLibrary/index.ts`
 - 提示词库分片：`frontend/playground/src/data/promptLibrary/chunks/`
 - 4146 试运行：`docs/TRIAL_DEPLOYMENT_CN.md`
+
+## 上游源码跟踪
+
+`frontend/playground` 是从 `CookSleep/gpt_image_playground` 集成进来的子应用。上游仓库根目录对应本仓库的 `frontend/playground/` 子目录。
+
+本地固定 remote：
+
+```bash
+git remote add playground-upstream https://github.com/CookSleep/gpt_image_playground.git
+git config remote.playground-upstream.tagOpt --no-tags
+git config --add remote.playground-upstream.fetch '+refs/tags/*:refs/remotes/playground-upstream/tags/*'
+```
+
+注意：CookSleep 仓库也使用 `v0.x` tag，直接 `git fetch --tags` 会污染 sub2api 本仓库的 release tag 命名空间，并可能和本 fork 的 tag 冲突。必须把 playground tag 拉到 `refs/remotes/playground-upstream/tags/*`，不要拉到普通 `refs/tags/*`。
+
+更新远端引用：
+
+```bash
+git fetch playground-upstream --prune --no-tags \
+  '+refs/heads/*:refs/remotes/playground-upstream/*' \
+  '+refs/tags/*:refs/remotes/playground-upstream/tags/*'
+```
+
+查看上游版本：
+
+```bash
+git show playground-upstream/main:package.json
+git for-each-ref --sort=-v:refname --format='%(refname:short)' refs/remotes/playground-upstream/tags | head
+```
+
+评估上游差异时，不要把 `playground-upstream/main` 直接 merge 到本仓库根目录。先看上游自身版本差异，再按文件把需要的改动移植到 `frontend/playground/`：
+
+```bash
+git log --oneline <old-upstream-commit>..<new-upstream-commit>
+git diff --stat <old-upstream-commit>..<new-upstream-commit>
+git diff --name-status <old-upstream-commit>..<new-upstream-commit>
+```
+
+当前记录：
+
+- 2026-07-07：本地 `frontend/playground/package.json` 为 `0.6.6`。
+- 2026-07-07：`playground-upstream/main` 已抓取到 `60da4a92`，上游 `package.json` 为 `0.6.12`。
+- `0.6.6..0.6.12` 值得优先评估的改动：Agent 图片任务恢复、导出 ZIP 使用任务 ID、select tooltip 关闭清理、默认 API URL 参数、prompt rewrite 设置、独立 Agent API 配置、移动端详情参数溢出修复、生成图尺寸记录。
+
+移植原则：
+
+- 优先挑选 bugfix 和可独立落地的小功能，不整体覆盖本地文件。
+- 保留 sub2api 定制：登录态、`api_key_id`、主站继承、禁止浏览器保存真实 API Key、`/api/v1/image-playground/...` 后端代理/Job 模式。
+- 上游新增 API 配置、provider、proxy、远程导入、部署脚本时，默认不直接开放给用户；必须先映射到 sub2api 后端权限和计费模型。
+- 移植后至少执行 `pnpm --dir frontend/playground run build`；涉及主站入口或静态资源时执行 `pnpm --dir frontend run build`。
 
 ## 开发原则
 

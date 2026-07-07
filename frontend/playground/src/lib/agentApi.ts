@@ -3,6 +3,10 @@ import { buildApiUrl, readClientDevProxyConfig, shouldUseApiProxy } from './devP
 import { appendStreamingFormatHint, maybeAppendStreamingHint, getApiErrorMessage, MIME_MAP, normalizeBase64Image, pickActualParams } from './imageApiShared'
 import { assertSub2APIParams, getCachedSub2APISettings, proxySub2API } from './sub2api'
 
+function startRequestTimeout(controller: AbortController, timeoutSeconds: number): ReturnType<typeof setTimeout> | null {
+  return timeoutSeconds > 0 ? setTimeout(() => controller.abort(), timeoutSeconds * 1000) : null
+}
+
 export interface AgentApiResultImage {
   toolCallId?: string
   action?: string
@@ -677,7 +681,7 @@ export async function callAgentResponsesApi(opts: {
   const proxyConfig = readClientDevProxyConfig()
   const useApiProxy = shouldUseApiProxy(profile.apiProxy, proxyConfig)
   const controller = new AbortController()
-  const timeoutId = setTimeout(() => controller.abort(), profile.timeout * 1000)
+  const timeoutId = startRequestTimeout(controller, profile.timeout)
   const abortFromCaller = () => controller.abort()
   if (signal?.aborted) controller.abort()
   signal?.addEventListener('abort', abortFromCaller, { once: true })
@@ -721,7 +725,7 @@ export async function callAgentResponsesApi(opts: {
       rawResponsePayload: JSON.stringify(payload, null, 2),
     }
   } finally {
-    clearTimeout(timeoutId)
+    if (timeoutId) clearTimeout(timeoutId)
     signal?.removeEventListener('abort', abortFromCaller)
   }
 }
@@ -737,7 +741,7 @@ export async function callAgentConversationTitleApi(opts: {
   const proxyConfig = readClientDevProxyConfig()
   const useApiProxy = shouldUseApiProxy(profile.apiProxy, proxyConfig)
   const controller = new AbortController()
-  const timeoutId = setTimeout(() => controller.abort(), profile.timeout * 1000)
+  const timeoutId = startRequestTimeout(controller, profile.timeout)
   const abortFromCaller = () => controller.abort()
   if (signal?.aborted) controller.abort()
   signal?.addEventListener('abort', abortFromCaller, { once: true })
@@ -770,7 +774,7 @@ export async function callAgentConversationTitleApi(opts: {
     const payload = await response.json() as ResponsesApiResponse
     return parseAgentConversationTitleXml(extractText(payload))
   } finally {
-    clearTimeout(timeoutId)
+    if (timeoutId) clearTimeout(timeoutId)
     signal?.removeEventListener('abort', abortFromCaller)
   }
 }
@@ -814,7 +818,7 @@ export async function callBatchImageSingle(opts: {
   const proxyConfig = readClientDevProxyConfig()
   const useApiProxy = shouldUseApiProxy(profile.apiProxy, proxyConfig)
   const controller = new AbortController()
-  const timeoutId = setTimeout(() => controller.abort(), profile.timeout * 1000)
+  const timeoutId = startRequestTimeout(controller, profile.timeout)
   const abortFromCaller = () => controller.abort()
   if (signal?.aborted) controller.abort()
   signal?.addEventListener('abort', abortFromCaller, { once: true })
@@ -952,7 +956,7 @@ export async function callBatchImageSingle(opts: {
     }
     return { batchItemId, image: null, error: err instanceof Error ? err.message : String(err) }
   } finally {
-    clearTimeout(timeoutId)
+    if (timeoutId) clearTimeout(timeoutId)
     signal?.removeEventListener('abort', abortFromCaller)
   }
 }

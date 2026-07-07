@@ -1,10 +1,15 @@
 package handler
 
 import (
+	"encoding/base64"
 	"errors"
+	"fmt"
+	"io"
+	"net/http"
 	"strconv"
 	"strings"
 
+	infraerrors "github.com/Wei-Shaw/sub2api/internal/pkg/errors"
 	"github.com/Wei-Shaw/sub2api/internal/pkg/pagination"
 	"github.com/Wei-Shaw/sub2api/internal/pkg/response"
 	middleware2 "github.com/Wei-Shaw/sub2api/internal/server/middleware"
@@ -165,6 +170,155 @@ func (h *ImageGalleryHandler) Generate(c *gin.Context) {
 	response.Success(c, result)
 }
 
+func (h *ImageGalleryHandler) CreateGenerationJob(c *gin.Context) {
+	h.createJob(c, false)
+}
+
+func (h *ImageGalleryHandler) CreateEditJob(c *gin.Context) {
+	h.createJob(c, true)
+}
+
+func (h *ImageGalleryHandler) createJob(c *gin.Context, expectEdit bool) {
+	subject, ok := middleware2.GetAuthSubjectFromContext(c)
+	if !ok {
+		response.Unauthorized(c, "User not authenticated")
+		return
+	}
+	req, ok := h.bindJobRequest(c)
+	if !ok {
+		return
+	}
+	if expectEdit && len(req.ReferenceImages) == 0 {
+		response.BadRequest(c, "image is required for image edit jobs")
+		return
+	}
+	if !expectEdit {
+		req.ReferenceImages = nil
+		req.MaskImage = ""
+	}
+	result, err := h.service.CreateJob(c.Request.Context(), subject.UserID, req)
+	if err != nil {
+		response.ErrorFrom(c, err)
+		return
+	}
+	response.Accepted(c, result)
+}
+
+func (h *ImageGalleryHandler) bindJobRequest(c *gin.Context) (service.ImageGalleryGenerateRequest, bool) {
+	contentType := strings.ToLower(c.GetHeader("Content-Type"))
+	if strings.HasPrefix(contentType, "multipart/form-data") {
+		req, err := h.bindMultipartJobRequest(c)
+		if err != nil {
+			writeImageGalleryBindError(c, err)
+			return service.ImageGalleryGenerateRequest{}, false
+		}
+		return req, true
+	}
+	var req service.ImageGalleryGenerateRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		writeImageGalleryBindError(c, err)
+		return req, false
+	}
+	return req, true
+}
+
+func (h *ImageGalleryHandler) bindMultipartJobRequest(c *gin.Context) (service.ImageGalleryGenerateRequest, error) {
+	settings, err := h.service.PublicSettings(c.Request.Context())
+	if err != nil {
+		return service.ImageGalleryGenerateRequest{}, err
+	}
+	maxBytes := int64(settings.MaxUploadMB) * 1024 * 1024
+	if maxBytes <= 0 {
+		maxBytes = 20 << 20
+	}
+	reader, err := c.Request.MultipartReader()
+	if err != nil {
+		return service.ImageGalleryGenerateRequest{}, err
+	}
+
+	var req service.ImageGalleryGenerateRequest
+	for {
+		part, err := reader.NextPart()
+		if errors.Is(err, io.EOF) {
+			break
+		}
+		if err != nil {
+			return service.ImageGalleryGenerateRequest{}, err
+		}
+		name := part.FormName()
+		if name == "" {
+			continue
+		}
+		if part.FileName() == "" {
+			valueBytes, err := io.ReadAll(io.LimitReader(part, 1<<20))
+			if err != nil {
+				return service.ImageGalleryGenerateRequest{}, err
+			}
+			assignImageGalleryJobField(&req, name, string(valueBytes))
+			continue
+		}
+		data, err := io.ReadAll(io.LimitReader(part, maxBytes+1))
+		if err != nil {
+			return service.ImageGalleryGenerateRequest{}, err
+		}
+		if int64(len(data)) > maxBytes {
+			return service.ImageGalleryGenerateRequest{}, service.ErrImageGalleryUploadTooLarge
+		}
+		if len(data) == 0 {
+			return service.ImageGalleryGenerateRequest{}, infraerrors.BadRequest("IMAGE_GALLERY_INVALID_UPLOAD", "empty image upload")
+		}
+		contentType := part.Header.Get("Content-Type")
+		if strings.TrimSpace(contentType) == "" {
+			contentType = http.DetectContentType(data)
+		}
+		dataURL := fmt.Sprintf("data:%s;base64,%s", contentType, base64.StdEncoding.EncodeToString(data))
+		if name == "mask" {
+			req.MaskImage = dataURL
+		} else if name == "image" || name == "image[]" || strings.HasPrefix(name, "image[") || strings.HasPrefix(name, "images") {
+			req.ReferenceImages = append(req.ReferenceImages, dataURL)
+		}
+	}
+	return req, nil
+}
+
+func assignImageGalleryJobField(req *service.ImageGalleryGenerateRequest, name, value string) {
+	value = strings.TrimSpace(value)
+	switch name {
+	case "api_key_id":
+		if id, err := strconv.ParseInt(value, 10, 64); err == nil {
+			req.APIKeyID = id
+		}
+	case "client_task_id":
+		req.ClientTaskID = value
+	case "prompt":
+		req.Prompt = value
+	case "model":
+		req.Model = value
+	case "size":
+		req.Size = value
+	case "quality":
+		req.Quality = value
+	case "n":
+		if n, err := strconv.Atoi(value); err == nil {
+			req.N = n
+		}
+	case "output_format":
+		req.OutputFormat = value
+	}
+}
+
+func writeImageGalleryBindError(c *gin.Context, err error) {
+	if maxErr, ok := extractMaxBytesError(err); ok {
+		response.Error(c, http.StatusRequestEntityTooLarge, buildBodyTooLargeMessage(maxErr.Limit))
+		return
+	}
+	if infraerrors.Code(err) == http.StatusRequestEntityTooLarge {
+		response.ErrorFrom(c, err)
+		return
+	}
+	response.BadRequest(c, "Invalid request: "+err.Error())
+}
+
 func (h *ImageGalleryHandler) Job(c *gin.Context) {
 	subject, ok := middleware2.GetAuthSubjectFromContext(c)
 	if !ok {
@@ -175,12 +329,45 @@ func (h *ImageGalleryHandler) Job(c *gin.Context) {
 	if !ok {
 		return
 	}
-	job, err := h.service.Job(c.Request.Context(), subject.UserID, id)
+	job, err := h.service.JobStatus(c.Request.Context(), subject.UserID, id)
 	if err != nil {
 		response.ErrorFrom(c, err)
 		return
 	}
 	response.Success(c, job)
+}
+
+func (h *ImageGalleryHandler) JobByClientTask(c *gin.Context) {
+	subject, ok := middleware2.GetAuthSubjectFromContext(c)
+	if !ok {
+		response.Unauthorized(c, "User not authenticated")
+		return
+	}
+	clientTaskID := strings.TrimSpace(c.Param("clientTaskId"))
+	job, err := h.service.JobByClientTaskID(c.Request.Context(), subject.UserID, clientTaskID)
+	if err != nil {
+		response.ErrorFrom(c, err)
+		return
+	}
+	response.Success(c, job)
+}
+
+func (h *ImageGalleryHandler) CancelJob(c *gin.Context) {
+	subject, ok := middleware2.GetAuthSubjectFromContext(c)
+	if !ok {
+		response.Unauthorized(c, "User not authenticated")
+		return
+	}
+	id, ok := parseIDParam(c, "id")
+	if !ok {
+		return
+	}
+	result, err := h.service.CancelJob(c.Request.Context(), subject.UserID, id)
+	if err != nil {
+		response.ErrorFrom(c, err)
+		return
+	}
+	response.Success(c, result)
 }
 
 func (h *ImageGalleryHandler) History(c *gin.Context) {

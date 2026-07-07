@@ -54,6 +54,26 @@ WHERE id=$1 AND user_id=$2
 	return scanImageJob(row)
 }
 
+func (r *imageGalleryRepository) GetLatestJobByClientTaskID(ctx context.Context, userID int64, clientTaskID string, since time.Time) (*service.ImageGenerationJob, error) {
+	row := r.db.QueryRowContext(ctx, `
+SELECT id, user_id, api_key_id, status, model, prompt, params, error, started_at, completed_at, created_at, updated_at
+FROM image_generation_jobs
+WHERE user_id=$1 AND params->>'client_task_id'=$2 AND created_at >= $3
+ORDER BY created_at DESC
+LIMIT 1
+`, userID, clientTaskID, since)
+	return scanImageJob(row)
+}
+
+func (r *imageGalleryRepository) ListAssetsByJob(ctx context.Context, userID, jobID int64) ([]service.ImageAsset, error) {
+	rows, err := r.db.QueryContext(ctx, imageAssetSelect(`a.user_id=$1 AND a.job_id=$2 AND a.deleted_at IS NULL`, false)+` ORDER BY a.created_at ASC`, userID, jobID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	return scanImageAssets(rows)
+}
+
 func (r *imageGalleryRepository) CreateAsset(ctx context.Context, asset *service.ImageAsset) error {
 	now := time.Now()
 	if len(asset.Params) == 0 {

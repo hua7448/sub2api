@@ -43,6 +43,7 @@ function newId(prefix: string) {
 
 const ADD_CUSTOM_PROVIDER_VALUE = '__add_custom_provider__'
 const COPY_IMPORT_URL_OPTIONS_STORAGE_KEY = 'gpt-image-playground.copy-import-url-options'
+const MAX_REQUEST_TIMEOUT_SECONDS = 1800
 
 const DEFAULT_COPY_IMPORT_URL_OPTIONS = {
   includeApiKey: false,
@@ -52,6 +53,13 @@ const DEFAULT_COPY_IMPORT_URL_OPTIONS = {
 }
 
 type CopyImportUrlOptions = typeof DEFAULT_COPY_IMPORT_URL_OPTIONS
+
+function normalizeRequestTimeoutInput(input: string, fallback: number): number {
+  if (input.trim() === '') return DEFAULT_SETTINGS.timeout
+  const value = Number(input)
+  if (!Number.isFinite(value)) return fallback
+  return Math.min(MAX_REQUEST_TIMEOUT_SECONDS, Math.max(0, Math.trunc(value)))
+}
 
 const ZIP_DOWNLOAD_ROUTE_OPTIONS: Array<{ route: ZipDownloadRoute; label: string; description: string }> = [
   { route: 'task-selection', label: '任务列表 > 多选', description: '主页或收藏夹详情中框选、Ctrl/⌘ 点选或移动端滑动选中任务后的“下载选中”。' },
@@ -690,11 +698,7 @@ export default function SettingsModal() {
       setShowZipDownloadRouteManager(false)
       return
     }
-    const nextTimeout = Number(timeoutInput)
-    const normalizedTimeout =
-      timeoutInput.trim() === '' || Number.isNaN(nextTimeout)
-        ? DEFAULT_SETTINGS.timeout
-        : nextTimeout
+    const normalizedTimeout = normalizeRequestTimeoutInput(timeoutInput, activeProfile.timeout)
     const normalizedAgentMaxToolRounds = agentMaxToolRoundsInput.trim() === ''
       ? DEFAULT_AGENT_MAX_TOOL_ROUNDS
       : normalizeAgentMaxToolRounds(agentMaxToolRoundsInput, draft.agentMaxToolRounds)
@@ -714,9 +718,7 @@ export default function SettingsModal() {
 
   const commitTimeout = useCallback(() => {
     if (!isOpenAICompatibleProvider(draft, activeProfile.provider) && activeProfile.provider !== 'sub2api') return
-    const nextTimeout = Number(timeoutInput)
-    const normalizedTimeout =
-      timeoutInput.trim() === '' ? DEFAULT_SETTINGS.timeout : Number.isNaN(nextTimeout) ? activeProfile.timeout : nextTimeout
+    const normalizedTimeout = normalizeRequestTimeoutInput(timeoutInput, activeProfile.timeout)
     setTimeoutInput(String(normalizedTimeout))
     updateActiveProfile({ timeout: normalizedTimeout }, true)
   }, [draft, activeProfile.id, activeProfile.provider, activeProfile.timeout, timeoutInput])
@@ -1223,8 +1225,8 @@ export default function SettingsModal() {
             onChange={(e) => setTimeoutInput(e.target.value)}
             onBlur={commitTimeout}
             type="number"
-            min={10}
-            max={600}
+            min={0}
+            max={MAX_REQUEST_TIMEOUT_SECONDS}
             className="w-full rounded-xl border border-gray-200/70 bg-white/60 px-3 py-2.5 text-sm text-gray-700 outline-none transition focus:border-blue-300 dark:border-white/[0.08] dark:bg-white/[0.03] dark:text-gray-200 dark:focus:border-blue-500/50"
           />
         </label>
@@ -2046,8 +2048,8 @@ export default function SettingsModal() {
                     onChange={(e) => setTimeoutInput(e.target.value)}
                     onBlur={commitTimeout}
                     type="number"
-                    min={10}
-                    max={600}
+                    min={0}
+                    max={MAX_REQUEST_TIMEOUT_SECONDS}
                     className="w-full rounded-xl border border-gray-200/70 bg-white/60 px-3 py-2.5 text-sm text-gray-700 outline-none transition focus:border-blue-300 dark:border-white/[0.08] dark:bg-white/[0.03] dark:text-gray-200 dark:focus:border-blue-500/50"
                   />
                 </label>

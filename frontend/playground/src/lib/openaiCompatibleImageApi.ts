@@ -23,6 +23,10 @@ import { assertSub2APIParams, getCachedSub2APISettings, proxySub2API } from './s
 
 const PROMPT_REWRITE_GUARD_PREFIX = 'Use the following text as the complete prompt. Do not rewrite it:'
 
+function startRequestTimeout(controller: AbortController, timeoutSeconds: number): ReturnType<typeof setTimeout> | null {
+  return timeoutSeconds > 0 ? setTimeout(() => controller.abort(), timeoutSeconds * 1000) : null
+}
+
 function getStreamPartialImages(profile: ApiProfile): number {
   return profile.streamPartialImages ?? DEFAULT_STREAM_PARTIAL_IMAGES
 }
@@ -570,7 +574,7 @@ async function callImagesApiSingle(opts: CallApiOptions, profile: ApiProfile): P
   const paths = createOpenAICompatiblePaths()
 
   const controller = new AbortController()
-  const timeoutId = setTimeout(() => controller.abort(), profile.timeout * 1000)
+  const timeoutId = startRequestTimeout(controller, profile.timeout)
 
   try {
     assertSub2APIParams(params, getCachedSub2APISettings())
@@ -687,7 +691,7 @@ async function callImagesApiSingle(opts: CallApiOptions, profile: ApiProfile): P
 
     return parseImagesApiResponse(await response.json() as ImageApiResponse, mime, controller.signal)
   } finally {
-    clearTimeout(timeoutId)
+    if (timeoutId) clearTimeout(timeoutId)
   }
 }
 
@@ -960,7 +964,7 @@ async function callCustomHttpImageApi(opts: CallApiOptions, profile: ApiProfile,
   const isEdit = inputImageDataUrls.length > 0
   const mime = MIME_MAP[params.output_format] || 'image/png'
   const controller = new AbortController()
-  let timeoutId: ReturnType<typeof setTimeout> | null = setTimeout(() => controller.abort(), profile.timeout * 1000)
+  let timeoutId = startRequestTimeout(controller, profile.timeout)
 
   try {
     const proxyConfig = readClientDevProxyConfig()
@@ -1050,7 +1054,7 @@ async function callResponsesImageApiSingle(opts: CallApiOptions, profile: ApiPro
   const useApiProxy = shouldUseApiProxy(profile.apiProxy, proxyConfig)
   const requestHeaders = createRequestHeaders(profile)
   const controller = new AbortController()
-  const timeoutId = setTimeout(() => controller.abort(), profile.timeout * 1000)
+  const timeoutId = startRequestTimeout(controller, profile.timeout)
 
   try {
     assertSub2APIParams(params, getCachedSub2APISettings())
@@ -1107,6 +1111,6 @@ async function callResponsesImageApiSingle(opts: CallApiOptions, profile: ApiPro
       revisedPrompts: imageResults.map((result) => result.revisedPrompt),
     }
   } finally {
-    clearTimeout(timeoutId)
+    if (timeoutId) clearTimeout(timeoutId)
   }
 }
