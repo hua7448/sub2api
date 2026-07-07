@@ -1714,7 +1714,7 @@ function isRunningOpenAITask(task: TaskRecord) {
 }
 
 function isRecoverableServerJobTask(task: TaskRecord) {
-  return task.apiProvider === 'sub2api' && Boolean(task.serverJobId || task.clientTaskId)
+  return task.apiProvider === 'sub2api' && Boolean(task.serverJobId)
 }
 
 function isAsyncCustomProviderTask(settings: AppSettings, provider: string, hasInputImages: boolean) {
@@ -2530,7 +2530,6 @@ export async function submitTask(options: { allowFullMask?: boolean; useCurrentA
   const taskId = genId()
   const task: TaskRecord = {
     id: taskId,
-    clientTaskId: taskId,
     prompt: prompt.trim(),
     params: taskParams,
     apiProvider: activeProfile.provider,
@@ -4323,7 +4322,6 @@ async function executeTask(taskId: string) {
 
     const result = await callImageApi({
       settings: requestSettings,
-      clientTaskId: task.clientTaskId || task.id,
       prompt: replaceImageMentionsForApi(requestPrompt, inputDataUrls.length),
       params: task.params,
       inputImageDataUrls: inputDataUrls,
@@ -4341,14 +4339,6 @@ async function executeTask(taskId: string) {
         updateTaskInStore(taskId, {
           customTaskId: request.taskId,
           customRecoverable: false,
-        })
-      },
-      onServerJobEnqueued: (job) => {
-        serverJobInfo = job
-        updateTaskInStore(taskId, {
-          serverJobId: job.jobId,
-          serverJobStatus: job.status,
-          serverRecoverable: true,
         })
       },
       onPartialImage: (partial) => {
@@ -4476,7 +4466,11 @@ async function executeTask(taskId: string) {
         elapsed: Date.now() - task.createdAt,
       })
       scheduleCustomRecovery(taskId)
-    } else if (latestTask.apiProvider === 'sub2api' && (latestServerJobInfo || latestTask.clientTaskId) && (isSub2APIJobRecoverableError(err) || isRecoverableSub2APINetworkError(err))) {
+    } else if (
+      latestTask.apiProvider === 'sub2api' &&
+      (isSub2APIJobRecoverableError(err) ? Boolean(err.jobId) : Boolean(latestServerJobInfo?.jobId)) &&
+      (isSub2APIJobRecoverableError(err) || isRecoverableSub2APINetworkError(err))
+    ) {
       const recoverableJobId = isSub2APIJobRecoverableError(err) ? err.jobId : latestServerJobInfo?.jobId
       updateTaskInStore(taskId, {
         status: 'recovering',

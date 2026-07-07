@@ -1,4 +1,4 @@
-import type { ApiProfile, AppSettings, TaskParams } from '../types'
+import { DEFAULT_STREAM_PARTIAL_IMAGES, type ApiProfile, type AppSettings, type TaskParams } from '../types'
 
 export interface Sub2APISettings {
   enabled: boolean
@@ -93,7 +93,7 @@ export function applySub2APISettings(settings: AppSettings, remote: Sub2APISetti
     apiProxy: false,
     responseFormatB64Json: true,
     streamImages: persistedProfile?.streamImages ?? true,
-    streamPartialImages: persistedProfile?.streamPartialImages ?? 2,
+    streamPartialImages: persistedProfile?.streamPartialImages ?? DEFAULT_STREAM_PARTIAL_IMAGES,
   }
 
   return {
