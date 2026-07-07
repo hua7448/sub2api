@@ -13,7 +13,6 @@ import type {
   MaskDraft,
   TaskRecord,
   FavoriteCollection,
-  ExportData,
   ResponsesApiResponse,
   ResponsesOutputItem,
 } from './types'
@@ -61,8 +60,9 @@ import { validateMaskMatchesImage } from './lib/canvasImage'
 import { orderInputImagesForMask } from './lib/mask'
 import { getChangedParams, normalizeParamsForSettings } from './lib/paramCompatibility'
 import { createTransparentOutputMeta, getTransparentRequestParams, removeKeyedBackgroundFromDataUrl } from './lib/transparentImage'
-import { getNumberedFileNameBase, sanitizeFileNamePart } from './lib/exportFileName'
-import { zipSync, unzipSync, strToU8, strFromU8 } from 'fflate'
+import { blobToDataUrl, fileToDataUrl } from './lib/dataUrl'
+import { buildExportZip, readExportZip, readExportZipFileAsDataUrl } from './lib/exportZip'
+import { formatExportFileTime } from './lib/exportFileName'
 
 export const ALL_FAVORITES_COLLECTION_ID = '__all_favorites__'
 export const DEFAULT_FAVORITE_COLLECTION_ID = '__default_favorites__'
@@ -1822,10 +1822,13 @@ export function showCodexCliPrompt(force = false, reason = '接口返回的提�
   const settings = state.settings
   const promptKey = getCodexCliPromptKey(settings)
   if (!force && (settings.codexCli || state.dismissedCodexCliPrompts.includes(promptKey))) return
+  const promptRewriteGuardMessage = settings.allowPromptRewrite
+    ? '当前已允许模型改写优化提示词，因此不会额外加入不改写要求。'
+    : '同时，提示词文本开头会加入简短的不改写要求，避免模型重写提示词，偏离原意。'
 
   state.setConfirmDialog({
     title: '检测到 Codex CLI API',
-    message: `${reason}，当前 API 来源很可能是 Codex CLI。\n\n是否开启 Codex CLI 兼容模式？开启后会禁用在此处无效的质量参数，并在 Images API 多图生成时使用并发请求，解决该 API 数量参数无效的问题。同时，提示词文本开头会加入简短的不改写要求，避免模型重写提示词，偏离原意。`,
+    message: `${reason}，当前 API 来源很可能是 Codex CLI。\n\n是否开启 Codex CLI 兼容模式？开启后会禁用在此处无效的质量参数，并在 Images API 多图生成时使用并发请求，解决该 API 数量参数无效的问题。${promptRewriteGuardMessage}`,
     confirmText: '开启',
     action: () => {
       const state = useStore.getState()
@@ -3853,6 +3856,7 @@ async function executeAgentRound(
           prompt: item.prompt,
           referenceImageDataUrls: references.dataUrls,
           referenceIds,
+          allowPromptRewrite: requestSettings.allowPromptRewrite,
           signal: controller.signal,
           onImageToolStarted: shouldStreamAssistantMessage
             ? async () => {
@@ -5017,27 +5021,6 @@ export async function clearData(options: ClearOptions = { clearConfig: true, cle
   showToast('所选数据已清空', 'success')
 }
 
-/** 从 dataUrl 解析出 MIME 扩展名和二进制数据 */
-function dataUrlToBytes(dataUrl: string): { ext: string; bytes: Uint8Array } {
-  const match = dataUrl.match(/^data:image\/(\w+);base64,/)
-  const ext = match?.[1] ?? 'png'
-  const b64 = dataUrl.replace(/^data:[^;]+;base64,/, '')
-  const binary = atob(b64)
-  const bytes = new Uint8Array(binary.length)
-  for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i)
-  return { ext, bytes }
-}
-
-/** 将二进制数据还原为 dataUrl */
-function bytesToDataUrl(bytes: Uint8Array, filePath: string): string {
-  const ext = filePath.split('.').pop()?.toLowerCase() ?? 'png'
-  const mimeMap: Record<string, string> = { png: 'image/png', jpg: 'image/jpeg', jpeg: 'image/jpeg', webp: 'image/webp' }
-  const mime = mimeMap[ext] ?? 'image/png'
-  let binary = ''
-  for (let i = 0; i < bytes.length; i++) binary += String.fromCharCode(bytes[i])
-  return `data:${mime};base64,${btoa(binary)}`
-}
-
 async function completeRecoveredCustomTask(task: TaskRecord, result: Awaited<ReturnType<typeof getCustomQueuedImageResult>>) {
   const latest = useStore.getState().tasks.find((item) => item.id === task.id)
   if (!latest || latest.status === 'done') return
@@ -5090,45 +5073,6 @@ async function recoverCustomTask(taskId: string) {
   }
 }
 
-function formatExportFileTime(date: Date): string {
-  const pad = (value: number) => String(value).padStart(2, '0')
-  return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}_${pad(date.getHours())}-${pad(date.getMinutes())}-${pad(date.getSeconds())}`
-}
-
-function getImageFileNameBases(tasks: TaskRecord[]) {
-  const bases = new Map<string, string>()
-
-  for (const task of tasks) addImageFileNameBases(bases, task.outputImages || [], `task-${task.id}`)
-  for (const task of tasks) addImageFileNameBases(bases, task.transparentOriginalImages || [], `task-${task.id}-orig`)
-  for (const task of tasks) addImageFileNameBases(bases, task.streamPartialImageIds || [], `task-${task.id}-partial`)
-  for (const task of tasks) addImageFileNameBases(bases, task.inputImageIds || [], `task-${task.id}-input`)
-  for (const task of tasks) {
-    if (task.maskImageId && !bases.has(task.maskImageId)) bases.set(task.maskImageId, `task-${task.id}-mask`)
-  }
-
-  return bases
-}
-
-function addImageFileNameBases(bases: Map<string, string>, imageIds: string[], fileNameBase: string) {
-  const ids = imageIds.filter(Boolean)
-  for (let index = 0; index < ids.length; index++) {
-    if (bases.has(ids[index])) continue
-    bases.set(ids[index], getNumberedFileNameBase(fileNameBase, index, ids.length))
-  }
-}
-
-function getUniqueImagePath(fileNameBase: string, ext: string, usedPaths: Set<string>) {
-  const base = sanitizeFileNamePart(fileNameBase) || 'image'
-  let path = `images/${base}.${ext}`
-  let duplicateIndex = 2
-  while (usedPaths.has(path)) {
-    path = `images/${base}-${String(duplicateIndex).padStart(2, '0')}.${ext}`
-    duplicateIndex++
-  }
-  usedPaths.add(path)
-  return path
-}
-
 /** 导出选项 */
 export interface ExportOptions {
   exportConfig?: boolean
@@ -5142,60 +5086,13 @@ export async function exportData(options: ExportOptions = { exportConfig: true, 
     const images = options.exportTasks ? await getAllImages() : []
     const { settings, agentConversations, favoriteCollections, defaultFavoriteCollectionId } = useStore.getState()
     const exportedAt = Date.now()
-    const imageCreatedAtFallback = new Map<string, number>()
-    const imageFileNameBases = getImageFileNameBases(tasks)
-
-    if (options.exportTasks) {
-      for (const task of tasks) {
-        for (const id of [
-          ...(task.inputImageIds || []),
-          ...(task.maskImageId ? [task.maskImageId] : []),
-          ...(task.outputImages || []),
-          ...(task.transparentOriginalImages || []),
-          ...(task.streamPartialImageIds || []),
-        ]) {
-          if (!id) continue
-          const prev = imageCreatedAtFallback.get(id)
-          if (prev == null || task.createdAt < prev) {
-            imageCreatedAtFallback.set(id, task.createdAt)
-          }
-        }
-      }
-    }
-
-    const imageFiles: ExportData['imageFiles'] = {}
-    const thumbnailFiles: NonNullable<ExportData['thumbnailFiles']> = {}
-    const zipFiles: Record<string, Uint8Array | [Uint8Array, { mtime: Date }]> = {}
-    const usedImagePaths = new Set<string>()
+    const thumbnailsByImageId = new Map<string, NonNullable<Awaited<ReturnType<typeof getImageThumbnail>>>>()
 
     if (options.exportTasks) {
       for (const img of images) {
-        const { ext, bytes } = dataUrlToBytes(img.dataUrl)
-        const path = getUniqueImagePath(imageFileNameBases.get(img.id) || `image-${img.id}`, ext, usedImagePaths)
-        const pathBase = path.slice('images/'.length, -(ext.length + 1))
-        const createdAt = img.createdAt ?? imageCreatedAtFallback.get(img.id) ?? exportedAt
-        imageFiles[img.id] = {
-          path,
-          createdAt,
-          source: img.source,
-          width: img.width,
-          height: img.height,
-        }
-        zipFiles[path] = [bytes, { mtime: new Date(createdAt) }]
-
         const thumbnail = await getImageThumbnail(img.id)
         if (thumbnail?.thumbnailDataUrl) {
-          const { ext: thumbnailExt, bytes: thumbnailBytes } = dataUrlToBytes(thumbnail.thumbnailDataUrl)
-          const thumbnailPath = `thumbnails/${pathBase}.${thumbnailExt}`
-          imageFiles[img.id].width = imageFiles[img.id].width ?? thumbnail.width
-          imageFiles[img.id].height = imageFiles[img.id].height ?? thumbnail.height
-          thumbnailFiles[img.id] = {
-            path: thumbnailPath,
-            width: thumbnail.width,
-            height: thumbnail.height,
-            thumbnailVersion: thumbnail.thumbnailVersion,
-          }
-          zipFiles[thumbnailPath] = [thumbnailBytes, { mtime: new Date(createdAt) }]
+          thumbnailsByImageId.set(img.id, thumbnail)
           cacheThumbnail(img.id, {
             dataUrl: thumbnail.thumbnailDataUrl,
             width: thumbnail.width,
@@ -5206,25 +5103,19 @@ export async function exportData(options: ExportOptions = { exportConfig: true, 
       }
     }
 
-    const manifest: ExportData = {
-      version: 3,
-      exportedAt: new Date(exportedAt).toISOString(),
-    }
-
-    if (options.exportConfig) manifest.settings = settings
-    if (options.exportTasks) {
-      manifest.tasks = tasks
-      manifest.favoriteCollections = favoriteCollections
-      manifest.defaultFavoriteCollectionId = defaultFavoriteCollectionId
-      manifest.agentConversations = getPersistableAgentConversations(agentConversations)
-      manifest.imageFiles = imageFiles
-      manifest.thumbnailFiles = thumbnailFiles
-    }
-
-    zipFiles['manifest.json'] = [strToU8(JSON.stringify(manifest, null, 2)), { mtime: new Date(exportedAt) }]
-
-    const zipped = zipSync(zipFiles, { level: 6 })
-    const blob = new Blob([zipped.buffer as ArrayBuffer], { type: 'application/zip' })
+    const { bytes } = buildExportZip({
+      options,
+      exportedAt,
+      settings,
+      tasks,
+      images,
+      thumbnailsByImageId,
+      favoriteCollections,
+      defaultFavoriteCollectionId,
+      agentConversations: getPersistableAgentConversations(agentConversations),
+    })
+    const buffer = bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.byteLength) as ArrayBuffer
+    const blob = new Blob([buffer], { type: 'application/zip' })
     const url = URL.createObjectURL(blob)
     const a = document.createElement('a')
     a.href = url
@@ -5252,20 +5143,14 @@ export interface ImportOptions {
 export async function importData(file: File, options: ImportOptions = { importConfig: true, importTasks: true }): Promise<boolean> {
   try {
     const buffer = await file.arrayBuffer()
-    const unzipped = unzipSync(new Uint8Array(buffer))
-
-    const manifestBytes = unzipped['manifest.json']
-    if (!manifestBytes) throw new Error('ZIP 中缺少 manifest.json')
-
-    const data: ExportData = JSON.parse(strFromU8(manifestBytes))
+    const { manifest: data, files } = readExportZip(new Uint8Array(buffer))
 
     const importedImageIds: string[] = []
     if (options.importTasks && data.tasks && data.imageFiles) {
       // 还原图片
       for (const [id, info] of Object.entries(data.imageFiles)) {
-        const bytes = unzipped[info.path]
-        if (!bytes) continue
-        const dataUrl = bytesToDataUrl(bytes, info.path)
+        const dataUrl = readExportZipFileAsDataUrl(files, info.path)
+        if (!dataUrl) continue
         await putImage({
           id,
           dataUrl,
@@ -5279,9 +5164,8 @@ export async function importData(file: File, options: ImportOptions = { importCo
       }
 
       for (const [id, info] of Object.entries(data.thumbnailFiles ?? {})) {
-        const bytes = unzipped[info.path]
-        if (!bytes) continue
-        const thumbnailDataUrl = bytesToDataUrl(bytes, info.path)
+        const thumbnailDataUrl = readExportZipFileAsDataUrl(files, info.path)
+        if (!thumbnailDataUrl) continue
         await putImageThumbnail({
           id,
           thumbnailDataUrl,
@@ -5389,22 +5273,4 @@ async function fetchImageSourceAsDataUrl(src: string): Promise<string> {
   const blob = await res.blob()
   if (!blob.type.startsWith('image/')) throw new Error('不是有效的图片')
   return await blobToDataUrl(blob)
-}
-
-function fileToDataUrl(file: File): Promise<string> {
-  return new Promise((resolve, reject) => {
-    const reader = new FileReader()
-    reader.onload = () => resolve(reader.result as string)
-    reader.onerror = reject
-    reader.readAsDataURL(file)
-  })
-}
-
-function blobToDataUrl(blob: Blob): Promise<string> {
-  return new Promise((resolve, reject) => {
-    const reader = new FileReader()
-    reader.onload = () => resolve(reader.result as string)
-    reader.onerror = reject
-    reader.readAsDataURL(blob)
-  })
 }

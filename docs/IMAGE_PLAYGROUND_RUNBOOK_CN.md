@@ -70,12 +70,13 @@ git diff --name-status <old-upstream-commit>..<new-upstream-commit>
 - 2026-07-07：本地 `frontend/playground/package.json` 为 `0.6.6`。
 - 2026-07-07：`playground-upstream/main` 已抓取到 `60da4a92`，上游 `package.json` 为 `0.6.12`。
 - `0.6.6..0.6.12` 值得优先评估的改动：Agent 图片任务恢复、导出 ZIP 使用任务 ID、select tooltip 关闭清理、默认 API URL 参数、prompt rewrite 设置、独立 Agent API 配置、移动端详情参数溢出修复、生成图尺寸记录。
+- 2026-07-08：生图调用、streaming、partial image、并发多图、结果参数、Agent batch 生图、data URL/ZIP helper 按 `playground-upstream/tags/v0.6.12` 行为基线手工对齐；`package.json` 版本号暂不代表完整上游覆盖。
 
 移植原则：
 
 - 优先挑选 bugfix 和可独立落地的小功能，不整体覆盖本地文件。
 - 保留 sub2api 定制：登录态、`api_key_id`、主站继承、禁止浏览器保存真实 API Key、`/api/v1/image-playground/proxy/...` 后端代理。
-- 普通生成/编辑默认沿用上游 `gpt_image_playground` 的 OpenAI-compatible 生图调用链；服务端 Job API 仅作为实验/后续评估接口保留，不作为默认提交路径。
+- 普通生成/编辑默认沿用上游 `gpt_image_playground v0.6.12` 的 OpenAI-compatible 生图调用链；sub2api 只负责同源代理、登录态、KEY 选择、权限和计费校验。服务端 Job API 仅作为实验/后续评估接口保留，不作为默认提交路径。
 - 上游新增 API 配置、provider、proxy、远程导入、部署脚本时，默认不直接开放给用户；必须先映射到 sub2api 后端权限和计费模型。
 - 移植后至少执行 `pnpm --dir frontend/playground run build`；涉及主站入口或静态资源时执行 `pnpm --dir frontend run build`。
 
