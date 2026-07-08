@@ -34,7 +34,14 @@ import Select from './Select'
 import { Checkbox } from './Checkbox'
 import ViewportTooltip from './ViewportTooltip'
 import { ChevronDownIcon, CloseIcon, CopyIcon, PlusIcon, TrashIcon, ExportIcon, ImportIcon, DragHandleIcon, LinkIcon } from './icons'
-import { fetchSub2APIEligibleKeys, getCachedSub2APIEligibleKeys, getCachedSub2APISettings, type Sub2APIEligibleKey } from '../lib/sub2api'
+import {
+  fetchSub2APIEligibleKeys,
+  getCachedSub2APIEligibleKeys,
+  getCachedSub2APISettings,
+  getSub2APIDefaultModelForMode,
+  getSub2APIModelsForMode,
+  type Sub2APIEligibleKey,
+} from '../lib/sub2api'
 import { hostText } from '../lib/sub2apiHost'
 
 function newId(prefix: string) {
@@ -1164,6 +1171,17 @@ export default function SettingsModal() {
     { label: hostText('2 张', '2 images'), value: 2 },
     { label: hostText('3 张', '3 images'), value: 3 },
   ]
+  const sub2apiModeOptions = [
+    { label: 'Images API (/v1/images)', value: 'images' },
+    { label: 'Responses API (/v1/responses)', value: 'responses' },
+  ]
+  const sub2apiModelOptions = getSub2APIModelsForMode(sub2apiSettings, activeProfile.apiMode)
+  const sub2apiModelSelectOptions = (sub2apiModelOptions.length ? sub2apiModelOptions : [activeProfile.model || getSub2APIDefaultModelForMode(sub2apiSettings, activeProfile.apiMode)])
+    .map((model) => ({ label: model, value: model }))
+  const commitSub2APIApiMode = (apiMode: AppSettings['apiMode']) => {
+    const nextModel = getSub2APIDefaultModelForMode(sub2apiSettings, apiMode)
+    updateActiveProfile({ apiMode, model: nextModel }, true)
+  }
 
   const renderSub2APISettings = () => (
     <div className="space-y-4">
@@ -1201,10 +1219,11 @@ export default function SettingsModal() {
       <div className="grid gap-4 sm:grid-cols-2">
         <label className="block">
           <span className="mb-1.5 block text-sm text-gray-600 dark:text-gray-300">{hostText('API 接口', 'API mode')}</span>
-          <input
-            value="Images API"
-            readOnly
-            className="w-full rounded-xl border border-gray-200/70 bg-gray-50/80 px-3 py-2.5 text-sm text-gray-500 outline-none dark:border-white/[0.08] dark:bg-white/[0.03] dark:text-gray-400"
+          <Select
+            value={activeProfile.apiMode}
+            onChange={(value) => commitSub2APIApiMode(value as AppSettings['apiMode'])}
+            options={sub2apiModeOptions}
+            className="w-full rounded-xl border border-gray-200/70 bg-white/60 px-3 py-2.5 text-sm text-gray-700 outline-none transition focus:border-blue-300 dark:border-white/[0.08] dark:bg-white/[0.03] dark:text-gray-200 dark:focus:border-blue-500/50"
           />
         </label>
         <label className="block">
@@ -1212,7 +1231,7 @@ export default function SettingsModal() {
           <Select
             value={activeProfile.model}
             onChange={(value) => updateActiveProfile({ model: String(value) }, true)}
-            options={(sub2apiSettings?.allowed_models?.length ? sub2apiSettings.allowed_models : [activeProfile.model]).map((model) => ({ label: model, value: model }))}
+            options={sub2apiModelSelectOptions}
             className="w-full rounded-xl border border-gray-200/70 bg-white/60 px-3 py-2.5 text-sm text-gray-700 outline-none transition focus:border-blue-300 dark:border-white/[0.08] dark:bg-white/[0.03] dark:text-gray-200 dark:focus:border-blue-500/50"
           />
         </label>
@@ -1572,6 +1591,11 @@ export default function SettingsModal() {
 
             {activeTab === 'agent' && (
               <div className="space-y-4">
+                {sub2apiSettings?.agent_enabled === false && (
+                  <div className="rounded-2xl border border-amber-200/80 bg-amber-50/80 p-4 text-sm text-amber-900 dark:border-amber-500/20 dark:bg-amber-500/10 dark:text-amber-100">
+                    {hostText('管理员当前未启用 Agent 模式。你仍可使用普通生图和 Responses API 生图。', 'Agent mode is currently disabled by the administrator. Standard image generation and Responses API image generation remain available.')}
+                  </div>
+                )}
                 <label className="block">
                   <span className="mb-1.5 block text-sm text-gray-600 dark:text-gray-300">最大工具调用轮数</span>
                   <input
@@ -1593,22 +1617,26 @@ export default function SettingsModal() {
                     <button
                       type="button"
                       onClick={() => {
+                        if (sub2apiSettings?.agent_web_search_enabled === false) return
                         const agentMaxToolRounds = agentMaxToolRoundsInput.trim() === ''
                           ? DEFAULT_AGENT_MAX_TOOL_ROUNDS
                           : normalizeAgentMaxToolRounds(agentMaxToolRoundsInput, draft.agentMaxToolRounds)
                         setAgentMaxToolRoundsInput(String(agentMaxToolRounds))
                         commitSettings({ ...draft, agentMaxToolRounds, agentWebSearch: !draft.agentWebSearch })
                       }}
-                      className={`relative inline-flex h-4 w-7 shrink-0 items-center rounded-full transition-colors ${draft.agentWebSearch ? 'bg-blue-500' : 'bg-gray-300 dark:bg-gray-600'}`}
+                      disabled={sub2apiSettings?.agent_web_search_enabled === false}
+                      className={`relative inline-flex h-4 w-7 shrink-0 items-center rounded-full transition-colors ${draft.agentWebSearch && sub2apiSettings?.agent_web_search_enabled !== false ? 'bg-blue-500' : 'bg-gray-300 dark:bg-gray-600'} ${sub2apiSettings?.agent_web_search_enabled === false ? 'cursor-not-allowed opacity-60' : ''}`}
                       role="switch"
-                      aria-checked={draft.agentWebSearch}
+                      aria-checked={draft.agentWebSearch && sub2apiSettings?.agent_web_search_enabled !== false}
                       aria-label="网络搜索"
                     >
-                      <span className={`inline-block h-3 w-3 transform rounded-full bg-white shadow transition-transform ${draft.agentWebSearch ? 'translate-x-[14px]' : 'translate-x-[2px]'}`} />
+                      <span className={`inline-block h-3 w-3 transform rounded-full bg-white shadow transition-transform ${draft.agentWebSearch && sub2apiSettings?.agent_web_search_enabled !== false ? 'translate-x-[14px]' : 'translate-x-[2px]'}`} />
                     </button>
                   </div>
                   <div data-selectable-text className="text-xs text-gray-500 dark:text-gray-500">
-                    启用 Responses API 的 <code className="rounded bg-gray-100 px-1 py-0.5 font-mono text-[10px] dark:bg-white/[0.06]">web_search</code> 工具。模型每次调用此工具会产生少量固定价格的额外计费。
+                    {sub2apiSettings?.agent_web_search_enabled === false
+                      ? '管理员当前未开放 Responses API 的 web_search 工具。'
+                      : <>启用 Responses API 的 <code className="rounded bg-gray-100 px-1 py-0.5 font-mono text-[10px] dark:bg-white/[0.06]">web_search</code> 工具。模型每次调用此工具会产生少量固定价格的额外计费。</>}
                   </div>
                 </div>
               </div>

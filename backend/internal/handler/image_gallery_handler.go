@@ -1,10 +1,14 @@
 package handler
 
 import (
+	"bytes"
 	"encoding/base64"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
+	"mime"
+	"mime/multipart"
 	"net/http"
 	"strconv"
 	"strings"
@@ -51,18 +55,18 @@ func (h *ImageGalleryHandler) EligibleKeys(c *gin.Context) {
 }
 
 func (h *ImageGalleryHandler) ProxyImagesGenerations(c *gin.Context) {
-	h.proxyOpenAI(c, "/v1/images/generations", h.openAIGateway.Images)
+	h.proxyOpenAI(c, "/v1/images/generations", h.openAIGateway.Images, h.validateImagesGenerationProxyRequest)
 }
 
 func (h *ImageGalleryHandler) ProxyImagesEdits(c *gin.Context) {
-	h.proxyOpenAI(c, "/v1/images/edits", h.openAIGateway.Images)
+	h.proxyOpenAI(c, "/v1/images/edits", h.openAIGateway.Images, h.validateImagesEditProxyRequest)
 }
 
 func (h *ImageGalleryHandler) ProxyResponses(c *gin.Context) {
-	h.proxyOpenAI(c, "/v1/responses", h.openAIGateway.Responses)
+	h.proxyOpenAI(c, "/v1/responses", h.openAIGateway.Responses, h.validateResponsesProxyRequest)
 }
 
-func (h *ImageGalleryHandler) proxyOpenAI(c *gin.Context, path string, handler func(*gin.Context)) {
+func (h *ImageGalleryHandler) proxyOpenAI(c *gin.Context, path string, handler func(*gin.Context), guard func(*gin.Context, service.ImageGallerySettings) bool) {
 	if h.openAIGateway == nil {
 		response.Error(c, 500, "OpenAI gateway is unavailable")
 		return
@@ -81,6 +85,16 @@ func (h *ImageGalleryHandler) proxyOpenAI(c *gin.Context, path string, handler f
 		response.ErrorFrom(c, err)
 		return
 	}
+	if guard != nil {
+		settings, err := h.service.Settings(c.Request.Context())
+		if err != nil {
+			response.ErrorFrom(c, err)
+			return
+		}
+		if !guard(c, settings) {
+			return
+		}
+	}
 	subscription, ok := h.proxySubscription(c, apiKey)
 	if !ok {
 		return
@@ -94,6 +108,299 @@ func (h *ImageGalleryHandler) proxyOpenAI(c *gin.Context, path string, handler f
 	c.Request.Header.Del("X-Goog-Api-Key")
 	middleware2.SetAuthenticatedAPIKeyContext(c, apiKey, subscription)
 	handler(c)
+}
+
+type imageGalleryProxyParams struct {
+	Model        string
+	Size         string
+	Quality      string
+	OutputFormat string
+	N            int
+}
+
+type imageGalleryResponsesProxyInspection struct {
+	Model            string
+	HasImageTool     bool
+	HasAgentTool     bool
+	HasWebSearchTool bool
+	ImageToolParams  []imageGalleryProxyParams
+}
+
+func (h *ImageGalleryHandler) validateImagesGenerationProxyRequest(c *gin.Context, settings service.ImageGallerySettings) bool {
+	body, ok := readAndRestoreImageGalleryProxyBody(c)
+	if !ok {
+		return false
+	}
+	params, err := parseImageGalleryJSONProxyParams(body)
+	if err != nil {
+		response.ErrorFrom(c, err)
+		return false
+	}
+	if err := validateImageGalleryProxyParams(params, settings, settings.AllowedModels, true); err != nil {
+		response.ErrorFrom(c, err)
+		return false
+	}
+	return true
+}
+
+func (h *ImageGalleryHandler) validateImagesEditProxyRequest(c *gin.Context, settings service.ImageGallerySettings) bool {
+	body, ok := readAndRestoreImageGalleryProxyBody(c)
+	if !ok {
+		return false
+	}
+	params, imageCount, err := parseImageGalleryMultipartProxyParams(body, c.GetHeader("Content-Type"), settings)
+	if err != nil {
+		response.ErrorFrom(c, err)
+		return false
+	}
+	if imageCount == 0 {
+		response.ErrorFrom(c, infraerrors.BadRequest("IMAGE_GALLERY_IMAGE_REQUIRED", "image edit requires at least one reference image"))
+		return false
+	}
+	if imageCount > 4 {
+		response.ErrorFrom(c, infraerrors.BadRequest("IMAGE_GALLERY_TOO_MANY_REFERENCE_IMAGES", "too many reference images"))
+		return false
+	}
+	if err := validateImageGalleryProxyParams(params, settings, settings.AllowedModels, true); err != nil {
+		response.ErrorFrom(c, err)
+		return false
+	}
+	return true
+}
+
+func (h *ImageGalleryHandler) validateResponsesProxyRequest(c *gin.Context, settings service.ImageGallerySettings) bool {
+	body, ok := readAndRestoreImageGalleryProxyBody(c)
+	if !ok {
+		return false
+	}
+	inspection, err := inspectImageGalleryResponsesProxyBody(body)
+	if err != nil {
+		response.ErrorFrom(c, err)
+		return false
+	}
+	if !inspection.HasImageTool {
+		response.ErrorFrom(c, infraerrors.BadRequest("IMAGE_GALLERY_RESPONSES_IMAGE_TOOL_REQUIRED", "responses proxy requires the image_generation tool"))
+		return false
+	}
+	if !settings.AgentEnabled && inspection.HasAgentTool {
+		response.ErrorFrom(c, infraerrors.Forbidden("IMAGE_GALLERY_AGENT_DISABLED", "image playground agent mode is disabled"))
+		return false
+	}
+	if !settings.AgentWebSearchEnabled && inspection.HasWebSearchTool {
+		response.ErrorFrom(c, infraerrors.Forbidden("IMAGE_GALLERY_AGENT_WEB_SEARCH_DISABLED", "agent web search is disabled"))
+		return false
+	}
+	params := imageGalleryProxyParams{Model: inspection.Model, N: 1}
+	if err := validateImageGalleryProxyParams(params, settings, settings.AllowedAgentModels, false); err != nil {
+		response.ErrorFrom(c, err)
+		return false
+	}
+	for _, imageParams := range inspection.ImageToolParams {
+		if err := validateImageGalleryProxyImageParams(imageParams, settings); err != nil {
+			response.ErrorFrom(c, err)
+			return false
+		}
+	}
+	return true
+}
+
+func readAndRestoreImageGalleryProxyBody(c *gin.Context) ([]byte, bool) {
+	if c.Request.Body == nil {
+		return nil, true
+	}
+	body, err := io.ReadAll(c.Request.Body)
+	if err != nil {
+		response.Error(c, http.StatusBadRequest, "Failed to read request body")
+		return nil, false
+	}
+	c.Request.Body = io.NopCloser(bytes.NewReader(body))
+	c.Request.ContentLength = int64(len(body))
+	return body, true
+}
+
+func parseImageGalleryJSONProxyParams(body []byte) (imageGalleryProxyParams, error) {
+	var payload map[string]any
+	if len(body) == 0 || json.Unmarshal(body, &payload) != nil {
+		return imageGalleryProxyParams{}, infraerrors.BadRequest("IMAGE_GALLERY_INVALID_PROXY_REQUEST", "invalid image proxy request body")
+	}
+	return imageGalleryProxyParams{
+		Model:        imageGalleryStringField(payload, "model"),
+		Size:         imageGalleryStringField(payload, "size"),
+		Quality:      imageGalleryStringField(payload, "quality"),
+		OutputFormat: strings.ToLower(imageGalleryStringField(payload, "output_format")),
+		N:            imageGalleryIntField(payload, "n", 1),
+	}, nil
+}
+
+func parseImageGalleryMultipartProxyParams(body []byte, contentType string, settings service.ImageGallerySettings) (imageGalleryProxyParams, int, error) {
+	mediaType, mediaParams, err := mime.ParseMediaType(contentType)
+	if err != nil || !strings.HasPrefix(strings.ToLower(mediaType), "multipart/") || mediaParams["boundary"] == "" {
+		return imageGalleryProxyParams{}, 0, infraerrors.BadRequest("IMAGE_GALLERY_INVALID_PROXY_REQUEST", "invalid multipart image proxy request")
+	}
+	maxMemory := int64(settings.MaxUploadMB)
+	if maxMemory <= 0 {
+		maxMemory = 20
+	}
+	maxMemory = maxMemory * 1024 * 1024 * 6
+	form, err := multipart.NewReader(bytes.NewReader(body), mediaParams["boundary"]).ReadForm(maxMemory)
+	if err != nil {
+		return imageGalleryProxyParams{}, 0, infraerrors.BadRequest("IMAGE_GALLERY_INVALID_PROXY_REQUEST", "invalid multipart image proxy request")
+	}
+	defer form.RemoveAll()
+
+	maxFileBytes := int64(settings.MaxUploadMB)
+	if maxFileBytes <= 0 {
+		maxFileBytes = 20
+	}
+	maxFileBytes *= 1024 * 1024
+	imageCount := 0
+	for field, files := range form.File {
+		switch field {
+		case "image", "image[]":
+			imageCount += len(files)
+		}
+		for _, file := range files {
+			if file != nil && file.Size > maxFileBytes {
+				return imageGalleryProxyParams{}, 0, service.ErrImageGalleryUploadTooLarge
+			}
+		}
+	}
+	params := imageGalleryProxyParams{
+		Model:        firstImageGalleryFormValue(form.Value, "model"),
+		Size:         firstImageGalleryFormValue(form.Value, "size"),
+		Quality:      firstImageGalleryFormValue(form.Value, "quality"),
+		OutputFormat: strings.ToLower(firstImageGalleryFormValue(form.Value, "output_format")),
+		N:            imageGalleryIntString(firstImageGalleryFormValue(form.Value, "n"), 1),
+	}
+	return params, imageCount, nil
+}
+
+func inspectImageGalleryResponsesProxyBody(body []byte) (imageGalleryResponsesProxyInspection, error) {
+	var payload map[string]any
+	if len(body) == 0 || json.Unmarshal(body, &payload) != nil {
+		return imageGalleryResponsesProxyInspection{}, infraerrors.BadRequest("IMAGE_GALLERY_INVALID_PROXY_REQUEST", "invalid responses proxy request body")
+	}
+	tools, ok := payload["tools"].([]any)
+	if !ok || len(tools) == 0 {
+		return imageGalleryResponsesProxyInspection{}, infraerrors.BadRequest("IMAGE_GALLERY_RESPONSES_IMAGE_TOOL_REQUIRED", "responses proxy requires the image_generation tool")
+	}
+	inspection := imageGalleryResponsesProxyInspection{
+		Model: imageGalleryStringField(payload, "model"),
+	}
+	for _, rawTool := range tools {
+		tool, ok := rawTool.(map[string]any)
+		if !ok {
+			return imageGalleryResponsesProxyInspection{}, infraerrors.BadRequest("IMAGE_GALLERY_INVALID_PROXY_REQUEST", "invalid responses tool definition")
+		}
+		toolType := strings.ToLower(imageGalleryStringField(tool, "type"))
+		toolName := strings.ToLower(imageGalleryStringField(tool, "name"))
+		if strings.Contains(toolType, "web_search") || strings.Contains(toolName, "web_search") {
+			inspection.HasWebSearchTool = true
+			inspection.HasAgentTool = true
+		}
+		if toolType == "image_generation" {
+			inspection.HasImageTool = true
+			inspection.ImageToolParams = append(inspection.ImageToolParams, imageGalleryProxyParams{
+				Size:         imageGalleryStringField(tool, "size"),
+				Quality:      imageGalleryStringField(tool, "quality"),
+				OutputFormat: strings.ToLower(imageGalleryStringField(tool, "output_format")),
+				N:            1,
+			})
+			continue
+		}
+		if toolType != "" {
+			inspection.HasAgentTool = true
+		}
+		if toolType == "function" || toolName == "generate_image_batch" || toolName == "continue_generation" {
+			inspection.HasAgentTool = true
+		}
+	}
+	return inspection, nil
+}
+
+func validateImageGalleryProxyParams(params imageGalleryProxyParams, settings service.ImageGallerySettings, allowedModels []string, imageModel bool) error {
+	model := strings.TrimSpace(params.Model)
+	if model == "" {
+		return infraerrors.BadRequest("IMAGE_GALLERY_MODEL_REQUIRED", "image proxy model is required")
+	}
+	if !imageGalleryContainsString(allowedModels, model) {
+		if imageModel {
+			return infraerrors.BadRequest("IMAGE_GALLERY_MODEL_NOT_ALLOWED", "image model is not allowed")
+		}
+		return infraerrors.BadRequest("IMAGE_GALLERY_AGENT_MODEL_NOT_ALLOWED", "agent model is not allowed")
+	}
+	if params.N <= 0 {
+		params.N = 1
+	}
+	if params.N > settings.MaxN {
+		return infraerrors.BadRequest("IMAGE_GALLERY_N_TOO_LARGE", "image count exceeds the configured limit")
+	}
+	return validateImageGalleryProxyImageParams(params, settings)
+}
+
+func validateImageGalleryProxyImageParams(params imageGalleryProxyParams, settings service.ImageGallerySettings) error {
+	if params.Size != "" && !imageGalleryContainsString(settings.AllowedSizes, params.Size) {
+		return infraerrors.BadRequest("IMAGE_GALLERY_SIZE_NOT_ALLOWED", "image size is not allowed")
+	}
+	if params.Quality != "" && !imageGalleryContainsString(settings.AllowedQuality, params.Quality) {
+		return infraerrors.BadRequest("IMAGE_GALLERY_QUALITY_NOT_ALLOWED", "image quality is not allowed")
+	}
+	if params.OutputFormat != "" && !imageGalleryContainsString(settings.AllowedOutputFormats, params.OutputFormat) {
+		return infraerrors.BadRequest("IMAGE_GALLERY_FORMAT_NOT_ALLOWED", "image output format is not allowed")
+	}
+	return nil
+}
+
+func imageGalleryStringField(payload map[string]any, key string) string {
+	value, _ := payload[key].(string)
+	return strings.TrimSpace(value)
+}
+
+func imageGalleryIntField(payload map[string]any, key string, fallback int) int {
+	switch value := payload[key].(type) {
+	case float64:
+		return int(value)
+	case int:
+		return value
+	case json.Number:
+		out, err := strconv.Atoi(value.String())
+		if err == nil {
+			return out
+		}
+	case string:
+		return imageGalleryIntString(value, fallback)
+	}
+	return fallback
+}
+
+func imageGalleryIntString(value string, fallback int) int {
+	value = strings.TrimSpace(value)
+	if value == "" {
+		return fallback
+	}
+	out, err := strconv.Atoi(value)
+	if err != nil {
+		return fallback
+	}
+	return out
+}
+
+func firstImageGalleryFormValue(values map[string][]string, key string) string {
+	for _, value := range values[key] {
+		if value = strings.TrimSpace(value); value != "" {
+			return value
+		}
+	}
+	return ""
+}
+
+func imageGalleryContainsString(items []string, value string) bool {
+	for _, item := range items {
+		if item == value {
+			return true
+		}
+	}
+	return false
 }
 
 func (h *ImageGalleryHandler) proxySubscription(c *gin.Context, apiKey *service.APIKey) (*service.UserSubscription, bool) {

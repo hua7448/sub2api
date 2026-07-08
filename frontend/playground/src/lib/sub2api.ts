@@ -1,10 +1,13 @@
 import { DEFAULT_STREAM_PARTIAL_IMAGES, type ApiProfile, type AppSettings, type TaskParams } from '../types'
+import { DEFAULT_IMAGES_MODEL, DEFAULT_RESPONSES_MODEL } from './apiProfiles'
 
 export interface Sub2APISettings {
   enabled: boolean
   max_upload_mb: number
   allowed_models: string[]
   default_model: string
+  allowed_agent_models: string[]
+  agent_model: string
   allowed_sizes: string[]
   allowed_quality: string[]
   allowed_output_formats: string[]
@@ -62,6 +65,26 @@ export function getCachedSub2APIEligibleKeys() {
   return cachedKeys ?? []
 }
 
+export function getSub2APIModelsForMode(settings: Sub2APISettings | null | undefined, apiMode: AppSettings['apiMode']): string[] {
+  const models = apiMode === 'responses'
+    ? settings?.allowed_agent_models ?? []
+    : settings?.allowed_models ?? []
+  return models.filter((model) => model.trim())
+}
+
+export function getSub2APIDefaultModelForMode(settings: Sub2APISettings | null | undefined, apiMode: AppSettings['apiMode']): string {
+  if (apiMode === 'responses') {
+    return settings?.agent_model || settings?.allowed_agent_models?.[0] || DEFAULT_RESPONSES_MODEL
+  }
+  return settings?.default_model || settings?.allowed_models?.[0] || DEFAULT_IMAGES_MODEL
+}
+
+function isSub2APIModelAllowed(settings: Sub2APISettings, apiMode: AppSettings['apiMode'], model: string | undefined): model is string {
+  if (!model) return false
+  const allowedModels = getSub2APIModelsForMode(settings, apiMode)
+  return allowedModels.length === 0 || allowedModels.includes(model)
+}
+
 export function selectSub2APIKeyId(profile: ApiProfile): number {
   const configured = Number(profile.sub2apiKeyId)
   if (Number.isFinite(configured) && configured > 0) return Math.trunc(configured)
@@ -74,10 +97,11 @@ export function applySub2APISettings(settings: AppSettings, remote: Sub2APISetti
   const persistedProfile = settings.profiles?.find((profile) => profile.provider === 'sub2api')
   const persistedKeyId = Number(persistedProfile?.sub2apiKeyId)
   const activeKeyId = keys.some((key) => key.id === persistedKeyId) ? persistedKeyId : keys[0]?.id ?? null
-  const persistedModelAllowed = persistedProfile?.model && (
-    remote.allowed_models.length === 0 || remote.allowed_models.includes(persistedProfile.model)
-  )
-  const model = (persistedModelAllowed ? persistedProfile.model : '') || remote.default_model || remote.allowed_models[0] || 'gpt-image-2'
+  const persistedApiMode = persistedProfile?.apiMode === 'responses' || settings.apiMode === 'responses' ? 'responses' : 'images'
+  const persistedModel = persistedProfile?.model || settings.model
+  const model = isSub2APIModelAllowed(remote, persistedApiMode, persistedModel)
+    ? persistedModel
+    : getSub2APIDefaultModelForMode(remote, persistedApiMode)
   const activeKey = activeKeyId ? keys.find((key) => key.id === activeKeyId) ?? null : null
   const profile: ApiProfile = {
     id: 'sub2api-default',
@@ -88,7 +112,7 @@ export function applySub2APISettings(settings: AppSettings, remote: Sub2APISetti
     sub2apiKeyId: activeKeyId,
     model,
     timeout: 600,
-    apiMode: 'images',
+    apiMode: persistedApiMode,
     codexCli: false,
     apiProxy: false,
     responseFormatB64Json: true,
@@ -101,7 +125,7 @@ export function applySub2APISettings(settings: AppSettings, remote: Sub2APISetti
     baseUrl: '',
     apiKey: '',
     model,
-    apiMode: 'images',
+    apiMode: persistedApiMode,
     codexCli: false,
     apiProxy: false,
     agentWebSearch: remote.agent_web_search_enabled ? settings.agentWebSearch : false,

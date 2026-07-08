@@ -577,7 +577,7 @@ async function callImagesApiSingle(opts: CallApiOptions, profile: ApiProfile): P
   const timeoutId = startRequestTimeout(controller, profile.timeout)
 
   try {
-    assertSub2APIParams(params, getCachedSub2APISettings())
+    if (profile.provider === 'sub2api') assertSub2APIParams(params, getCachedSub2APISettings())
     let response: Response
 
     if (isEdit) {
@@ -1057,7 +1057,7 @@ async function callResponsesImageApiSingle(opts: CallApiOptions, profile: ApiPro
   const timeoutId = startRequestTimeout(controller, profile.timeout)
 
   try {
-    assertSub2APIParams(params, getCachedSub2APISettings())
+    if (profile.provider === 'sub2api') assertSub2APIParams(params, getCachedSub2APISettings())
     if (opts.maskDataUrl) {
       assertMaskEditFileSize('遮罩主图文件', getDataUrlDecodedByteSize(inputImageDataUrls[0] ?? ''))
       assertMaskEditFileSize('遮罩文件', getDataUrlDecodedByteSize(opts.maskDataUrl))

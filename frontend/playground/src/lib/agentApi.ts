@@ -687,7 +687,7 @@ export async function callAgentResponsesApi(opts: {
   signal?.addEventListener('abort', abortFromCaller, { once: true })
 
   try {
-    assertSub2APIParams(params, getCachedSub2APISettings())
+    if (profile.provider === 'sub2api') assertSub2APIParams(params, getCachedSub2APISettings())
     const body: Record<string, unknown> = {
       model: profile.model || settings.model,
       instructions: createAgentInstructions(settings),
@@ -825,7 +825,7 @@ export async function callBatchImageSingle(opts: {
   signal?.addEventListener('abort', abortFromCaller, { once: true })
 
   try {
-    assertSub2APIParams(params, getCachedSub2APISettings())
+    if (profile.provider === 'sub2api') assertSub2APIParams(params, getCachedSub2APISettings())
     // Build input: reference id mapping + optional prompt-rewrite guard + reference images.
     const referenceMapping = referenceImageDataUrls.length > 0
       ? `Attached reference images correspond to these ids, in order: ${(referenceIds ?? []).map((id) => `<ref id="${id}" />`).join(', ') || 'reference images'}.`

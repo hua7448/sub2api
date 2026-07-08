@@ -55,6 +55,7 @@ import {
   isRecoverableSub2APINetworkError,
   isSub2APIJobRecoverableError,
 } from './lib/sub2apiJobs'
+import { getCachedSub2APISettings } from './lib/sub2api'
 import { text, translateUiString } from './lib/playgroundI18n'
 import { validateMaskMatchesImage } from './lib/canvasImage'
 import { orderInputImagesForMask } from './lib/mask'
@@ -1182,6 +1183,19 @@ export const useStore = create<AppState>()(
         const activeProfile = getActiveApiProfile(settings)
 
         const supportsAgentResponses = activeProfile.provider === 'openai' || activeProfile.provider === 'sub2api'
+
+        if (activeProfile.provider === 'sub2api' && getCachedSub2APISettings()?.agent_enabled === false) {
+          state.setConfirmDialog({
+            title: 'Agent 模式未启用',
+            message: '管理员当前未启用生图广场 Agent 模式。你仍可使用普通生图和 Responses API 生图。',
+            confirmText: '去设置',
+            cancelText: '取消',
+            action: () => {
+              useStore.getState().setShowSettings(true, 'api')
+            },
+          })
+          return
+        }
 
         if (supportsAgentResponses && activeProfile.apiMode === 'responses') {
           const galleryInputDraft = saveGalleryInputDraft(state)
@@ -3356,6 +3370,11 @@ export async function submitAgentMessage() {
     state.setAppMode('agent')
     return
   }
+  const sub2apiSettings = activeProfile.provider === 'sub2api' ? getCachedSub2APISettings() : null
+  if (sub2apiSettings?.agent_enabled === false) {
+    showToast('管理员当前未启用生图广场 Agent 模式', 'error')
+    return
+  }
 
   if (validateApiProfile(activeProfile)) {
     showToast(`请先完善请求 API 配置：${validateApiProfile(activeProfile)}`, 'error')
@@ -3402,6 +3421,9 @@ export async function submitAgentMessage() {
   }
 
   const requestSettings = createSettingsForApiProfile(normalizedSettings, activeProfile)
+  if (sub2apiSettings?.agent_web_search_enabled === false) {
+    requestSettings.agentWebSearch = false
+  }
   const now = Date.now()
   const editingRound = state.agentEditingRoundId
     ? conversation.rounds.find((item) => item.id === state.agentEditingRoundId) ?? null
@@ -3507,6 +3529,11 @@ export async function regenerateAgentAssistantMessage(conversationId: string, ro
     state.setAppMode('agent')
     return
   }
+  const sub2apiSettings = activeProfile.provider === 'sub2api' ? getCachedSub2APISettings() : null
+  if (sub2apiSettings?.agent_enabled === false) {
+    showToast('管理员当前未启用生图广场 Agent 模式', 'error')
+    return
+  }
 
   if (validateApiProfile(activeProfile)) {
     showToast(`请先完善请求 API 配置：${validateApiProfile(activeProfile)}`, 'error')
@@ -3531,6 +3558,9 @@ export async function regenerateAgentAssistantMessage(conversationId: string, ro
 
   const inputImageIds = uniqueIds(sourceRound.inputImageIds)
   const requestSettings = createSettingsForApiProfile(normalizedSettings, activeProfile)
+  if (sub2apiSettings?.agent_web_search_enabled === false) {
+    requestSettings.agentWebSearch = false
+  }
   const normalizedParams = {
     ...normalizeParamsForSettings(params, requestSettings, { hasInputImages: inputImageIds.length > 0 }),
     n: DEFAULT_PARAMS.n,

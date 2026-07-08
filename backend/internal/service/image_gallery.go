@@ -41,6 +41,8 @@ const (
 	SettingKeyImageGalleryRetentionDays         = "image_gallery_retention_days"
 	SettingKeyImageGalleryAllowedModels         = "image_gallery_allowed_models"
 	SettingKeyImageGalleryDefaultModel          = "image_gallery_default_model"
+	SettingKeyImageGalleryAllowedAgentModels    = "image_gallery_allowed_agent_models"
+	SettingKeyImageGalleryAgentModel            = "image_gallery_agent_model"
 	SettingKeyImageGalleryAllowedSizes          = "image_gallery_allowed_sizes"
 	SettingKeyImageGalleryAllowedQuality        = "image_gallery_allowed_quality"
 	SettingKeyImageGalleryAllowedOutputFormats  = "image_gallery_allowed_output_formats"
@@ -91,6 +93,8 @@ type ImageGallerySettings struct {
 	RetentionDays         int      `json:"retention_days"`
 	AllowedModels         []string `json:"allowed_models"`
 	DefaultModel          string   `json:"default_model"`
+	AllowedAgentModels    []string `json:"allowed_agent_models"`
+	AgentModel            string   `json:"agent_model"`
 	AllowedSizes          []string `json:"allowed_sizes"`
 	AllowedQuality        []string `json:"allowed_quality"`
 	AllowedOutputFormats  []string `json:"allowed_output_formats"`
@@ -407,6 +411,8 @@ func (s *ImageGalleryService) UpdateSettings(ctx context.Context, settings Image
 		SettingKeyImageGalleryRetentionDays:         fmt.Sprintf("%d", normalized.RetentionDays),
 		SettingKeyImageGalleryAllowedModels:         mustJSON(normalized.AllowedModels),
 		SettingKeyImageGalleryDefaultModel:          normalized.DefaultModel,
+		SettingKeyImageGalleryAllowedAgentModels:    mustJSON(normalized.AllowedAgentModels),
+		SettingKeyImageGalleryAgentModel:            normalized.AgentModel,
 		SettingKeyImageGalleryAllowedSizes:          mustJSON(normalized.AllowedSizes),
 		SettingKeyImageGalleryAllowedQuality:        mustJSON(normalized.AllowedQuality),
 		SettingKeyImageGalleryAllowedOutputFormats:  mustJSON(normalized.AllowedOutputFormats),
@@ -1078,6 +1084,8 @@ func DefaultImageGallerySettings() ImageGallerySettings {
 		RetentionDays:         0,
 		AllowedModels:         []string{"gpt-image-2"},
 		DefaultModel:          "gpt-image-2",
+		AllowedAgentModels:    []string{"gpt-5.5"},
+		AgentModel:            "gpt-5.5",
 		AllowedSizes:          []string{"1024x1024", "1024x1536", "1536x1024", "auto"},
 		AllowedQuality:        []string{"auto", "low", "medium", "high"},
 		AllowedOutputFormats:  []string{"png", "jpeg", "webp"},
@@ -1101,6 +1109,8 @@ func imageGallerySettingKeys() []string {
 		SettingKeyImageGalleryRetentionDays,
 		SettingKeyImageGalleryAllowedModels,
 		SettingKeyImageGalleryDefaultModel,
+		SettingKeyImageGalleryAllowedAgentModels,
+		SettingKeyImageGalleryAgentModel,
 		SettingKeyImageGalleryAllowedSizes,
 		SettingKeyImageGalleryAllowedQuality,
 		SettingKeyImageGalleryAllowedOutputFormats,
@@ -1124,6 +1134,8 @@ func parseImageGallerySettings(values map[string]string) ImageGallerySettings {
 	defaults.RetentionDays = parseIntSetting(values[SettingKeyImageGalleryRetentionDays], defaults.RetentionDays)
 	defaults.AllowedModels = parseStringSlice(values[SettingKeyImageGalleryAllowedModels], defaults.AllowedModels)
 	defaults.DefaultModel = firstImageGalleryNonEmpty(values[SettingKeyImageGalleryDefaultModel], defaults.DefaultModel)
+	defaults.AllowedAgentModels = parseStringSlice(values[SettingKeyImageGalleryAllowedAgentModels], defaults.AllowedAgentModels)
+	defaults.AgentModel = firstImageGalleryNonEmpty(values[SettingKeyImageGalleryAgentModel], defaults.AgentModel)
 	defaults.AllowedSizes = parseStringSlice(values[SettingKeyImageGalleryAllowedSizes], defaults.AllowedSizes)
 	defaults.AllowedQuality = parseStringSlice(values[SettingKeyImageGalleryAllowedQuality], defaults.AllowedQuality)
 	defaults.AllowedOutputFormats = parseStringSlice(values[SettingKeyImageGalleryAllowedOutputFormats], defaults.AllowedOutputFormats)
@@ -1152,18 +1164,31 @@ func normalizeImageGallerySettings(settings ImageGallerySettings) ImageGallerySe
 	if settings.RetentionDays < 0 {
 		settings.RetentionDays = 0
 	}
+	settings.AllowedModels = cleanStringSlice(settings.AllowedModels)
 	if len(settings.AllowedModels) == 0 {
 		settings.AllowedModels = defaults.AllowedModels
 	}
-	if settings.DefaultModel == "" {
+	settings.DefaultModel = strings.TrimSpace(settings.DefaultModel)
+	if settings.DefaultModel == "" || !containsString(settings.AllowedModels, settings.DefaultModel) {
 		settings.DefaultModel = settings.AllowedModels[0]
 	}
+	settings.AllowedAgentModels = cleanStringSlice(settings.AllowedAgentModels)
+	if len(settings.AllowedAgentModels) == 0 {
+		settings.AllowedAgentModels = defaults.AllowedAgentModels
+	}
+	settings.AgentModel = strings.TrimSpace(settings.AgentModel)
+	if settings.AgentModel == "" || !containsString(settings.AllowedAgentModels, settings.AgentModel) {
+		settings.AgentModel = settings.AllowedAgentModels[0]
+	}
+	settings.AllowedSizes = cleanStringSlice(settings.AllowedSizes)
 	if len(settings.AllowedSizes) == 0 {
 		settings.AllowedSizes = defaults.AllowedSizes
 	}
+	settings.AllowedQuality = cleanStringSlice(settings.AllowedQuality)
 	if len(settings.AllowedQuality) == 0 {
 		settings.AllowedQuality = defaults.AllowedQuality
 	}
+	settings.AllowedOutputFormats = cleanStringSlice(settings.AllowedOutputFormats)
 	if len(settings.AllowedOutputFormats) == 0 {
 		settings.AllowedOutputFormats = defaults.AllowedOutputFormats
 	}
@@ -1177,10 +1202,6 @@ func normalizeImageGallerySettings(settings ImageGallerySettings) ImageGallerySe
 	settings.PublishRequiresReview = false
 	settings.TemplatesEnabled = false
 	settings.TemplateImportEnabled = false
-	settings.AllowedModels = cleanStringSlice(settings.AllowedModels)
-	settings.AllowedSizes = cleanStringSlice(settings.AllowedSizes)
-	settings.AllowedQuality = cleanStringSlice(settings.AllowedQuality)
-	settings.AllowedOutputFormats = cleanStringSlice(settings.AllowedOutputFormats)
 	return settings
 }
 

@@ -585,7 +585,7 @@ describe('custom providers', () => {
     expect(clamped.profiles[0].streamPartialImages).toBe(3)
   })
 
-  it('normalizes sub2api profile to Images API and preserves model, timeout, and streaming options', () => {
+  it('normalizes sub2api profile without exposing keys or proxy settings and preserves Responses mode', () => {
     const settings = normalizeSettings({
       profiles: [{
         id: 'sub2api-default',
@@ -622,7 +622,7 @@ describe('custom providers', () => {
       sub2apiKeyId: 7,
       model: 'gpt-5.5',
       timeout: 300,
-      apiMode: 'images',
+      apiMode: 'responses',
       codexCli: false,
       apiProxy: false,
       streamImages: false,

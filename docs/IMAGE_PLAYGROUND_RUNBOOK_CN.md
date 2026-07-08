@@ -10,6 +10,8 @@
 - 浏览器永远不保存、不展示用户真实 API Key。playground 只能保存 `api_key_id`、模型和 UI 参数。
 - 前端只调用 `/api/v1/image-playground/...`，不能直接请求 `/v1/...`、外部 OpenAI 域名、自定义 Base URL 或自定义 provider。
 - 后端代理必须用登录态校验当前用户、KEY 归属、KEY 状态、额度、过期时间和分组 `allow_image_generation`。
+- 后端代理必须同时校验生图参数白名单：Images API 使用 `allowed_models/default_model`；Responses API 和 Agent 使用 `allowed_agent_models/agent_model`；尺寸、质量、输出格式和 `n` 仍受生图广场设置限制。
+- Agent 和 Web Search 不是前端开关。`/api/v1/image-playground/proxy/responses` 必须按请求体工具类型硬校验 `agent_enabled` 和 `agent_web_search_enabled`，前端只做体验引导。
 - 本地历史、收藏、图片缓存、ZIP 导出继续使用 playground 的 IndexedDB，但 IndexedDB 不是计费事实来源。
 - 正式发布优先走 GitHub Actions `Release` workflow 和 SmartAPI 一键更新；服务器手动镜像只用于 4146 试运行或应急回退。
 
@@ -19,7 +21,7 @@
 - 管理设置页：`frontend/src/views/admin/ImageGalleryAdminView.vue`
 - 主站嵌入和路由：`backend/internal/web/embed_on.go`
 - 后端路由：`backend/internal/server/routes/user.go`
-- 后端代理：`backend/internal/handler/image_playground_handler.go`
+- 后端代理：`backend/internal/handler/image_gallery_handler.go`
 - playground API 层：`frontend/playground/src/lib/sub2api.ts`
 - playground 主站继承：`frontend/playground/src/lib/sub2apiHost.ts`
 - playground 下载：`frontend/playground/src/lib/downloadImages.ts`
@@ -76,7 +78,8 @@ git diff --name-status <old-upstream-commit>..<new-upstream-commit>
 
 - 优先挑选 bugfix 和可独立落地的小功能，不整体覆盖本地文件。
 - 保留 sub2api 定制：登录态、`api_key_id`、主站继承、禁止浏览器保存真实 API Key、`/api/v1/image-playground/proxy/...` 后端代理。
-- 普通生成/编辑默认沿用上游 `gpt_image_playground v0.6.12` 的 OpenAI-compatible 生图调用链；sub2api 只负责同源代理、登录态、KEY 选择、权限和计费校验。服务端 Job API 仅作为实验/后续评估接口保留，不作为默认提交路径。
+- 普通生成/编辑默认沿用上游 `gpt_image_playground v0.6.12` 的 OpenAI-compatible 生图调用链；sub2api 只负责同源代理、登录态、KEY 选择、参数白名单、Agent/Web Search 权限和计费校验。服务端 Job API 仅作为实验/后续评估接口保留，不作为默认提交路径。
+- sub2api 的 Images API 和 Responses/Agent 模型必须分离配置：图片模型走 `allowed_models/default_model`，Responses/Agent 文本模型走 `allowed_agent_models/agent_model`，避免把 `gpt-image-*` 当作 Responses 文本模型发送。
 - 上游新增 API 配置、provider、proxy、远程导入、部署脚本时，默认不直接开放给用户；必须先映射到 sub2api 后端权限和计费模型。
 - 移植后至少执行 `pnpm --dir frontend/playground run build`；涉及主站入口或静态资源时执行 `pnpm --dir frontend run build`。
 
