@@ -8,7 +8,6 @@ export { normalizeBaseUrl } from './devProxy'
 
 export async function callImageApi(opts: CallApiOptions): Promise<CallApiResult> {
   const profile = getActiveApiProfile(opts.settings)
-  if (profile.provider === 'sub2api') return callOpenAICompatibleImageApi(opts, profile, null)
   if (profile.provider === 'fal') return callFalAiImageApi(opts, profile)
 
   return callOpenAICompatibleImageApi(opts, profile, getCustomProviderDefinition(opts.settings, profile.provider))

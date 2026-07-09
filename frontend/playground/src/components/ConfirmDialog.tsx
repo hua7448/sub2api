@@ -5,6 +5,7 @@ import { usePreventBackgroundScroll } from '../hooks/usePreventBackgroundScroll'
 import { Checkbox } from './Checkbox'
 import { CopyIcon } from './icons'
 import { hostText } from '../lib/sub2apiHost'
+import { translateUiString } from '../lib/playgroundI18n'
 
 function renderMessage(message: string) {
   return message.split(/(`[^`]+`|「[^」]+」|\*\*[^*]+\*\*)/g).map((part, index) => {
@@ -84,8 +85,10 @@ export default function ConfirmDialog() {
   const isDestructive = confirmDialog.title.includes('删除') || confirmDialog.title.includes('清空') || confirmDialog.title.toLowerCase().includes('delete') || confirmDialog.title.toLowerCase().includes('clear')
   const confirmTone = confirmDialog.tone ?? (isDestructive ? 'danger' : undefined)
   const confirmClassName = getActionButtonClass(confirmTone === 'danger' || confirmTone === 'warning' ? confirmTone : 'primary')
-  const confirmText = confirmDialog.confirmText ?? (isDestructive ? hostText('确认删除', 'Confirm delete') : hostText('确认', 'Confirm'))
-  const cancelText = confirmDialog.cancelText ?? hostText('取消', 'Cancel')
+  const title = translateUiString(confirmDialog.title)
+  const message = translateUiString(confirmDialog.message)
+  const confirmText = translateUiString(confirmDialog.confirmText ?? (isDestructive ? hostText('确认删除', 'Confirm delete') : hostText('确认', 'Confirm')))
+  const cancelText = translateUiString(confirmDialog.cancelText ?? hostText('取消', 'Cancel'))
   const customButtons = confirmDialog.buttons?.filter((button) => button.label.trim()) ?? []
 
   return (
@@ -110,16 +113,16 @@ export default function ConfirmDialog() {
           {confirmDialog.icon === 'copy' && (
             <CopyIcon className="h-5 w-5 shrink-0 text-blue-500" />
           )}
-          {confirmDialog.title}
+          {title}
         </h3>
         <p className={`text-sm text-gray-500 dark:text-gray-400 ${confirmDialog.checkbox ? 'mb-4' : 'mb-6'} leading-relaxed whitespace-pre-line ${confirmDialog.messageAlign === 'center' ? 'text-center' : ''}`}>
-          {renderMessage(confirmDialog.message)}
+          {renderMessage(message)}
         </p>
         {confirmDialog.checkbox && (
           <Checkbox
             checked={checkboxChecked}
             onChange={setCheckboxChecked}
-            label={confirmDialog.checkbox.label}
+            label={translateUiString(confirmDialog.checkbox.label)}
             tone={confirmDialog.checkbox.tone}
             disabled={confirmDialog.checkbox.disabled}
             className="mb-6"
@@ -138,7 +141,7 @@ export default function ConfirmDialog() {
                 disabled={!canConfirm}
                 className={`flex-1 py-2 rounded-lg text-sm font-medium transition disabled:cursor-not-allowed disabled:opacity-60 ${getActionButtonClass(button.tone)}`}
               >
-                {button.label}
+                {translateUiString(button.label)}
               </button>
             ))}
           </div>

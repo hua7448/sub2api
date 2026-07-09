@@ -16,12 +16,14 @@ import (
 	"io"
 	"mime"
 	"mime/multipart"
+	"net"
 	"net/http"
 	"net/textproto"
 	"os"
 	"path/filepath"
 	"sort"
 	"strings"
+	"sync"
 	"time"
 
 	infraerrors "github.com/Wei-Shaw/sub2api/internal/pkg/errors"
@@ -39,6 +41,8 @@ const (
 	SettingKeyImageGalleryRetentionDays         = "image_gallery_retention_days"
 	SettingKeyImageGalleryAllowedModels         = "image_gallery_allowed_models"
 	SettingKeyImageGalleryDefaultModel          = "image_gallery_default_model"
+	SettingKeyImageGalleryAllowedAgentModels    = "image_gallery_allowed_agent_models"
+	SettingKeyImageGalleryAgentModel            = "image_gallery_agent_model"
 	SettingKeyImageGalleryAllowedSizes          = "image_gallery_allowed_sizes"
 	SettingKeyImageGalleryAllowedQuality        = "image_gallery_allowed_quality"
 	SettingKeyImageGalleryAllowedOutputFormats  = "image_gallery_allowed_output_formats"
@@ -55,6 +59,7 @@ const (
 	ImageGalleryJobSucceeded      = "succeeded"
 	ImageGalleryJobFailed         = "failed"
 	ImageGalleryJobSaveFailed     = "save_failed"
+	ImageGalleryJobCancelled      = "cancelled"
 	ImageGalleryVisibilityPrivate = "private"
 	ImageGalleryVisibilityPublic  = "public"
 	ImageGalleryReviewNone        = "none"
@@ -63,12 +68,18 @@ const (
 	ImageGalleryReviewRejected    = "rejected"
 )
 
+const (
+	imageGalleryJobMaxDuration      = 30 * time.Minute
+	imageGalleryClientTaskLookupAge = 24 * time.Hour
+)
+
 var (
 	ErrImageGalleryDisabled       = infraerrors.Forbidden("IMAGE_GALLERY_DISABLED", "image gallery is disabled")
 	ErrImageGalleryPublicDisabled = infraerrors.Forbidden("IMAGE_GALLERY_PUBLIC_DISABLED", "public image gallery is disabled")
 	ErrImageGalleryInvalidParam   = infraerrors.BadRequest("IMAGE_GALLERY_INVALID_PARAM", "invalid image gallery parameter")
 	ErrImageGalleryNotFound       = infraerrors.NotFound("IMAGE_GALLERY_NOT_FOUND", "image gallery item not found")
 	ErrImageGalleryForbidden      = infraerrors.Forbidden("IMAGE_GALLERY_FORBIDDEN", "image gallery access denied")
+	ErrImageGalleryUploadTooLarge = infraerrors.New(http.StatusRequestEntityTooLarge, "IMAGE_GALLERY_UPLOAD_TOO_LARGE", "image upload exceeds configured limit")
 )
 
 type ImageGallerySettings struct {
@@ -82,6 +93,8 @@ type ImageGallerySettings struct {
 	RetentionDays         int      `json:"retention_days"`
 	AllowedModels         []string `json:"allowed_models"`
 	DefaultModel          string   `json:"default_model"`
+	AllowedAgentModels    []string `json:"allowed_agent_models"`
+	AgentModel            string   `json:"agent_model"`
 	AllowedSizes          []string `json:"allowed_sizes"`
 	AllowedQuality        []string `json:"allowed_quality"`
 	AllowedOutputFormats  []string `json:"allowed_output_formats"`
@@ -161,6 +174,7 @@ type ImageGalleryEligibleKey struct {
 
 type ImageGalleryGenerateRequest struct {
 	APIKeyID        int64    `json:"api_key_id"`
+	ClientTaskID    string   `json:"client_task_id,omitempty"`
 	Prompt          string   `json:"prompt"`
 	Model           string   `json:"model"`
 	Size            string   `json:"size"`
@@ -175,6 +189,15 @@ type ImageGalleryGenerateResult struct {
 	Job    *ImageGenerationJob `json:"job"`
 	Assets []ImageAsset        `json:"assets"`
 	Raw    json.RawMessage     `json:"raw,omitempty"`
+}
+
+type ImageGalleryJobCreateResult struct {
+	Job *ImageGenerationJob `json:"job"`
+}
+
+type ImageGalleryJobStatusResult struct {
+	Job    *ImageGenerationJob `json:"job"`
+	Assets []ImageAsset        `json:"assets"`
 }
 
 type ImageGalleryUpdateItemRequest struct {
@@ -215,6 +238,8 @@ type ImageGalleryRepository interface {
 	CreateJob(ctx context.Context, job *ImageGenerationJob) error
 	UpdateJob(ctx context.Context, job *ImageGenerationJob) error
 	GetJob(ctx context.Context, userID, jobID int64) (*ImageGenerationJob, error)
+	GetLatestJobByClientTaskID(ctx context.Context, userID int64, clientTaskID string, since time.Time) (*ImageGenerationJob, error)
+	ListAssetsByJob(ctx context.Context, userID, jobID int64) ([]ImageAsset, error)
 	CreateAsset(ctx context.Context, asset *ImageAsset) error
 	GetAsset(ctx context.Context, id int64) (*ImageAsset, error)
 	ListHistory(ctx context.Context, userID int64, params pagination.PaginationParams) ([]ImageAsset, *pagination.PaginationResult, error)
@@ -271,7 +296,7 @@ func (c *LocalImageGatewayClient) Generate(ctx context.Context, apiKey string, r
 	req.Header.Set("Authorization", "Bearer "+apiKey)
 	client := c.Client
 	if client == nil {
-		client = &http.Client{Timeout: 180 * time.Second}
+		client = &http.Client{Timeout: imageGalleryJobMaxDuration}
 	}
 	resp, err := client.Do(req)
 	if err != nil {
@@ -336,6 +361,8 @@ type ImageGalleryService struct {
 	settingRepo   SettingRepository
 	apiKeyService *APIKeyService
 	gatewayClient ImageGatewayClient
+	jobMu         sync.Mutex
+	jobCancels    map[int64]context.CancelFunc
 }
 
 func NewImageGalleryService(repo ImageGalleryRepository, settingRepo SettingRepository, apiKeyService *APIKeyService) *ImageGalleryService {
@@ -344,7 +371,17 @@ func NewImageGalleryService(repo ImageGalleryRepository, settingRepo SettingRepo
 		settingRepo:   settingRepo,
 		apiKeyService: apiKeyService,
 		gatewayClient: &LocalImageGatewayClient{},
+		jobCancels:    map[int64]context.CancelFunc{},
 	}
+}
+
+type preparedImageGalleryGenerate struct {
+	settings       ImageGallerySettings
+	apiKey         *APIKey
+	req            ImageGalleryGenerateRequest
+	params         json.RawMessage
+	referenceFiles []ImageGatewayFile
+	maskFile       *ImageGatewayFile
 }
 
 func (s *ImageGalleryService) SetGatewayClient(client ImageGatewayClient) {
@@ -374,6 +411,8 @@ func (s *ImageGalleryService) UpdateSettings(ctx context.Context, settings Image
 		SettingKeyImageGalleryRetentionDays:         fmt.Sprintf("%d", normalized.RetentionDays),
 		SettingKeyImageGalleryAllowedModels:         mustJSON(normalized.AllowedModels),
 		SettingKeyImageGalleryDefaultModel:          normalized.DefaultModel,
+		SettingKeyImageGalleryAllowedAgentModels:    mustJSON(normalized.AllowedAgentModels),
+		SettingKeyImageGalleryAgentModel:            normalized.AgentModel,
 		SettingKeyImageGalleryAllowedSizes:          mustJSON(normalized.AllowedSizes),
 		SettingKeyImageGalleryAllowedQuality:        mustJSON(normalized.AllowedQuality),
 		SettingKeyImageGalleryAllowedOutputFormats:  mustJSON(normalized.AllowedOutputFormats),
@@ -460,6 +499,59 @@ func (s *ImageGalleryService) ValidateProxyAPIKey(ctx context.Context, userID, a
 }
 
 func (s *ImageGalleryService) Generate(ctx context.Context, userID int64, req ImageGalleryGenerateRequest) (*ImageGalleryGenerateResult, error) {
+	prepared, err := s.prepareGenerateRequest(ctx, userID, req)
+	if err != nil {
+		return nil, err
+	}
+	job := &ImageGenerationJob{
+		UserID:   userID,
+		APIKeyID: &prepared.req.APIKeyID,
+		Status:   ImageGalleryJobRunning,
+		Model:    prepared.req.Model,
+		Prompt:   prepared.req.Prompt,
+		Params:   prepared.params,
+	}
+	now := time.Now()
+	job.StartedAt = &now
+	if err := s.repo.CreateJob(ctx, job); err != nil {
+		return nil, err
+	}
+	return s.executeGenerateJob(ctx, job, prepared)
+}
+
+func (s *ImageGalleryService) CreateJob(ctx context.Context, userID int64, req ImageGalleryGenerateRequest) (*ImageGalleryJobCreateResult, error) {
+	prepared, err := s.prepareGenerateRequest(ctx, userID, req)
+	if err != nil {
+		return nil, err
+	}
+	if prepared.req.ClientTaskID != "" {
+		existing, lookupErr := s.repo.GetLatestJobByClientTaskID(ctx, userID, prepared.req.ClientTaskID, time.Now().Add(-imageGalleryClientTaskLookupAge))
+		if lookupErr == nil {
+			return &ImageGalleryJobCreateResult{Job: existing}, nil
+		}
+		if !infraerrors.IsNotFound(lookupErr) {
+			return nil, lookupErr
+		}
+	}
+
+	job := &ImageGenerationJob{
+		UserID:   userID,
+		APIKeyID: &prepared.req.APIKeyID,
+		Status:   ImageGalleryJobRunning,
+		Model:    prepared.req.Model,
+		Prompt:   prepared.req.Prompt,
+		Params:   prepared.params,
+	}
+	now := time.Now()
+	job.StartedAt = &now
+	if err := s.repo.CreateJob(ctx, job); err != nil {
+		return nil, err
+	}
+	s.startBackgroundGenerateJob(job, prepared)
+	return &ImageGalleryJobCreateResult{Job: job}, nil
+}
+
+func (s *ImageGalleryService) prepareGenerateRequest(ctx context.Context, userID int64, req ImageGalleryGenerateRequest) (*preparedImageGalleryGenerate, error) {
 	settings, err := s.Settings(ctx)
 	if err != nil {
 		return nil, err
@@ -495,26 +587,41 @@ func (s *ImageGalleryService) Generate(ctx context.Context, userID int64, req Im
 	if err != nil {
 		return nil, err
 	}
-
 	params := generateParamsJSON(req)
-	job := &ImageGenerationJob{
-		UserID:   userID,
-		APIKeyID: &req.APIKeyID,
-		Status:   ImageGalleryJobRunning,
-		Model:    req.Model,
-		Prompt:   req.Prompt,
-		Params:   params,
-	}
-	now := time.Now()
-	job.StartedAt = &now
-	if err := s.repo.CreateJob(ctx, job); err != nil {
-		return nil, err
-	}
+	return &preparedImageGalleryGenerate{
+		settings:       settings,
+		apiKey:         apiKey,
+		req:            req,
+		params:         params,
+		referenceFiles: referenceFiles,
+		maskFile:       maskFile,
+	}, nil
+}
 
+func (s *ImageGalleryService) startBackgroundGenerateJob(job *ImageGenerationJob, prepared *preparedImageGalleryGenerate) {
+	ctx, cancel := context.WithTimeout(context.Background(), imageGalleryJobMaxDuration)
+	s.jobMu.Lock()
+	s.jobCancels[job.ID] = cancel
+	s.jobMu.Unlock()
+
+	go func() {
+		defer cancel()
+		defer func() {
+			s.jobMu.Lock()
+			delete(s.jobCancels, job.ID)
+			s.jobMu.Unlock()
+		}()
+		_, _ = s.executeGenerateJob(ctx, job, prepared)
+	}()
+}
+
+func (s *ImageGalleryService) executeGenerateJob(ctx context.Context, job *ImageGenerationJob, prepared *preparedImageGalleryGenerate) (*ImageGalleryGenerateResult, error) {
+	req := prepared.req
 	payload := map[string]any{
-		"model":  req.Model,
-		"prompt": req.Prompt,
-		"n":      req.N,
+		"model":           req.Model,
+		"prompt":          req.Prompt,
+		"n":               req.N,
+		"response_format": "b64_json",
 	}
 	if req.Size != "" {
 		payload["size"] = req.Size
@@ -526,20 +633,19 @@ func (s *ImageGalleryService) Generate(ctx context.Context, userID int64, req Im
 		payload["output_format"] = req.OutputFormat
 	}
 	started := time.Now()
-	body, _, _, genErr := s.gatewayClient.Generate(ctx, apiKey.Key, ImageGatewayRequest{
+	body, _, _, genErr := s.gatewayClient.Generate(ctx, prepared.apiKey.Key, ImageGatewayRequest{
 		Payload:        payload,
-		ReferenceFiles: referenceFiles,
-		MaskFile:       maskFile,
+		ReferenceFiles: prepared.referenceFiles,
+		MaskFile:       prepared.maskFile,
 	})
 	if genErr != nil {
-		job.Status = ImageGalleryJobFailed
-		job.Error = truncateImageGalleryString(string(body), 2000)
+		job.Status, job.Error = imageGalleryJobFailure(ctx, genErr, body)
 		if job.Error == "" {
 			job.Error = genErr.Error()
 		}
 		completed := time.Now()
 		job.CompletedAt = &completed
-		_ = s.repo.UpdateJob(ctx, job)
+		s.updateJobDetached(job)
 		return &ImageGalleryGenerateResult{Job: job, Raw: json.RawMessage(body)}, genErr
 	}
 
@@ -549,13 +655,13 @@ func (s *ImageGalleryService) Generate(ctx context.Context, userID int64, req Im
 		job.Error = parseErr.Error()
 		completed := time.Now()
 		job.CompletedAt = &completed
-		_ = s.repo.UpdateJob(ctx, job)
+		s.updateJobDetached(job)
 		return &ImageGalleryGenerateResult{Job: job, Raw: json.RawMessage(body)}, parseErr
 	}
-	usageID, actualCost, _ := s.repo.FindLatestUsageLogID(ctx, userID, req.APIKeyID, started.Add(-2*time.Second))
+	usageID, actualCost, _ := s.repo.FindLatestUsageLogID(ctx, job.UserID, req.APIKeyID, started.Add(-2*time.Second))
 	assets := make([]ImageAsset, 0, len(images))
 	for _, img := range images {
-		saved, saveErr := s.saveImage(ctx, settings, userID, job.ID, req.APIKeyID, usageID, actualCost, req, params, img)
+		saved, saveErr := s.saveImage(ctx, prepared.settings, job.UserID, job.ID, req.APIKeyID, usageID, actualCost, req, prepared.params, img)
 		if saveErr != nil {
 			job.Status = ImageGalleryJobSaveFailed
 			job.Error = saveErr.Error()
@@ -573,8 +679,32 @@ func (s *ImageGalleryService) Generate(ctx context.Context, userID int64, req Im
 	}
 	completed := time.Now()
 	job.CompletedAt = &completed
-	_ = s.repo.UpdateJob(ctx, job)
+	s.updateJobDetached(job)
 	return &ImageGalleryGenerateResult{Job: job, Assets: assets, Raw: json.RawMessage(body)}, nil
+}
+
+func (s *ImageGalleryService) updateJobDetached(job *ImageGenerationJob) {
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+	_ = s.repo.UpdateJob(ctx, job)
+}
+
+func imageGalleryJobFailure(ctx context.Context, err error, body []byte) (string, string) {
+	if errors.Is(err, context.Canceled) || ctx.Err() == context.Canceled {
+		return ImageGalleryJobCancelled, "image generation job cancelled"
+	}
+	if errors.Is(err, context.DeadlineExceeded) || ctx.Err() == context.DeadlineExceeded {
+		return ImageGalleryJobFailed, "image generation job timed out after 30 minutes"
+	}
+	var netErr net.Error
+	if errors.As(err, &netErr) && netErr.Timeout() {
+		return ImageGalleryJobFailed, err.Error()
+	}
+	message := truncateImageGalleryString(string(body), 2000)
+	if message == "" {
+		message = err.Error()
+	}
+	return ImageGalleryJobFailed, message
 }
 
 func (s *ImageGalleryService) saveImage(ctx context.Context, settings ImageGallerySettings, userID, jobID, apiKeyID int64, usageID *int64, actualCost *float64, req ImageGalleryGenerateRequest, params json.RawMessage, img generatedImage) (*ImageAsset, error) {
@@ -630,6 +760,73 @@ func (s *ImageGalleryService) saveImage(ctx context.Context, settings ImageGalle
 
 func (s *ImageGalleryService) Job(ctx context.Context, userID, jobID int64) (*ImageGenerationJob, error) {
 	return s.repo.GetJob(ctx, userID, jobID)
+}
+
+func (s *ImageGalleryService) JobStatus(ctx context.Context, userID, jobID int64) (*ImageGalleryJobStatusResult, error) {
+	job, err := s.repo.GetJob(ctx, userID, jobID)
+	if err != nil {
+		return nil, err
+	}
+	s.markExpiredRunningJob(ctx, job)
+	assets, err := s.repo.ListAssetsByJob(ctx, userID, job.ID)
+	if err != nil {
+		return nil, err
+	}
+	decorateAssetsForPlayground(assets)
+	return &ImageGalleryJobStatusResult{Job: job, Assets: assets}, nil
+}
+
+func (s *ImageGalleryService) JobByClientTaskID(ctx context.Context, userID int64, clientTaskID string) (*ImageGalleryJobStatusResult, error) {
+	clientTaskID = normalizeClientTaskID(clientTaskID)
+	if clientTaskID == "" {
+		return nil, ErrImageGalleryInvalidParam
+	}
+	job, err := s.repo.GetLatestJobByClientTaskID(ctx, userID, clientTaskID, time.Now().Add(-imageGalleryClientTaskLookupAge))
+	if err != nil {
+		return nil, err
+	}
+	return s.JobStatus(ctx, userID, job.ID)
+}
+
+func (s *ImageGalleryService) CancelJob(ctx context.Context, userID, jobID int64) (*ImageGalleryJobStatusResult, error) {
+	job, err := s.repo.GetJob(ctx, userID, jobID)
+	if err != nil {
+		return nil, err
+	}
+	if job.Status == ImageGalleryJobRunning || job.Status == ImageGalleryJobPending {
+		s.jobMu.Lock()
+		cancel := s.jobCancels[job.ID]
+		s.jobMu.Unlock()
+		if cancel != nil {
+			cancel()
+		}
+		job.Status = ImageGalleryJobCancelled
+		if job.Error == "" {
+			job.Error = "image generation job cancelled"
+		}
+		completed := time.Now()
+		job.CompletedAt = &completed
+		_ = s.repo.UpdateJob(ctx, job)
+	}
+	return s.JobStatus(ctx, userID, jobID)
+}
+
+func (s *ImageGalleryService) markExpiredRunningJob(ctx context.Context, job *ImageGenerationJob) {
+	if job == nil || (job.Status != ImageGalleryJobRunning && job.Status != ImageGalleryJobPending) {
+		return
+	}
+	startedAt := job.CreatedAt
+	if job.StartedAt != nil {
+		startedAt = *job.StartedAt
+	}
+	if time.Since(startedAt) < imageGalleryJobMaxDuration+time.Minute {
+		return
+	}
+	job.Status = ImageGalleryJobFailed
+	job.Error = "image generation job timed out after 30 minutes"
+	completed := time.Now()
+	job.CompletedAt = &completed
+	_ = s.repo.UpdateJob(ctx, job)
 }
 
 func (s *ImageGalleryService) History(ctx context.Context, userID int64, params pagination.PaginationParams) ([]ImageAsset, *pagination.PaginationResult, error) {
@@ -887,6 +1084,8 @@ func DefaultImageGallerySettings() ImageGallerySettings {
 		RetentionDays:         0,
 		AllowedModels:         []string{"gpt-image-2"},
 		DefaultModel:          "gpt-image-2",
+		AllowedAgentModels:    []string{"gpt-5.5"},
+		AgentModel:            "gpt-5.5",
 		AllowedSizes:          []string{"1024x1024", "1024x1536", "1536x1024", "auto"},
 		AllowedQuality:        []string{"auto", "low", "medium", "high"},
 		AllowedOutputFormats:  []string{"png", "jpeg", "webp"},
@@ -910,6 +1109,8 @@ func imageGallerySettingKeys() []string {
 		SettingKeyImageGalleryRetentionDays,
 		SettingKeyImageGalleryAllowedModels,
 		SettingKeyImageGalleryDefaultModel,
+		SettingKeyImageGalleryAllowedAgentModels,
+		SettingKeyImageGalleryAgentModel,
 		SettingKeyImageGalleryAllowedSizes,
 		SettingKeyImageGalleryAllowedQuality,
 		SettingKeyImageGalleryAllowedOutputFormats,
@@ -933,6 +1134,8 @@ func parseImageGallerySettings(values map[string]string) ImageGallerySettings {
 	defaults.RetentionDays = parseIntSetting(values[SettingKeyImageGalleryRetentionDays], defaults.RetentionDays)
 	defaults.AllowedModels = parseStringSlice(values[SettingKeyImageGalleryAllowedModels], defaults.AllowedModels)
 	defaults.DefaultModel = firstImageGalleryNonEmpty(values[SettingKeyImageGalleryDefaultModel], defaults.DefaultModel)
+	defaults.AllowedAgentModels = parseStringSlice(values[SettingKeyImageGalleryAllowedAgentModels], defaults.AllowedAgentModels)
+	defaults.AgentModel = firstImageGalleryNonEmpty(values[SettingKeyImageGalleryAgentModel], defaults.AgentModel)
 	defaults.AllowedSizes = parseStringSlice(values[SettingKeyImageGalleryAllowedSizes], defaults.AllowedSizes)
 	defaults.AllowedQuality = parseStringSlice(values[SettingKeyImageGalleryAllowedQuality], defaults.AllowedQuality)
 	defaults.AllowedOutputFormats = parseStringSlice(values[SettingKeyImageGalleryAllowedOutputFormats], defaults.AllowedOutputFormats)
@@ -961,18 +1164,31 @@ func normalizeImageGallerySettings(settings ImageGallerySettings) ImageGallerySe
 	if settings.RetentionDays < 0 {
 		settings.RetentionDays = 0
 	}
+	settings.AllowedModels = cleanStringSlice(settings.AllowedModels)
 	if len(settings.AllowedModels) == 0 {
 		settings.AllowedModels = defaults.AllowedModels
 	}
-	if settings.DefaultModel == "" {
+	settings.DefaultModel = strings.TrimSpace(settings.DefaultModel)
+	if settings.DefaultModel == "" || !containsString(settings.AllowedModels, settings.DefaultModel) {
 		settings.DefaultModel = settings.AllowedModels[0]
 	}
+	settings.AllowedAgentModels = cleanStringSlice(settings.AllowedAgentModels)
+	if len(settings.AllowedAgentModels) == 0 {
+		settings.AllowedAgentModels = defaults.AllowedAgentModels
+	}
+	settings.AgentModel = strings.TrimSpace(settings.AgentModel)
+	if settings.AgentModel == "" || !containsString(settings.AllowedAgentModels, settings.AgentModel) {
+		settings.AgentModel = settings.AllowedAgentModels[0]
+	}
+	settings.AllowedSizes = cleanStringSlice(settings.AllowedSizes)
 	if len(settings.AllowedSizes) == 0 {
 		settings.AllowedSizes = defaults.AllowedSizes
 	}
+	settings.AllowedQuality = cleanStringSlice(settings.AllowedQuality)
 	if len(settings.AllowedQuality) == 0 {
 		settings.AllowedQuality = defaults.AllowedQuality
 	}
+	settings.AllowedOutputFormats = cleanStringSlice(settings.AllowedOutputFormats)
 	if len(settings.AllowedOutputFormats) == 0 {
 		settings.AllowedOutputFormats = defaults.AllowedOutputFormats
 	}
@@ -986,14 +1202,11 @@ func normalizeImageGallerySettings(settings ImageGallerySettings) ImageGallerySe
 	settings.PublishRequiresReview = false
 	settings.TemplatesEnabled = false
 	settings.TemplateImportEnabled = false
-	settings.AllowedModels = cleanStringSlice(settings.AllowedModels)
-	settings.AllowedSizes = cleanStringSlice(settings.AllowedSizes)
-	settings.AllowedQuality = cleanStringSlice(settings.AllowedQuality)
-	settings.AllowedOutputFormats = cleanStringSlice(settings.AllowedOutputFormats)
 	return settings
 }
 
 func normalizeGenerateRequest(req ImageGalleryGenerateRequest, settings ImageGallerySettings) ImageGalleryGenerateRequest {
+	req.ClientTaskID = normalizeClientTaskID(req.ClientTaskID)
 	req.Prompt = strings.TrimSpace(req.Prompt)
 	req.Model = firstImageGalleryNonEmpty(strings.TrimSpace(req.Model), settings.DefaultModel)
 	req.Size = strings.TrimSpace(req.Size)
@@ -1011,6 +1224,14 @@ func normalizeGenerateRequest(req ImageGalleryGenerateRequest, settings ImageGal
 		req.N = 1
 	}
 	return req
+}
+
+func normalizeClientTaskID(value string) string {
+	value = strings.TrimSpace(value)
+	if len(value) > 128 {
+		return value[:128]
+	}
+	return value
 }
 
 func validateGenerateRequest(req ImageGalleryGenerateRequest, settings ImageGallerySettings) error {
@@ -1123,7 +1344,7 @@ func decodeImageGatewayFile(raw, name string, maxBytes int64) (ImageGatewayFile,
 		return ImageGatewayFile{}, infraerrors.BadRequest("IMAGE_GALLERY_INVALID_UPLOAD", "empty image upload")
 	}
 	if int64(len(data)) > maxBytes {
-		return ImageGatewayFile{}, infraerrors.BadRequest("IMAGE_GALLERY_UPLOAD_TOO_LARGE", "image upload exceeds configured limit")
+		return ImageGatewayFile{}, ErrImageGalleryUploadTooLarge
 	}
 	detected := http.DetectContentType(data)
 	if contentType == "" || contentType == "application/octet-stream" {
@@ -1220,6 +1441,21 @@ func decorateAssets(items []ImageAsset) {
 	}
 }
 
+func decorateAssetForPlayground(asset *ImageAsset) *ImageAsset {
+	if asset == nil {
+		return nil
+	}
+	asset.URL = fmt.Sprintf("/api/v1/image-playground/assets/%d", asset.ID)
+	asset.DownloadURL = asset.URL + "?download=1"
+	return asset
+}
+
+func decorateAssetsForPlayground(items []ImageAsset) {
+	for i := range items {
+		decorateAssetForPlayground(&items[i])
+	}
+}
+
 func generateParamsJSON(req ImageGalleryGenerateRequest) json.RawMessage {
 	body, _ := json.Marshal(map[string]any{
 		"size":                  req.Size,
@@ -1228,6 +1464,7 @@ func generateParamsJSON(req ImageGalleryGenerateRequest) json.RawMessage {
 		"output_format":         req.OutputFormat,
 		"reference_image_count": len(req.ReferenceImages),
 		"has_mask":              req.MaskImage != "",
+		"client_task_id":        req.ClientTaskID,
 	})
 	return body
 }

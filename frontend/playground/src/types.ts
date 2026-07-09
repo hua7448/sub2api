@@ -101,6 +101,7 @@ export interface AppSettings {
   persistInputOnRestart: boolean
   reuseTaskApiProfileTemporarily: boolean
   alwaysShowRetryButton: boolean
+  allowPromptRewrite: boolean
   taskCompletionNotification: boolean
   enterSubmit: boolean
   referenceImageEditAction: ReferenceImageEditAction
@@ -152,7 +153,7 @@ export interface MaskDraft {
 
 // ===== 任务记录 =====
 
-export type TaskStatus = 'running' | 'done' | 'error'
+export type TaskStatus = 'running' | 'recovering' | 'done' | 'error' | 'cancelled'
 
 export interface TaskRecord {
   id: string
@@ -178,6 +179,18 @@ export interface TaskRecord {
   customTaskId?: string
   /** 自定义异步任务是否等待自动恢复 */
   customRecoverable?: boolean
+  /** sub2api 服务端 Job ID，用于断连后恢复 */
+  serverJobId?: number
+  /** 前端生成的幂等任务 ID，用于提交响应丢失时找回 Job */
+  clientTaskId?: string
+  /** 服务端 Job 状态 */
+  serverJobStatus?: string
+  /** 服务端 Job 是否等待自动恢复 */
+  serverRecoverable?: boolean
+  /** 服务端保存的资产 ID */
+  serverAssetIds?: number[]
+  /** 最近一次恢复尝试时间 */
+  lastRecoverAttemptAt?: number
   /** API 返回的实际生效参数，用于标记与请求值不一致的情况 */
   actualParams?: Partial<TaskParams>
   /** 输出图片对应的实际生效参数，key 为 outputImages 中的图片 id */

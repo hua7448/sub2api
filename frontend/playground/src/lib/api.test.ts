@@ -1,7 +1,31 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { DEFAULT_PARAMS } from '../types'
-import { DEFAULT_SETTINGS } from './apiProfiles'
-import { callImageApi } from './api'
+import { DEFAULT_PARAMS, type ApiProfile } from '../types'
+import { createDefaultOpenAIProfile, DEFAULT_SETTINGS } from './apiProfiles'
+import { callOpenAICompatibleImageApi } from './openaiCompatibleImageApi'
+import type { CallApiOptions, CallApiResult } from './imageApiShared'
+
+function getTestApiProfile(settings: CallApiOptions['settings']): ApiProfile {
+  const explicitProfile = settings.profiles.find((profile) => profile.id === settings.activeProfileId)
+  if (explicitProfile && explicitProfile.provider !== 'sub2api') return explicitProfile
+
+  return createDefaultOpenAIProfile({
+    apiKey: settings.apiKey || 'test-key',
+    baseUrl: settings.baseUrl || DEFAULT_SETTINGS.baseUrl || 'https://api.openai.com/v1',
+    model: settings.model || 'gpt-image-2',
+    timeout: settings.timeout,
+    apiMode: settings.apiMode,
+    codexCli: settings.codexCli,
+    apiProxy: settings.apiProxy,
+    streamImages: settings.streamImages,
+    streamPartialImages: settings.streamPartialImages,
+  })
+}
+
+function callImageApi(opts: CallApiOptions): Promise<CallApiResult> {
+  const profile = getTestApiProfile(opts.settings)
+  const customProvider = opts.settings.customProviders.find((provider) => provider.id === profile.provider) ?? null
+  return callOpenAICompatibleImageApi(opts, profile, customProvider)
+}
 
 describe('callImageApi', () => {
   afterEach(() => {
@@ -35,6 +59,49 @@ describe('callImageApi', () => {
       expect(body.input).toBe('Use the following text as the complete prompt. Do not rewrite it:\nprompt')
     },
   )
+
+  it('does not add the prompt rewrite guard on Responses API when prompt rewrite is allowed', async () => {
+    const fetchMock = vi.spyOn(globalThis, 'fetch').mockResolvedValue(new Response(JSON.stringify({
+      output: [{
+        type: 'image_generation_call',
+        result: 'aW1hZ2U=',
+      }],
+    }), {
+      status: 200,
+      headers: { 'Content-Type': 'application/json' },
+    }))
+
+    await callImageApi({
+      settings: { ...DEFAULT_SETTINGS, apiKey: 'test-key', apiMode: 'responses', codexCli: true, allowPromptRewrite: true },
+      prompt: 'prompt',
+      params: { ...DEFAULT_PARAMS },
+      inputImageDataUrls: [],
+    })
+
+    const [, init] = fetchMock.mock.calls[0]
+    const body = JSON.parse(String((init as RequestInit).body))
+    expect(body.input).toBe('prompt')
+  })
+
+  it('does not add the prompt rewrite guard on Codex CLI Images API when prompt rewrite is allowed', async () => {
+    const fetchMock = vi.spyOn(globalThis, 'fetch').mockResolvedValue(new Response(JSON.stringify({
+      data: [{ b64_json: 'aW1hZ2U=' }],
+    }), {
+      status: 200,
+      headers: { 'Content-Type': 'application/json' },
+    }))
+
+    await callImageApi({
+      settings: { ...DEFAULT_SETTINGS, apiKey: 'test-key', codexCli: true, allowPromptRewrite: true },
+      prompt: 'prompt',
+      params: { ...DEFAULT_PARAMS },
+      inputImageDataUrls: [],
+    })
+
+    const [, init] = fetchMock.mock.calls[0]
+    const body = JSON.parse(String((init as RequestInit).body))
+    expect(body.prompt).toBe('prompt')
+  })
 
   it('records actual params returned on Images API responses in Codex CLI mode', async () => {
     const fetchMock = vi.spyOn(globalThis, 'fetch').mockResolvedValue(new Response(JSON.stringify({

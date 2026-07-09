@@ -1,4 +1,5 @@
 import type { AppSettings, TaskParams } from '../types'
+import { blobToDataUrl } from './dataUrl'
 
 export const MIME_MAP: Record<string, string> = {
   png: 'image/png',
@@ -16,8 +17,10 @@ export interface CallApiOptions {
   /** 输入图片的 data URL 列表 */
   inputImageDataUrls: string[]
   maskDataUrl?: string
+  clientTaskId?: string
   onFalRequestEnqueued?: (request: { requestId: string; endpoint: string }) => void
   onCustomTaskEnqueued?: (task: { taskId: string }) => void
+  onServerJobEnqueued?: (job: { jobId: number; status?: string }) => void
   onPartialImage?: (partial: { image: string; partialImageIndex?: number; requestIndex?: number }) => void
 }
 
@@ -34,6 +37,10 @@ export interface CallApiResult {
   rawImageUrls?: string[]
   /** 并发多图请求中失败的单张请求 */
   failedRequests?: Array<{ requestIndex: number; error: string }>
+  /** sub2api 服务端 Job 元数据 */
+  serverJobId?: number
+  serverJobStatus?: string
+  serverAssetIds?: number[]
 }
 
 export function isHttpUrl(value: unknown): value is string {
@@ -81,18 +88,6 @@ export function assertImageInputPayloadSize(bytes: number) {
 
 export function assertMaskEditFileSize(label: string, bytes: number) {
   assertMaxBytes(label, bytes, MAX_MASK_EDIT_FILE_BYTES)
-}
-
-async function blobToDataUrl(blob: Blob, fallbackMime: string): Promise<string> {
-  const bytes = new Uint8Array(await blob.arrayBuffer())
-  let binary = ''
-
-  for (let i = 0; i < bytes.length; i += 0x8000) {
-    const chunk = bytes.subarray(i, i + 0x8000)
-    binary += String.fromCharCode(...chunk)
-  }
-
-  return `data:${blob.type || fallbackMime};base64,${btoa(binary)}`
 }
 
 export const IMAGE_FETCH_CORS_HINT = ' 可点链接按钮复制结果链接，或尝试开启「返回 Base64 图片数据」避免此问题。'

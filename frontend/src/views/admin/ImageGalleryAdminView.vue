@@ -49,6 +49,14 @@
               <span class="input-label">{{ t('admin.imageGallery.allowedModels') }}</span>
               <input v-model="allowedModelsText" class="input" placeholder="gpt-image-2, gpt-image-1" />
             </label>
+            <label class="block">
+              <span class="input-label">{{ t('admin.imageGallery.agentModel') }}</span>
+              <input v-model="settings.agent_model" class="input" placeholder="gpt-5.5" />
+            </label>
+            <label class="block">
+              <span class="input-label">{{ t('admin.imageGallery.allowedAgentModels') }}</span>
+              <input v-model="allowedAgentModelsText" class="input" placeholder="gpt-5.5, gpt-5.4" />
+            </label>
             <label class="block md:col-span-2">
               <span class="input-label">{{ t('admin.imageGallery.allowedSizes') }}</span>
               <input v-model="allowedSizesText" class="input" placeholder="1024x1024, 1024x1536, 1536x1024, auto" />
@@ -87,11 +95,12 @@ const saving = ref(false)
 const settings = ref<ImageGallerySettings | null>(null)
 
 const allowedModelsText = listSetting('allowed_models')
+const allowedAgentModelsText = listSetting('allowed_agent_models')
 const allowedSizesText = listSetting('allowed_sizes')
 const allowedQualityText = listSetting('allowed_quality')
 const allowedFormatsText = listSetting('allowed_output_formats')
 
-function listSetting(key: 'allowed_models' | 'allowed_sizes' | 'allowed_quality' | 'allowed_output_formats') {
+function listSetting(key: 'allowed_models' | 'allowed_agent_models' | 'allowed_sizes' | 'allowed_quality' | 'allowed_output_formats') {
   return computed({
     get: () => settings.value?.[key].join(', ') ?? '',
     set: (value: string) => {

@@ -5,10 +5,13 @@
 ## 核心边界
 
 - 生图广场是 `frontend/playground` 下的独立 React/Vite 子应用，不把 React 组件混入主站 Vue 应用。
+- 生图广场源码上游是 `https://github.com/CookSleep/gpt_image_playground.git`。本 fork 使用远端名 `playground-upstream` 单独跟踪它，不和 sub2api 官方 `upstream` 混用。
 - 主站入口只负责跳转 `/image-playground/index.html`，管理端仍使用 Vue 的生图广场设置页。
 - 浏览器永远不保存、不展示用户真实 API Key。playground 只能保存 `api_key_id`、模型和 UI 参数。
 - 前端只调用 `/api/v1/image-playground/...`，不能直接请求 `/v1/...`、外部 OpenAI 域名、自定义 Base URL 或自定义 provider。
 - 后端代理必须用登录态校验当前用户、KEY 归属、KEY 状态、额度、过期时间和分组 `allow_image_generation`。
+- 后端代理必须同时校验生图参数白名单：Images API 使用 `allowed_models/default_model`；Responses API 和 Agent 使用 `allowed_agent_models/agent_model`；尺寸、质量、输出格式和 `n` 仍受生图广场设置限制。
+- Agent 和 Web Search 不是前端开关。`/api/v1/image-playground/proxy/responses` 必须按请求体工具类型硬校验 `agent_enabled` 和 `agent_web_search_enabled`，前端只做体验引导。
 - 本地历史、收藏、图片缓存、ZIP 导出继续使用 playground 的 IndexedDB，但 IndexedDB 不是计费事实来源。
 - 正式发布优先走 GitHub Actions `Release` workflow 和 SmartAPI 一键更新；服务器手动镜像只用于 4146 试运行或应急回退。
 
@@ -18,7 +21,7 @@
 - 管理设置页：`frontend/src/views/admin/ImageGalleryAdminView.vue`
 - 主站嵌入和路由：`backend/internal/web/embed_on.go`
 - 后端路由：`backend/internal/server/routes/user.go`
-- 后端代理：`backend/internal/handler/image_playground_handler.go`
+- 后端代理：`backend/internal/handler/image_gallery_handler.go`
 - playground API 层：`frontend/playground/src/lib/sub2api.ts`
 - playground 主站继承：`frontend/playground/src/lib/sub2apiHost.ts`
 - playground 下载：`frontend/playground/src/lib/downloadImages.ts`
@@ -26,6 +29,59 @@
 - 提示词库索引：`frontend/playground/src/data/promptLibrary/index.ts`
 - 提示词库分片：`frontend/playground/src/data/promptLibrary/chunks/`
 - 4146 试运行：`docs/TRIAL_DEPLOYMENT_CN.md`
+
+## 上游源码跟踪
+
+`frontend/playground` 是从 `CookSleep/gpt_image_playground` 集成进来的子应用。上游仓库根目录对应本仓库的 `frontend/playground/` 子目录。
+
+本地固定 remote：
+
+```bash
+git remote add playground-upstream https://github.com/CookSleep/gpt_image_playground.git
+git config remote.playground-upstream.tagOpt --no-tags
+git config --add remote.playground-upstream.fetch '+refs/tags/*:refs/remotes/playground-upstream/tags/*'
+```
+
+注意：CookSleep 仓库也使用 `v0.x` tag，直接 `git fetch --tags` 会污染 sub2api 本仓库的 release tag 命名空间，并可能和本 fork 的 tag 冲突。必须把 playground tag 拉到 `refs/remotes/playground-upstream/tags/*`，不要拉到普通 `refs/tags/*`。
+
+更新远端引用：
+
+```bash
+git fetch playground-upstream --prune --no-tags \
+  '+refs/heads/*:refs/remotes/playground-upstream/*' \
+  '+refs/tags/*:refs/remotes/playground-upstream/tags/*'
+```
+
+查看上游版本：
+
+```bash
+git show playground-upstream/main:package.json
+git for-each-ref --sort=-v:refname --format='%(refname:short)' refs/remotes/playground-upstream/tags | head
+```
+
+评估上游差异时，不要把 `playground-upstream/main` 直接 merge 到本仓库根目录。先看上游自身版本差异，再按文件把需要的改动移植到 `frontend/playground/`：
+
+```bash
+git log --oneline <old-upstream-commit>..<new-upstream-commit>
+git diff --stat <old-upstream-commit>..<new-upstream-commit>
+git diff --name-status <old-upstream-commit>..<new-upstream-commit>
+```
+
+当前记录：
+
+- 2026-07-07：本地 `frontend/playground/package.json` 为 `0.6.6`。
+- 2026-07-07：`playground-upstream/main` 已抓取到 `60da4a92`，上游 `package.json` 为 `0.6.12`。
+- `0.6.6..0.6.12` 值得优先评估的改动：Agent 图片任务恢复、导出 ZIP 使用任务 ID、select tooltip 关闭清理、默认 API URL 参数、prompt rewrite 设置、独立 Agent API 配置、移动端详情参数溢出修复、生成图尺寸记录。
+- 2026-07-08：生图调用、streaming、partial image、并发多图、结果参数、Agent batch 生图、data URL/ZIP helper 按 `playground-upstream/tags/v0.6.12` 行为基线手工对齐；`package.json` 版本号暂不代表完整上游覆盖。
+
+移植原则：
+
+- 优先挑选 bugfix 和可独立落地的小功能，不整体覆盖本地文件。
+- 保留 sub2api 定制：登录态、`api_key_id`、主站继承、禁止浏览器保存真实 API Key、`/api/v1/image-playground/proxy/...` 后端代理。
+- 普通生成/编辑默认沿用上游 `gpt_image_playground v0.6.12` 的 OpenAI-compatible 生图调用链；sub2api 只负责同源代理、登录态、KEY 选择、参数白名单、Agent/Web Search 权限和计费校验。服务端 Job API 仅作为实验/后续评估接口保留，不作为默认提交路径。
+- sub2api 的 Images API 和 Responses/Agent 模型必须分离配置：图片模型走 `allowed_models/default_model`，Responses/Agent 文本模型走 `allowed_agent_models/agent_model`，避免把 `gpt-image-*` 当作 Responses 文本模型发送。
+- 上游新增 API 配置、provider、proxy、远程导入、部署脚本时，默认不直接开放给用户；必须先映射到 sub2api 后端权限和计费模型。
+- 移植后至少执行 `pnpm --dir frontend/playground run build`；涉及主站入口或静态资源时执行 `pnpm --dir frontend run build`。
 
 ## 开发原则
 
