@@ -1,5 +1,58 @@
 # SmartAPI 发布记录
 
+## v0.1.146-smartapi.1
+
+- 发布时间：2026-07-09
+- 官方基线：0.1.146
+- 同步分支：`sync/upstream-2026-07-09-v0.1.146`
+- 发布分支：`release/v0.1.146-smartapi.1`
+- Release URL：https://github.com/hua7448/sub2api/releases/tag/v0.1.146-smartapi.1
+- 镜像：`ghcr.io/hua7448/sub2api:0.1.146-smartapi.1`
+
+### 本次变更
+
+- 同步官方 `v0.1.146` 基线更新。
+- 吸收官方 API Key 并发统计、账号请求头覆写、账号导入拖拽批量处理、OpenAI 新模型/价格、Grok 图片价格控制、订阅人民币预览、Redis scan/index cleanup hardening、endpoint/responses compact 修复、Codex/OAuth header 与 User-Agent 修复、非 v1 模型同步修复等更新。
+- 合入本 fork 的生图广场发布改动：按 `gpt_image_playground v0.6.12` 对齐普通生图、编辑、streaming partial image、结果处理、重试、ZIP 导出和 Agent 生图逻辑。
+- 保留 sub2api 安全边界：前端不保存真实 API Key，不开放 Base URL/自定义 provider；所有生图请求经 `/api/v1/image-playground/proxy/...` 后端鉴权代理，并校验登录态、KEY 归属、状态、额度、过期时间和分组 `allow_image_generation`。
+- 增强生图后端代理 guard：Images/Responses 请求按管理端 allowed models、allowed agent models、尺寸、质量、输出格式、Agent/Web Search 开关做服务端白名单校验。
+- 更新 `docs/IMAGE_PLAYGROUND_RUNBOOK_CN.md`，明确默认生图链路沿用上游 `gpt_image_playground v0.6.12`，sub2api 只做同源代理、安全适配和计费权限边界。
+
+### 验证记录
+
+- 纯 upstream 同步分支验证：
+  - `git diff --check` 通过。
+  - `pnpm --dir frontend run build` 通过。
+  - `cd backend && go test ./internal/repository ./internal/service ./internal/handler ./internal/server/routes` 通过。
+- release 分支验证：
+  - `git diff --check` 通过。
+  - `pnpm --dir frontend/playground exec vitest run src/lib/api.test.ts` 通过。
+  - `pnpm --dir frontend/playground exec vitest run src/lib/sub2apiDirect.test.ts` 通过。
+  - `pnpm --dir frontend/playground exec vitest run src/lib/downloadImages.test.ts src/lib/exportFileName.test.ts src/lib/dataUrl.test.ts src/lib/exportZip.test.ts` 通过。
+  - `pnpm --dir frontend/playground run build` 通过。
+  - `pnpm --dir frontend run build` 通过。
+  - `cd backend && go test ./internal/repository ./internal/service ./internal/handler ./internal/server/routes` 通过。
+- Release workflow：GitHub Actions `Release` run `28991661313` 成功。
+- Release 校验：
+  - `isPrerelease=false`
+  - `/releases/latest` 指向 `v0.1.146-smartapi.1`
+  - assets 包含 `checksums.txt`、`linux_amd64`、`linux_arm64`、`darwin_amd64`、`darwin_arm64`、`windows_amd64`
+  - GHCR 镜像 tag 按 GoReleaser 配置为 `ghcr.io/hua7448/sub2api:0.1.146-smartapi.1`
+- 4146 试运行：本轮已输出固定隔离 trial 环境命令；未在服务器实际替换 4146 容器，正式切换生产前仍需按 `docs/TRIAL_DEPLOYMENT_CN.md` 完成登录、生图、Agent、Network、usage logs 和额度扣减检查。
+
+### 部署状态
+
+- 本次变更不包含数据库迁移。
+- `main` 已推送到 `4ccb107c`，tag `v0.1.146-smartapi.1` 指向同一提交。
+- 生产发布必须使用明确版本 tag：`ghcr.io/hua7448/sub2api:0.1.146-smartapi.1`，不得使用 `latest`。
+- 生产替换前必须先使用 4146 trial 环境验证；只替换应用容器，不删除或重建正式 PostgreSQL、Redis、`data/` 或 Docker volume。
+
+### 回滚提示
+
+- 上一稳定版本：`v0.1.145-smartapi.2`
+- 因本版无数据库迁移，回滚以替换应用镜像 tag 或二进制为主。
+- 回滚时不得执行 `docker compose down -v`、删除生产数据目录或删除生产 volume。
+
 ## v0.1.145-smartapi.2
 
 - 发布时间：2026-07-06
