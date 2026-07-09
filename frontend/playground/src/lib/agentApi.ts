@@ -3,6 +3,10 @@ import { buildApiUrl, readClientDevProxyConfig, shouldUseApiProxy } from './devP
 import { appendStreamingFormatHint, maybeAppendStreamingHint, getApiErrorMessage, MIME_MAP, normalizeBase64Image, pickActualParams } from './imageApiShared'
 import { assertSub2APIParams, getCachedSub2APISettings, proxySub2API } from './sub2api'
 
+function startRequestTimeout(controller: AbortController, timeoutSeconds: number): ReturnType<typeof setTimeout> | null {
+  return timeoutSeconds > 0 ? setTimeout(() => controller.abort(), timeoutSeconds * 1000) : null
+}
+
 export interface AgentApiResultImage {
   toolCallId?: string
   action?: string
@@ -677,13 +681,13 @@ export async function callAgentResponsesApi(opts: {
   const proxyConfig = readClientDevProxyConfig()
   const useApiProxy = shouldUseApiProxy(profile.apiProxy, proxyConfig)
   const controller = new AbortController()
-  const timeoutId = setTimeout(() => controller.abort(), profile.timeout * 1000)
+  const timeoutId = startRequestTimeout(controller, profile.timeout)
   const abortFromCaller = () => controller.abort()
   if (signal?.aborted) controller.abort()
   signal?.addEventListener('abort', abortFromCaller, { once: true })
 
   try {
-    assertSub2APIParams(params, getCachedSub2APISettings())
+    if (profile.provider === 'sub2api') assertSub2APIParams(params, getCachedSub2APISettings())
     const body: Record<string, unknown> = {
       model: profile.model || settings.model,
       instructions: createAgentInstructions(settings),
@@ -721,7 +725,7 @@ export async function callAgentResponsesApi(opts: {
       rawResponsePayload: JSON.stringify(payload, null, 2),
     }
   } finally {
-    clearTimeout(timeoutId)
+    if (timeoutId) clearTimeout(timeoutId)
     signal?.removeEventListener('abort', abortFromCaller)
   }
 }
@@ -737,7 +741,7 @@ export async function callAgentConversationTitleApi(opts: {
   const proxyConfig = readClientDevProxyConfig()
   const useApiProxy = shouldUseApiProxy(profile.apiProxy, proxyConfig)
   const controller = new AbortController()
-  const timeoutId = setTimeout(() => controller.abort(), profile.timeout * 1000)
+  const timeoutId = startRequestTimeout(controller, profile.timeout)
   const abortFromCaller = () => controller.abort()
   if (signal?.aborted) controller.abort()
   signal?.addEventListener('abort', abortFromCaller, { once: true })
@@ -770,7 +774,7 @@ export async function callAgentConversationTitleApi(opts: {
     const payload = await response.json() as ResponsesApiResponse
     return parseAgentConversationTitleXml(extractText(payload))
   } finally {
-    clearTimeout(timeoutId)
+    if (timeoutId) clearTimeout(timeoutId)
     signal?.removeEventListener('abort', abortFromCaller)
   }
 }
@@ -804,28 +808,30 @@ export async function callBatchImageSingle(opts: {
   prompt: string
   referenceImageDataUrls: string[]
   referenceIds?: string[]
+  allowPromptRewrite?: boolean
   signal?: AbortSignal
   onImageToolStarted?: () => void | Promise<void>
   onPartialImage?: (event: { image: string; partialImageIndex?: number }) => void | Promise<void>
   onImageToolCompleted?: (image: AgentApiResultImage) => void | Promise<void>
 }): Promise<BatchImageCallResult> {
-  const { profile, params, batchItemId, prompt, referenceImageDataUrls, referenceIds, signal, onImageToolStarted, onPartialImage, onImageToolCompleted } = opts
+  const { profile, params, batchItemId, prompt, referenceImageDataUrls, referenceIds, allowPromptRewrite, signal, onImageToolStarted, onPartialImage, onImageToolCompleted } = opts
   const mime = MIME_MAP[params.output_format] || 'image/png'
   const proxyConfig = readClientDevProxyConfig()
   const useApiProxy = shouldUseApiProxy(profile.apiProxy, proxyConfig)
   const controller = new AbortController()
-  const timeoutId = setTimeout(() => controller.abort(), profile.timeout * 1000)
+  const timeoutId = startRequestTimeout(controller, profile.timeout)
   const abortFromCaller = () => controller.abort()
   if (signal?.aborted) controller.abort()
   signal?.addEventListener('abort', abortFromCaller, { once: true })
 
   try {
-    assertSub2APIParams(params, getCachedSub2APISettings())
-    // Build input: reference id mapping + prompt-rewrite guard + reference images.
+    if (profile.provider === 'sub2api') assertSub2APIParams(params, getCachedSub2APISettings())
+    // Build input: reference id mapping + optional prompt-rewrite guard + reference images.
     const referenceMapping = referenceImageDataUrls.length > 0
       ? `Attached reference images correspond to these ids, in order: ${(referenceIds ?? []).map((id) => `<ref id="${id}" />`).join(', ') || 'reference images'}.`
       : ''
-    const guardedPrompt = [referenceMapping, `${PROMPT_REWRITE_GUARD_PREFIX}\n${prompt}`].filter(Boolean).join('\n\n')
+    const promptText = allowPromptRewrite ? prompt : `${PROMPT_REWRITE_GUARD_PREFIX}\n${prompt}`
+    const guardedPrompt = [referenceMapping, promptText].filter(Boolean).join('\n\n')
     let input: unknown
     if (referenceImageDataUrls.length > 0) {
       input = [{
@@ -952,7 +958,7 @@ export async function callBatchImageSingle(opts: {
     }
     return { batchItemId, image: null, error: err instanceof Error ? err.message : String(err) }
   } finally {
-    clearTimeout(timeoutId)
+    if (timeoutId) clearTimeout(timeoutId)
     signal?.removeEventListener('abort', abortFromCaller)
   }
 }

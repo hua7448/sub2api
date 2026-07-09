@@ -5,6 +5,8 @@ export interface ImageGallerySettings {
   max_upload_mb: number
   allowed_models: string[]
   default_model: string
+  allowed_agent_models: string[]
+  agent_model: string
   allowed_sizes: string[]
   allowed_quality: string[]
   allowed_output_formats: string[]

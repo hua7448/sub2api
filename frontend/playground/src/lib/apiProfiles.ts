@@ -488,8 +488,10 @@ function validateImportedProfileRecord(input: unknown) {
 export function normalizeSettings(input: Partial<AppSettings> | unknown): AppSettings {
   const record = input && typeof input === 'object' ? input as Record<string, unknown> : {}
   const customProviders: CustomProviderDefinition[] = []
-  const persistedProfile = Array.isArray(record.profiles) && record.profiles[0] && typeof record.profiles[0] === 'object'
-    ? record.profiles[0] as Record<string, unknown>
+  const persistedProfile = Array.isArray(record.profiles)
+    ? (record.profiles.find((item) =>
+        item && typeof item === 'object' && (item as Record<string, unknown>).provider === 'sub2api',
+      ) ?? record.profiles[0] ?? {}) as Record<string, unknown>
     : {}
   const persistedProfileModel = typeof persistedProfile.model === 'string' && persistedProfile.model.trim()
     ? persistedProfile.model
@@ -497,13 +499,14 @@ export function normalizeSettings(input: Partial<AppSettings> | unknown): AppSet
   const persistedProfileTimeout = typeof persistedProfile.timeout === 'number' && Number.isFinite(persistedProfile.timeout)
     ? persistedProfile.timeout
     : undefined
+  const persistedApiMode: ApiMode = persistedProfile.apiMode === 'responses' || record.apiMode === 'responses' ? 'responses' : 'images'
   const legacyProfile = createDefaultOpenAIProfile({
     baseUrl: '',
     apiKey: '',
     sub2apiKeyId: typeof persistedProfile.sub2apiKeyId === 'number' ? persistedProfile.sub2apiKeyId : null,
-    model: persistedProfileModel || (typeof record.model === 'string' && record.model.trim() ? record.model : DEFAULT_IMAGES_MODEL),
+    model: persistedProfileModel || (typeof record.model === 'string' && record.model.trim() ? record.model : (persistedApiMode === 'responses' ? DEFAULT_RESPONSES_MODEL : DEFAULT_IMAGES_MODEL)),
     timeout: persistedProfileTimeout ?? (typeof record.timeout === 'number' && Number.isFinite(record.timeout) ? record.timeout : DEFAULT_API_TIMEOUT),
-    apiMode: 'images',
+    apiMode: persistedApiMode,
     codexCli: false,
     apiProxy: false,
     responseFormatB64Json: record.responseFormatB64Json === true ? true : undefined,
@@ -518,7 +521,7 @@ export function normalizeSettings(input: Partial<AppSettings> | unknown): AppSet
     baseUrl: '',
     apiKey: '',
     sub2apiKeyId: typeof persistedProfile.sub2apiKeyId === 'number' ? persistedProfile.sub2apiKeyId : legacyProfile.sub2apiKeyId ?? null,
-    apiMode: 'images',
+    apiMode: persistedApiMode,
     codexCli: false,
     apiProxy: false,
     streamImages: typeof persistedProfile.streamImages === 'boolean' ? persistedProfile.streamImages : true,
@@ -544,6 +547,7 @@ export function normalizeSettings(input: Partial<AppSettings> | unknown): AppSet
     persistInputOnRestart: typeof record.persistInputOnRestart === 'boolean' ? record.persistInputOnRestart : true,
     reuseTaskApiProfileTemporarily: typeof record.reuseTaskApiProfileTemporarily === 'boolean' ? record.reuseTaskApiProfileTemporarily : false,
     alwaysShowRetryButton: typeof record.alwaysShowRetryButton === 'boolean' ? record.alwaysShowRetryButton : false,
+    allowPromptRewrite: typeof record.allowPromptRewrite === 'boolean' ? record.allowPromptRewrite : false,
     taskCompletionNotification: typeof record.taskCompletionNotification === 'boolean' ? record.taskCompletionNotification : false,
     enterSubmit: typeof record.enterSubmit === 'boolean' ? record.enterSubmit : false,
     referenceImageEditAction: normalizeReferenceImageEditAction(record.referenceImageEditAction),
@@ -636,7 +640,7 @@ export function getActiveApiProfile(settings: Partial<AppSettings> | unknown): A
   const record = settings && typeof settings === 'object' ? settings as Record<string, unknown> : {}
   const normalized = normalizeSettings(settings)
   const profile = normalized.profiles.find((p) => p.id === normalized.activeProfileId) ?? normalized.profiles[0] ?? createDefaultOpenAIProfile()
-  const apiMode = profile.provider === 'openai' && (record.apiMode === 'images' || record.apiMode === 'responses')
+  const apiMode = (profile.provider === 'openai' || profile.provider === 'sub2api') && (record.apiMode === 'images' || record.apiMode === 'responses')
     ? record.apiMode
     : profile.apiMode
 
@@ -841,6 +845,7 @@ export const DEFAULT_SETTINGS: AppSettings = normalizeSettings({
   persistInputOnRestart: true,
   reuseTaskApiProfileTemporarily: false,
   alwaysShowRetryButton: false,
+  allowPromptRewrite: false,
   taskCompletionNotification: false,
   enterSubmit: false,
   referenceImageEditAction: 'ask',

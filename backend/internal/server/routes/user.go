@@ -139,6 +139,15 @@ func RegisterUserRoutes(
 		{
 			imagePlayground.GET("/settings", h.ImageGallery.Settings)
 			imagePlayground.GET("/eligible-keys", h.ImageGallery.EligibleKeys)
+			imagePlayground.GET("/assets/:id", h.ImageGallery.Asset)
+			jobs := imagePlayground.Group("/jobs")
+			{
+				jobs.POST("/images/generations", h.ImageGallery.CreateGenerationJob)
+				jobs.POST("/images/edits", h.ImageGallery.CreateEditJob)
+				jobs.GET("/by-client-task/:clientTaskId", h.ImageGallery.JobByClientTask)
+				jobs.GET("/:id", h.ImageGallery.Job)
+				jobs.POST("/:id/cancel", h.ImageGallery.CancelJob)
+			}
 			proxy := imagePlayground.Group("/proxy")
 			{
 				proxy.POST("/images/generations", h.ImageGallery.ProxyImagesGenerations)

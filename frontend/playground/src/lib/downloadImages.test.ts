@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { downloadImageIds } from './downloadImages'
+import { downloadImageIds, getImageZipEntries } from './downloadImages'
 
 describe('downloadImageIds', () => {
   const originalFetch = globalThis.fetch
@@ -68,5 +68,15 @@ describe('downloadImageIds', () => {
     expect(clickSpy).toHaveBeenCalledTimes(1)
     expect(appendSpy).toHaveBeenCalledTimes(1)
     expect(removeSpy).toHaveBeenCalledTimes(1)
+  })
+
+  it('uses stable numbered bases for ZIP entries', () => {
+    expect(getImageZipEntries(['img-1'], 'task-task-1')).toEqual([
+      { imageId: 'img-1', fileNameBase: 'task-task-1' },
+    ])
+    expect(getImageZipEntries(['img-1', 'img-2'], 'task-task-1')).toEqual([
+      { imageId: 'img-1', fileNameBase: 'task-task-1-01' },
+      { imageId: 'img-2', fileNameBase: 'task-task-1-02' },
+    ])
   })
 })
