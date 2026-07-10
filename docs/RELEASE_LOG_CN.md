@@ -1,5 +1,70 @@
 # SmartAPI 发布记录
 
+## v0.1.149-smartapi.1
+
+- 发布时间：2026-07-10
+- 官方基线：0.1.149
+- 同步分支：`sync/upstream-2026-07-10-v0.1.149`
+- 发布分支：`release/v0.1.149-smartapi.1`
+- Release URL：https://github.com/hua7448/sub2api/releases/tag/v0.1.149-smartapi.1
+- 镜像：`ghcr.io/hua7448/sub2api:0.1.149-smartapi.1`
+
+### 本次变更
+
+- 同步官方 `v0.1.149` 基线更新。
+- 吸收官方版本回滚 UI、用户角色/token 排行、用量布局与延迟展示、compact SSE bridge 修复、上游错误透传、Grok 修复和批量生图相关能力。
+- 同步官方 Go 版本要求到 `go1.26.5`，release workflow 也校验 `go1.26.5`。
+- 保留 SmartAPI 定制：fork 更新源 `hua7448/sub2api`、`-smartapi.N` 稳定 tag 过滤、`prerelease=false`、模型价格广场、生图广场/Image Gallery、外部充值入口和相关 feature flags。
+- 定价 fallback 继续合并磁盘 fallback 与二进制内嵌 fallback，避免后台一键热更新只替换二进制时丢失内嵌价格补缺。
+
+### 验证记录
+
+- 冲突解决后检查：
+  - `git diff --cached --check` 通过。
+  - 未发现残留冲突标记。
+- 后端验证：
+  - 首次 `go version` 使用默认 `proxy.golang.org` 拉取 `go1.26.5` 超时；改用 `GOPROXY=https://goproxy.cn,direct` 后工具链下载成功。
+  - `GOPROXY=https://goproxy.cn,direct go test ./internal/repository ./internal/service ./internal/handler ./internal/handler/dto ./internal/server ./internal/server/routes ./internal/setup ./cmd/server ./cmd/jwtgen` 通过。
+  - `GOPROXY=https://goproxy.cn,direct go test ./...` 通过。
+- 前端验证：
+  - `pnpm --dir frontend run build` 通过，包含主前端和 `frontend/playground` 构建；仅有既有 Vite chunk size / dynamic import、Browserslist 数据较旧、playground 依赖 build script approval、pnpm 版本提示等警告。
+- Release workflow：GitHub Actions `Release` run `29062963299` 成功。
+- Release 校验：
+  - `isPrerelease=false`
+  - `/releases/latest` 指向 `v0.1.149-smartapi.1`
+  - assets 包含 `checksums.txt`、`linux_amd64`、`linux_arm64`、`darwin_amd64`、`darwin_arm64`、`windows_amd64`
+  - workflow 以 tag ref 触发：`headBranch=v0.1.149-smartapi.1`，`headSha=42f49665fd9a24ae590e5a7abefdd56f56e5a572`
+- 4146 试运行：本轮未在服务器实际替换 4146 trial 容器；正式切换生产前必须按 `docs/FORK_WORKFLOW_CN.md` 和 `docs/TRIAL_DEPLOYMENT_CN.md` 完成试运行。
+
+### 部署状态
+
+- 本次变更包含数据库迁移：
+  - `159_batch_image_foundation.sql`
+  - `160_add_user_frozen_balance.sql`
+  - `160_batch_image_provider_refs.sql`
+  - `161_batch_image_pricing_snapshot.sql`
+  - `162_add_group_batch_image_generation_gate.sql`
+  - `163_batch_image_default_discount_and_hold_ratio.sql`
+  - `164_batch_image_download_and_user_delete.sql`
+  - `165_hide_pre_upstream_batch_image_failures.sql`
+  - `166_batch_image_task_name.sql`
+  - `167_clear_auto_batch_image_task_names.sql`
+  - `168_restore_empty_batch_image_task_names.sql`
+  - `169_batch_image_parent_batch.sql`
+  - `170_add_grok_video_pricing_controls.sql`
+  - `171_allow_video_usage_without_image_size.sql`
+  - `172_video_per_second_billing_metadata.sql`
+- 生产发布必须使用明确版本 tag：`ghcr.io/hua7448/sub2api:0.1.149-smartapi.1`，不得使用 `latest`。
+- 生产替换前必须备份数据库，并先使用独立 trial 容器和非生产端口 `4146` 验证登录、API Key、账号调度、计费、批量生图、Grok 视频计费、用量统计和后台回滚 UI。
+- 只替换应用容器，不删除或重建正式 PostgreSQL、Redis、`data/` 或 Docker volume。
+
+### 回滚提示
+
+- 上一稳定版本：`v0.1.146-smartapi.1`
+- 因本版包含数据库迁移，回滚前必须评估旧版本对新增批量生图表、用户冻结余额、分组批量生图开关、Grok 视频价格控制和视频计费元数据字段的兼容性。
+- 若已执行生产迁移，不要直接回退应用后忽略数据库状态；必须先确认迁移是否向后兼容，必要时从发布前备份恢复。
+- 严禁执行 `docker compose down -v`、删除生产数据目录或删除生产 volume。
+
 ## v0.1.146-smartapi.1
 
 - 发布时间：2026-07-09
