@@ -7,6 +7,7 @@ import (
 	"context"
 	"embed"
 	"encoding/json"
+	htmlpkg "html"
 	"io"
 	"io/fs"
 	"net/http"
@@ -314,7 +315,7 @@ func injectSiteTitleForPage(html, settingsJSON []byte, zhPageTitle, enPageTitle 
 	if bytes.Contains(html, []byte(`lang="zh`)) || bytes.Contains(html, []byte(`lang="zh-CN"`)) {
 		pageTitle = zhPageTitle
 	}
-	newTitle := []byte("<title>" + cfg.SiteName + " - " + pageTitle + "</title>")
+	newTitle := []byte("<title>" + htmlpkg.EscapeString(cfg.SiteName) + " - " + htmlpkg.EscapeString(pageTitle) + "</title>")
 	var buf bytes.Buffer
 	buf.Write(html[:titleStart])
 	buf.Write(newTitle)

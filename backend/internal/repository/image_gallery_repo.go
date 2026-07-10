@@ -359,11 +359,11 @@ FROM image_templates WHERE id=$1
 	return scanTemplate(row)
 }
 
-type rowScanner interface {
+type imageGalleryRowScanner interface {
 	Scan(dest ...any) error
 }
 
-func scanImageJob(row rowScanner) (*service.ImageGenerationJob, error) {
+func scanImageJob(row imageGalleryRowScanner) (*service.ImageGenerationJob, error) {
 	var job service.ImageGenerationJob
 	var params []byte
 	err := row.Scan(&job.ID, &job.UserID, &job.APIKeyID, &job.Status, &job.Model, &job.Prompt, &params, &job.Error, &job.StartedAt, &job.CompletedAt, &job.CreatedAt, &job.UpdatedAt)
@@ -391,7 +391,7 @@ LEFT JOIN usage_logs ul ON ul.id = a.usage_log_id
 WHERE ` + where
 }
 
-func scanImageAsset(row rowScanner) (*service.ImageAsset, error) {
+func scanImageAsset(row imageGalleryRowScanner) (*service.ImageAsset, error) {
 	var item service.ImageAsset
 	var params []byte
 	var cost sql.NullFloat64
@@ -421,11 +421,11 @@ func scanImageAssets(rows *sql.Rows) ([]service.ImageAsset, error) {
 	return items, rows.Err()
 }
 
-func scanTemplate(row rowScanner) (*service.ImageGalleryTemplate, error) {
+func scanTemplate(row imageGalleryRowScanner) (*service.ImageGalleryTemplate, error) {
 	return scanTemplateRows(row)
 }
 
-func scanTemplateRows(row rowScanner) (*service.ImageGalleryTemplate, error) {
+func scanTemplateRows(row imageGalleryRowScanner) (*service.ImageGalleryTemplate, error) {
 	var item service.ImageGalleryTemplate
 	var tags []byte
 	var variables []byte
