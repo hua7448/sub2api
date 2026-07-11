@@ -1,5 +1,54 @@
 # SmartAPI 发布记录
 
+## v0.1.151-smartapi.1
+
+- 发布时间：2026-07-11
+- 官方基线：0.1.151
+- 同步分支：`sync/upstream-2026-07-11-v0.1.151`
+- 发布分支：`release/v0.1.151-smartapi.1`
+- Release URL：https://github.com/hua7448/sub2api/releases/tag/v0.1.151-smartapi.1
+- 镜像：`ghcr.io/hua7448/sub2api:0.1.151-smartapi.1`
+
+### 本次变更
+
+- 同步官方 `v0.1.151` 基线更新，包含 `v0.1.150` 与 `v0.1.151` 的 upstream 修复。
+- 吸收官方 Codex 上游身份配对修复、GPT-5.6 计费/用量完整性修复、用户级 Fast/Flex 策略、compact SSE/stream bridge 加固、Grok reasoning effort 兼容、setup-token 自动刷新、parallel tool calls 兼容映射、后台用户用量拆分和英文语言包补齐。
+- 吸收官方支付和订阅相关修复：账单并发与支付恢复加固、订阅额度重置、兑换调整、用户余额与支付履约回归测试补充。
+- 新增 usage log `request_type=4` 的数据库约束兼容，用于记录 cyber-policy blocked 请求，避免和 legacy `request_type=0` 混淆。
+- 保留 SmartAPI 定制：fork 更新源 `hua7448/sub2api`、`-smartapi.N` 稳定 tag 过滤、`prerelease=false`、完整 release assets、模型价格 fallback 与现有 SmartAPI 功能边界。
+
+### 验证记录
+
+- 前端验证：
+  - `pnpm --dir frontend run build` 通过，包含主前端和 `frontend/playground` 构建；仅有既有 Vite chunk size / dynamic import、Browserslist 数据较旧、playground 依赖 build script approval 等警告。
+- 后端验证：
+  - 首次 `cd backend && go test ./...` 因 Go 自动下载 `go1.26.5` 工具链访问 `proxy.golang.org` 超时未进入测试执行。
+  - 改用文档代理环境后，`ALL_PROXY=http://127.0.0.1:7897 HTTPS_PROXY=http://127.0.0.1:7897 HTTP_PROXY=http://127.0.0.1:7897 GOPROXY=https://proxy.golang.org,direct go test ./...` 通过。
+- Release workflow：GitHub Actions `Release` run `29133433458` 成功。
+- Release 校验：
+  - `isPrerelease=false`
+  - `/releases/latest` 指向 `v0.1.151-smartapi.1`
+  - assets 包含 `checksums.txt`、`linux_amd64`、`linux_arm64`、`darwin_amd64`、`darwin_arm64`、`windows_amd64`
+  - workflow 以 tag ref 触发：`headBranch=v0.1.151-smartapi.1`，`headSha=c27aa5fa388468e1cf2262b1675efaccddf49ae8`
+- GHCR 镜像 tag 按 GoReleaser 配置为 `ghcr.io/hua7448/sub2api:0.1.151-smartapi.1`；本地环境无 `docker` CLI，且当前 `gh` token 缺少 `read:packages`，未额外读取 registry manifest。
+- 4146 试运行：本轮未在服务器实际替换 4146 trial 容器；正式切换生产前必须按 `docs/FORK_WORKFLOW_CN.md` 和 `docs/TRIAL_DEPLOYMENT_CN.md` 完成试运行。
+
+### 部署状态
+
+- 本次变更包含数据库迁移：
+  - `173_allow_cyber_blocked_usage_request_type.sql`
+- 生产发布必须使用明确版本 tag：`ghcr.io/hua7448/sub2api:0.1.151-smartapi.1`，不得使用 `latest`。
+- 生产替换前必须备份数据库，并先使用独立 trial 容器和非生产端口 `4146` 验证登录、API Key、账号调度、计费、支付恢复、订阅额度、OpenAI/Codex 转发、compact SSE/stream bridge、Grok reasoning effort、用量统计和后台设置。
+- 只替换应用容器，不删除或重建正式 PostgreSQL、Redis、`data/` 或 Docker volume。
+
+### 回滚提示
+
+- 上一稳定版本：`v0.1.149-smartapi.1`
+- 因本版包含数据库迁移，生产回滚前必须评估迁移是否向后兼容。
+- 新版本可能写入 `usage_logs.request_type=4`；若回滚到旧应用，需要确认旧版本对该 request type 的统计、展示和约束处理是否兼容。
+- 若已执行生产迁移，不要直接回退应用后忽略数据库状态；必须先确认迁移是否向后兼容，必要时从发布前备份恢复。
+- 严禁执行 `docker compose down -v`、删除生产数据目录或删除生产 volume。
+
 ## v0.1.149-smartapi.1
 
 - 发布时间：2026-07-10
