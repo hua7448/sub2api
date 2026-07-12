@@ -2,6 +2,35 @@
 
 本文记录当前服务器上固定使用的试运行方式。所有功能验证先走 4146 trial 环境，确认通过后再按 `docs/FORK_WORKFLOW_CN.md` 进入正式发布流程。
 
+## 执行环境与 SSH 凭据
+
+4146 trial 需要登录服务器执行 Docker 命令。执行前必须先确认当前执行环境能 SSH 到目标服务器：
+
+```bash
+ssh -v root@18.217.117.151
+```
+
+Codex CLI 和 Codex App 可能不是同一个执行环境：
+
+- Codex CLI 通常运行在本机，可直接使用本机的 `~/.ssh/config`、`~/.ssh/id_*`、`ssh-agent` 和本机网络/代理。
+- Codex App 运行在隔离环境里，默认不会继承本机 SSH 私钥或 `ssh-agent`。
+
+如果 Codex App 执行 trial 时出现：
+
+```text
+Permission denied (publickey...)
+```
+
+说明 App 当前环境没有可用的服务器 SSH 凭据。这不是 GitHub Release 权限问题，也不是发布 workflow 问题；它只表示无法完成服务器 4146 试运行。按发布规范，不能因为 App 无法 SSH 就跳过 4146 trial。
+
+恢复方式：
+
+- 在当前执行环境配置可登录服务器的 SSH 私钥或 SSH Host。
+- 或在服务器上添加当前执行环境生成的公钥到目标用户的 `authorized_keys`。
+- 或改由已具备 SSH 权限的本机 Codex CLI 手动完成 4146 trial，再继续 GitHub 合并、tag 和 Release 检查。
+
+不要把生产 SSH 私钥、`.env`、数据库 dump 或其他敏感信息粘贴到聊天或提交到仓库。
+
 ## 固定隔离边界
 
 正式环境：

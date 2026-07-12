@@ -280,6 +280,8 @@ services:
 
 当前服务器固定的 4146 隔离试运行环境、容器名、更新命令和测试清单见 `docs/TRIAL_DEPLOYMENT_CN.md`。后续 agent 工作应优先按该文档执行，确保测试环境与正式 4145、正式 PostgreSQL、正式 Redis 隔离。
 
+如果在 Codex App 等隔离环境中执行试运行时遇到 `Permission denied (publickey...)`，说明该环境没有服务器 SSH 凭据；这不是 GitHub Release 权限问题。必须先按 `docs/TRIAL_DEPLOYMENT_CN.md` 恢复 SSH 权限，或改由有 SSH 权限的本机 CLI 完成 4146 trial。不得因自动化环境缺少 SSH key 而跳过试运行。
+
 生图广场相关开发、测试、热修发布、提示词库、下载/离页保护、KEY 下拉排查和上线公告模板见 `docs/IMAGE_PLAYGROUND_RUNBOOK_CN.md`。涉及该模块时，先读专项 runbook，再按本发布规范执行。
 
 试运行可以使用服务器手动构建镜像：
