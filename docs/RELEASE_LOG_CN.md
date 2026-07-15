@@ -1,5 +1,64 @@
 # SmartAPI 发布记录
 
+## v0.1.155-smartapi.1
+
+- 发布时间：2026-07-14
+- 官方基线：0.1.155
+- 同步分支：`sync/upstream-2026-07-14`
+- 发布分支：未单独创建 release 分支；同步分支验证后 fast-forward 合入 `main` 并打 tag
+- Release URL：https://github.com/hua7448/sub2api/releases/tag/v0.1.155-smartapi.1
+- 镜像：`ghcr.io/hua7448/sub2api:0.1.155-smartapi.1`
+- 发布提交：`cbf39e044196d1d582d379977235f48e2b451ce6`
+
+### 本次变更
+
+- 同步官方 `v0.1.155` 基线更新；未合入 `v0.1.155` tag 之后 `upstream/main` 上的同基线零散 chore 提交。
+- 吸收官方 Grok 渠道健康监控、Grok Web SSO 批量导入、Grok 免费账号滚动 24 小时配额估算、OAuth 新导入账号自动探活、Free 计划徽标、系统日志 host 过滤和可选 server timing 指标采集。
+- 吸收官方网关与 OpenAI/Codex 修复：HTTP/2 keep-alive PING、Responses Lite 图像工具保留、Responses namespace 原样透传、WSv2 namespace 转发、非流式图片请求 keepalive、流式图片最终状态补齐、请求体重复扫描优化、Codex manifest 刷新稳定性与 API Key 上游代理模型列表。
+- 吸收官方调度与计费修复：调度器全量重建并发合并、账号到期暂停和代理到期改投不再触发全量重建、事件延迟计算修复、OpenAI 长上下文计费改为账号级开关且默认关闭、reset credits 检测改进。
+- 吸收官方 Apple container 部署支持和相关 shell 测试；Go 基线保持 `go1.26.5`，release workflow 与 `backend/go.mod` 一致。
+- 冲突解决保留 SmartAPI 定制：`backend/cmd/server/VERSION` 使用 `0.1.155-smartapi.1`，嵌入前端继续支持 `data/public` 本地覆盖和 image playground 路由，同时接入官方静态资源长缓存 header。
+
+### 验证记录
+
+- 本地检查：
+  - `git diff --check` 通过。
+  - `go version` 为 `go1.26.5 darwin/arm64`。
+- 后端验证：
+  - `cd backend && go test ./...` 通过。
+- 前端验证：
+  - `pnpm --dir frontend run build` 通过，包含主前端和 `frontend/playground` 构建；仅有既有 Vite chunk size / dynamic import、Browserslist 数据较旧、playground 依赖 build script approval、pnpm 版本提示等警告。
+- Release workflow：GitHub Actions `Release` run `29341993375` 成功。
+- Release 校验：
+  - `isDraft=false`
+  - `isPrerelease=false`
+  - `/releases/latest` 指向 `v0.1.155-smartapi.1`
+  - assets 包含 `checksums.txt`、`linux_amd64`、`linux_arm64`、`darwin_amd64`、`darwin_arm64`、`windows_amd64`
+  - workflow 以 tag ref 触发：`headBranch=v0.1.155-smartapi.1`，`headSha=cbf39e044196d1d582d379977235f48e2b451ce6`
+- 4146 试运行：本轮未在服务器实际替换 4146 trial 容器；正式切换生产前必须按 `docs/FORK_WORKFLOW_CN.md` 和 `docs/TRIAL_DEPLOYMENT_CN.md` 完成试运行。
+
+### 部署状态
+
+- 本次变更包含数据库迁移：
+  - `174_add_usage_log_long_context_billing.sql`
+  - `174_add_usage_logs_api_key_latest_ip_index_notx.sql`
+  - `175_add_ops_system_logs_host.sql`
+  - `175_default_openai_long_context_billing.sql`
+  - `175a_add_ops_system_logs_host_index_notx.sql`
+  - `176_channel_monitor_grok_provider.sql`
+- 生产发布必须使用明确版本 tag：`ghcr.io/hua7448/sub2api:0.1.155-smartapi.1`，不得使用 `latest`。
+- 生产替换前必须备份数据库，并先使用独立 trial 容器和非生产端口 `4146` 验证登录、API Key、账号调度、计费、Grok OAuth/SSO、Grok 监控、OpenAI/Codex 转发、Responses namespace、图片生成、用量统计、系统日志和后台设置。
+- 只替换应用容器，不删除或重建正式 PostgreSQL、Redis、`data/` 或 Docker volume。
+- 本轮只完成代码同步、tag、GitHub Release 和 GHCR 镜像发布；未执行生产容器替换。
+
+### 回滚提示
+
+- 上一稳定版本：`v0.1.152-smartapi.1`
+- 因本版包含数据库迁移，生产回滚前必须评估迁移是否向后兼容。
+- 新版本可能写入长上下文计费字段、ops system logs host 字段、Grok channel monitor provider 配置及相关索引；若回滚到旧应用，需要确认旧版本对这些字段、索引和统计逻辑的兼容性。
+- 若已执行生产迁移，不要直接回退应用后忽略数据库状态；必须先确认迁移是否向后兼容，必要时从发布前备份恢复。
+- 严禁执行 `docker compose down -v`、删除生产数据目录或删除生产 volume。
+
 ## v0.1.151-smartapi.1
 
 - 发布时间：2026-07-11
