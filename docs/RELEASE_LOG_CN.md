@@ -14,6 +14,7 @@
 
 - 基于 `v0.1.159-smartapi.1` 追加 CI 修复并重新发布；`v0.1.159-smartapi.1` 已被本版本替代，不建议部署 `.1`。
 - 保留 `.1` 的全部变更：同步官方 `v0.1.159`、保留 SmartAPI 定制、加入 `kimi-k3` 定价补缺。
+- 本次同步不是用官方代码覆盖本地版本；已保留本地 SmartAPI 定制功能、发布规则和既有差异，并在冲突处理中合入官方 `v0.1.159` 新功能。
 - 修复后端 unit-tag 测试：Image Gallery 的 `mustJSON` helper 与 upstream unit 测试 helper 冲突，改为专用命名；GLM-5.2 回归测试更新为当前专属价格预期。
 - 修复后端 golangci-lint：Image Gallery、repository、update service 中的 `errcheck` 问题。
 - 修复前端 playground lint：文件名清理正则、类型断言前导分号、`prefer-const` 等问题。
