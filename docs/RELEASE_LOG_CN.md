@@ -1,5 +1,60 @@
 # SmartAPI 发布记录
 
+## v0.1.159-smartapi.1
+
+- 发布时间：2026-07-17
+- 官方基线：0.1.159
+- 同步分支：`sync/upstream-2026-07-17`
+- 发布分支：`release/v0.1.159-smartapi.1`
+- Release URL：https://github.com/hua7448/sub2api/releases/tag/v0.1.159-smartapi.1
+- 镜像：`ghcr.io/hua7448/sub2api:0.1.159-smartapi.1`
+- 发布提交：`c6644d0e19c1a2633c06f06e84fcfd3aac4a5e55`
+
+### 本次变更
+
+- 同步官方 `v0.1.159` 基线更新；未合入 `v0.1.159` tag 之后 `upstream/main` 上的同基线 `VERSION` chore 提交，fork 版本文件使用 `0.1.159-smartapi.1`。
+- 吸收官方安全增强：操作审计日志、会话 IP/UA 绑定、敏感操作 step-up 2FA、管理员角色提升保护、API Key ACL 信任开关下的 client IP 归一化，以及相关后台路由和设置项。
+- 吸收官方异步图片任务、图片结果对象存储、图片输入 token/费用拆分、上游计费倍率探测、自定义图片输入 token 单价、OpenAI 账号调度倍率、API Key 计费倍率自省等计费和图片链路更新。
+- 吸收官方 OpenAI/Codex/Grok 修复：Agent Identity、Responses/WebSocket v2、Codex image tool、alpha/search、Grok OAuth/SSO、自定义上游端点、Free cache、调度缓存、failover、passthrough 错误语义和前端配置体验。
+- 保留 SmartAPI 定制：模型价格广场、生图广场/Image Gallery、外部充值入口、SmartAPI 更新源、`-smartapi.N` 稳定 tag 规则、完整 release assets 和 `prerelease=false`。
+- 新增 `kimi-k3` 定价补缺：输入缓存命中 ¥2.00/1M tokens，输入缓存未命中 ¥20.00/1M tokens，输出 ¥100.00/1M tokens，上下文窗口 1,048,576 tokens，并补充 billing/pricing 回归测试。
+
+### 验证记录
+
+- 后端验证：
+  - `cd backend && go test ./...` 通过。
+- 前端验证：
+  - `pnpm --dir frontend run build` 通过；仅有既有 Vite dynamic import/chunk size、pnpm ignored build scripts 等警告。
+- Release workflow：GitHub Actions `Release` run `29550537819` 成功。
+- Release 校验：
+  - `isDraft=false`
+  - `isPrerelease=false`
+  - `/releases/latest` 指向 `v0.1.159-smartapi.1`
+  - assets 包含 `checksums.txt`、`linux_amd64`、`linux_arm64`、`darwin_amd64`、`darwin_arm64`、`windows_amd64`
+  - workflow 以 tag ref 触发：`headBranch=v0.1.159-smartapi.1`，`headSha=c6644d0e19c1a2633c06f06e84fcfd3aac4a5e55`
+- 4146 试运行：本轮未在服务器实际替换 4146 trial 容器；正式切换生产前必须按 `docs/FORK_WORKFLOW_CN.md` 和 `docs/TRIAL_DEPLOYMENT_CN.md` 完成试运行。
+
+### 部署状态
+
+- 本次变更包含数据库迁移：
+  - `177_add_subscription_plan_currency.sql`
+  - `178_channel_image_input_price.sql`
+  - `179_usage_log_image_input_tokens.sql`
+  - `180_audit_logs.sql`
+  - `181_group_duplicate_operation_id.sql`
+- 生产发布必须使用明确版本 tag：`ghcr.io/hua7448/sub2api:0.1.159-smartapi.1`，不得使用 `latest`。
+- 生产替换前必须备份数据库，并先使用独立 trial 容器和非生产端口 `4146` 验证登录、API Key、账号调度、计费、审计日志、step-up 2FA、异步图片任务、对象存储、OpenAI/Codex/Grok 转发、用量统计和后台设置。
+- 只替换应用容器，不删除或重建正式 PostgreSQL、Redis、`data/` 或 Docker volume。
+- 本轮只完成代码同步、tag、GitHub Release 和 GHCR 镜像发布；未执行生产容器替换。
+
+### 回滚提示
+
+- 上一稳定版本：`v0.1.155-smartapi.1`
+- 因本版包含数据库迁移，生产回滚前必须评估迁移是否向后兼容。
+- 新版本可能写入订阅套餐币种、渠道图片输入 token 单价、usage logs 图片输入 token/费用、审计日志和重复 operation id 防护相关数据；若回滚到旧应用，需要确认旧版本对这些字段、表和约束的兼容性。
+- 若已执行生产迁移，不要直接回退应用后忽略数据库状态；必须先确认迁移是否向后兼容，必要时从发布前备份恢复。
+- 严禁执行 `docker compose down -v`、删除生产数据目录或删除生产 volume。
+
 ## v0.1.155-smartapi.1
 
 - 发布时间：2026-07-14
