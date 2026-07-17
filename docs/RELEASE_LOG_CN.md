@@ -1,5 +1,65 @@
 # SmartAPI 发布记录
 
+## v0.1.159-smartapi.2
+
+- 发布时间：2026-07-17
+- 官方基线：0.1.159
+- 同步分支：`sync/upstream-2026-07-17`
+- 发布分支：`release/v0.1.159-smartapi.2`
+- Release URL：https://github.com/hua7448/sub2api/releases/tag/v0.1.159-smartapi.2
+- 镜像：`ghcr.io/hua7448/sub2api:0.1.159-smartapi.2`
+- 发布提交：`03249e45f07bd2261bb3ff2770f6e9bd6d80c2e2`
+
+### 本次变更
+
+- 基于 `v0.1.159-smartapi.1` 追加 CI 修复并重新发布；`v0.1.159-smartapi.1` 已被本版本替代，不建议部署 `.1`。
+- 保留 `.1` 的全部变更：同步官方 `v0.1.159`、保留 SmartAPI 定制、加入 `kimi-k3` 定价补缺。
+- 修复后端 unit-tag 测试：Image Gallery 的 `mustJSON` helper 与 upstream unit 测试 helper 冲突，改为专用命名；GLM-5.2 回归测试更新为当前专属价格预期。
+- 修复后端 golangci-lint：Image Gallery、repository、update service 中的 `errcheck` 问题。
+- 修复前端 playground lint：文件名清理正则、类型断言前导分号、`prefer-const` 等问题。
+
+### 验证记录
+
+- 本地验证：
+  - `git diff --check` 通过。
+  - `cd backend && go test -tags=unit ./...` 通过。
+  - `cd backend && go run github.com/golangci/golangci-lint/v2/cmd/golangci-lint@v2.9.0 run ./...` 通过。
+  - `make test-frontend` 通过；仅有既有 playground unused warning。
+  - `pnpm --dir frontend run build` 通过；仅有既有 Vite dynamic import/chunk size、Browserslist 数据较旧、pnpm ignored build scripts 等警告。
+- GitHub Actions：
+  - `main` CI run `29551889934` 成功。
+  - `release/v0.1.159-smartapi.2` CI run `29551889844` 成功。
+  - tag `v0.1.159-smartapi.2` CI run `29551889793` 成功。
+  - Release workflow run `29551889895` 成功。
+- Release 校验：
+  - `isDraft=false`
+  - `isPrerelease=false`
+  - `/releases/latest` 指向 `v0.1.159-smartapi.2`
+  - assets 包含 `checksums.txt`、`linux_amd64`、`linux_arm64`、`darwin_amd64`、`darwin_arm64`、`windows_amd64`
+  - workflow 以 tag ref 触发：`headBranch=v0.1.159-smartapi.2`，`headSha=03249e45f07bd2261bb3ff2770f6e9bd6d80c2e2`
+- 4146 试运行：本轮未在服务器实际替换 4146 trial 容器；正式切换生产前必须按 `docs/FORK_WORKFLOW_CN.md` 和 `docs/TRIAL_DEPLOYMENT_CN.md` 完成试运行。
+
+### 部署状态
+
+- 本次变更包含数据库迁移：
+  - `177_add_subscription_plan_currency.sql`
+  - `178_channel_image_input_price.sql`
+  - `179_usage_log_image_input_tokens.sql`
+  - `180_audit_logs.sql`
+  - `181_group_duplicate_operation_id.sql`
+- 生产发布必须使用明确版本 tag：`ghcr.io/hua7448/sub2api:0.1.159-smartapi.2`，不得使用 `latest`。
+- 生产替换前必须备份数据库，并先使用独立 trial 容器和非生产端口 `4146` 验证登录、API Key、账号调度、计费、审计日志、step-up 2FA、异步图片任务、对象存储、OpenAI/Codex/Grok 转发、用量统计和后台设置。
+- 只替换应用容器，不删除或重建正式 PostgreSQL、Redis、`data/` 或 Docker volume。
+- 本轮只完成代码同步、CI 修复、tag、GitHub Release 和 GHCR 镜像发布；未执行生产容器替换。
+
+### 回滚提示
+
+- 上一生产稳定版本仍按实际生产部署记录确认；若生产尚未部署 `v0.1.159-smartapi.*`，上一稳定版本通常为 `v0.1.155-smartapi.1`。
+- 因本版包含数据库迁移，生产回滚前必须评估迁移是否向后兼容。
+- 新版本可能写入订阅套餐币种、渠道图片输入 token 单价、usage logs 图片输入 token/费用、审计日志和重复 operation id 防护相关数据；若回滚到旧应用，需要确认旧版本对这些字段、表和约束的兼容性。
+- 若已执行生产迁移，不要直接回退应用后忽略数据库状态；必须先确认迁移是否向后兼容，必要时从发布前备份恢复。
+- 严禁执行 `docker compose down -v`、删除生产数据目录或删除生产 volume。
+
 ## v0.1.159-smartapi.1
 
 - 发布时间：2026-07-17
