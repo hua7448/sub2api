@@ -604,6 +604,20 @@ func TestGetFallbackPricing_FamilyMatching(t *testing.T) {
 
 		// ---- 月之暗面 Kimi ----
 		{
+			name:              "kimi k3",
+			model:             "kimi-k3",
+			expectedInput:     2.80e-6,
+			expectedOutput:    floatPtr(14e-6),
+			expectedCacheRead: floatPtr(0.28e-6),
+		},
+		{
+			name:              "kimi 3 alias",
+			model:             "kimi-3",
+			expectedInput:     2.80e-6,
+			expectedOutput:    floatPtr(14e-6),
+			expectedCacheRead: floatPtr(0.28e-6),
+		},
+		{
 			name:              "kimi k2.6 flagship",
 			model:             "kimi-k2.6",
 			expectedInput:     0.95e-6,

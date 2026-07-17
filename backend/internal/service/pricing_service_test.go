@@ -439,7 +439,7 @@ func TestDefaultPricingIncludesCodexAutoReview(t *testing.T) {
 	require.InDelta(t, 5e-7, got.CacheReadInputTokenCost, 1e-12)
 }
 
-func TestMergeMissingFallbackPricingAddsBundledKimiK27WithoutOverridingExisting(t *testing.T) {
+func TestMergeMissingFallbackPricingAddsBundledKimiPricingWithoutOverridingExisting(t *testing.T) {
 	existingKimiK26 := &LiteLLMModelPricing{InputCostPerToken: 123e-6}
 	svc := &PricingService{
 		cfg: &config.Config{
@@ -459,6 +459,14 @@ func TestMergeMissingFallbackPricingAddsBundledKimiK27WithoutOverridingExisting(
 	require.InDelta(t, 6.5e-6, kimiK27.InputCostPerToken, 1e-12)
 	require.InDelta(t, 27e-6, kimiK27.OutputCostPerToken, 1e-12)
 	require.InDelta(t, 1.3e-6, kimiK27.CacheReadInputTokenCost, 1e-12)
+
+	kimiK3 := got["kimi-k3"]
+	require.NotNil(t, kimiK3)
+	require.InDelta(t, 20e-6, kimiK3.InputCostPerToken, 1e-12)
+	require.InDelta(t, 100e-6, kimiK3.OutputCostPerToken, 1e-12)
+	require.InDelta(t, 2e-6, kimiK3.CacheReadInputTokenCost, 1e-12)
+	require.Equal(t, "moonshot", kimiK3.LiteLLMProvider)
+	require.True(t, kimiK3.SupportsPromptCaching)
 }
 
 func TestMergeMissingFallbackPricingUsesBundledFallbackWithoutDiskConfig(t *testing.T) {
@@ -473,6 +481,12 @@ func TestMergeMissingFallbackPricingUsesBundledFallbackWithoutDiskConfig(t *test
 	require.InDelta(t, 6.5e-6, kimiK27.InputCostPerToken, 1e-12)
 	require.InDelta(t, 27e-6, kimiK27.OutputCostPerToken, 1e-12)
 	require.InDelta(t, 1.3e-6, kimiK27.CacheReadInputTokenCost, 1e-12)
+
+	kimiK3 := got["kimi-k3"]
+	require.NotNil(t, kimiK3)
+	require.InDelta(t, 20e-6, kimiK3.InputCostPerToken, 1e-12)
+	require.InDelta(t, 100e-6, kimiK3.OutputCostPerToken, 1e-12)
+	require.InDelta(t, 2e-6, kimiK3.CacheReadInputTokenCost, 1e-12)
 }
 
 func TestGetModelPricing_Gpt54MiniUsesDedicatedStaticFallbackWhenRemoteMissing(t *testing.T) {
