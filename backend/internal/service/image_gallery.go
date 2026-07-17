@@ -302,7 +302,7 @@ func (c *LocalImageGatewayClient) Generate(ctx context.Context, apiKey string, r
 	if err != nil {
 		return nil, 0, nil, err
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 	respBody, readErr := io.ReadAll(io.LimitReader(resp.Body, 64<<20))
 	if readErr != nil {
 		return nil, resp.StatusCode, resp.Header, readErr
@@ -409,13 +409,13 @@ func (s *ImageGalleryService) UpdateSettings(ctx context.Context, settings Image
 		SettingKeyImageGalleryMaxUploadMB:           fmt.Sprintf("%d", normalized.MaxUploadMB),
 		SettingKeyImageGalleryUserQuotaMB:           fmt.Sprintf("%d", normalized.UserQuotaMB),
 		SettingKeyImageGalleryRetentionDays:         fmt.Sprintf("%d", normalized.RetentionDays),
-		SettingKeyImageGalleryAllowedModels:         mustJSON(normalized.AllowedModels),
+		SettingKeyImageGalleryAllowedModels:         mustImageGalleryJSON(normalized.AllowedModels),
 		SettingKeyImageGalleryDefaultModel:          normalized.DefaultModel,
-		SettingKeyImageGalleryAllowedAgentModels:    mustJSON(normalized.AllowedAgentModels),
+		SettingKeyImageGalleryAllowedAgentModels:    mustImageGalleryJSON(normalized.AllowedAgentModels),
 		SettingKeyImageGalleryAgentModel:            normalized.AgentModel,
-		SettingKeyImageGalleryAllowedSizes:          mustJSON(normalized.AllowedSizes),
-		SettingKeyImageGalleryAllowedQuality:        mustJSON(normalized.AllowedQuality),
-		SettingKeyImageGalleryAllowedOutputFormats:  mustJSON(normalized.AllowedOutputFormats),
+		SettingKeyImageGalleryAllowedSizes:          mustImageGalleryJSON(normalized.AllowedSizes),
+		SettingKeyImageGalleryAllowedQuality:        mustImageGalleryJSON(normalized.AllowedQuality),
+		SettingKeyImageGalleryAllowedOutputFormats:  mustImageGalleryJSON(normalized.AllowedOutputFormats),
 		SettingKeyImageGalleryMaxN:                  fmt.Sprintf("%d", normalized.MaxN),
 		SettingKeyImageGalleryTemplatesEnabled:      formatBool(normalized.TemplatesEnabled),
 		SettingKeyImageGalleryTemplateImportEnabled: formatBool(normalized.TemplateImportEnabled),
@@ -1388,7 +1388,7 @@ func downloadImage(ctx context.Context, imageURL string, maxBytes int64) ([]byte
 	if err != nil {
 		return nil, err
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
 		return nil, fmt.Errorf("download image returned HTTP %d", resp.StatusCode)
 	}
@@ -1547,8 +1547,11 @@ func containsString(items []string, value string) bool {
 	return false
 }
 
-func mustJSON(v any) string {
-	body, _ := json.Marshal(v)
+func mustImageGalleryJSON(v any) string {
+	body, err := json.Marshal(v)
+	if err != nil {
+		return "null"
+	}
 	return string(body)
 }
 

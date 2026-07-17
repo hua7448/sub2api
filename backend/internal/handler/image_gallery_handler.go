@@ -246,7 +246,7 @@ func parseImageGalleryMultipartProxyParams(body []byte, contentType string, sett
 	if err != nil {
 		return imageGalleryProxyParams{}, 0, infraerrors.BadRequest("IMAGE_GALLERY_INVALID_PROXY_REQUEST", "invalid multipart image proxy request")
 	}
-	defer form.RemoveAll()
+	defer func() { _ = form.RemoveAll() }()
 
 	maxFileBytes := int64(settings.MaxUploadMB)
 	if maxFileBytes <= 0 {

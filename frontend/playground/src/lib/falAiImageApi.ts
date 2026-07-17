@@ -128,7 +128,8 @@ async function parseFalImageResults(payload: FalApiResponse, fallbackMime: strin
         : 'fal.ai 未返回可用图片数据',
     )
     if (customBaseUrlLabel) {
-      ;(err as any).rawResponsePayload = JSON.stringify(payload, null, 2)
+      const errorWithPayload = err as Error & { rawResponsePayload?: string }
+      errorWithPayload.rawResponsePayload = JSON.stringify(payload, null, 2)
     }
     throw err
   }

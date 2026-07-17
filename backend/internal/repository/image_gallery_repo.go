@@ -70,7 +70,7 @@ func (r *imageGalleryRepository) ListAssetsByJob(ctx context.Context, userID, jo
 	if err != nil {
 		return nil, err
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 	return scanImageAssets(rows)
 }
 
@@ -105,7 +105,7 @@ func (r *imageGalleryRepository) ListHistory(ctx context.Context, userID int64, 
 	if err != nil {
 		return nil, nil, err
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 	items, err := scanImageAssets(rows)
 	return items, paginationResult(total, params), err
 }
@@ -121,7 +121,7 @@ func (r *imageGalleryRepository) ListPublic(ctx context.Context, userID int64, p
 	if err != nil {
 		return nil, nil, err
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 	items, err := scanImageAssets(rows)
 	return items, paginationResult(total, params), err
 }
@@ -145,7 +145,7 @@ func (r *imageGalleryRepository) ListAdminAssets(ctx context.Context, status str
 	if err != nil {
 		return nil, nil, err
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 	items, err := scanImageAssets(rows)
 	return items, paginationResult(total, params), err
 }
@@ -211,7 +211,7 @@ LIMIT $%d OFFSET $%d
 	if err != nil {
 		return nil, nil, err
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 	items := []service.ImageGalleryTemplate{}
 	for rows.Next() {
 		item, err := scanTemplateRows(rows)
@@ -275,7 +275,7 @@ func (r *imageGalleryRepository) ImportTemplates(ctx context.Context, req servic
 	if err != nil {
 		return 0, 0, err
 	}
-	defer tx.Rollback()
+	defer func() { _ = tx.Rollback() }()
 	for _, item := range req.Templates {
 		if strings.TrimSpace(item.Title) == "" || strings.TrimSpace(item.Prompt) == "" {
 			skipped++
@@ -342,7 +342,7 @@ func (r *imageGalleryRepository) DeletedOrExpiredAssets(ctx context.Context, cut
 	if err != nil {
 		return nil, err
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 	return scanImageAssets(rows)
 }
 

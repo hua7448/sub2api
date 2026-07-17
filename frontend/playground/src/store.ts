@@ -4323,7 +4323,7 @@ async function executeTask(taskId: string) {
   let customTaskInfo: { taskId: string } | null = task.customTaskId
     ? { taskId: task.customTaskId }
     : null
-  let serverJobInfo: { jobId: number; status?: string } | null = task.serverJobId
+  const serverJobInfo: { jobId: number; status?: string } | null = task.serverJobId
     ? { jobId: task.serverJobId, status: task.serverJobStatus }
     : null
 

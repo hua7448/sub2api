@@ -756,7 +756,7 @@ func readLeadingDigits(s string) string {
 		if r < '0' || r > '9' {
 			break
 		}
-		b.WriteRune(r)
+		_, _ = b.WriteRune(r)
 	}
 	return b.String()
 }

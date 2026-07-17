@@ -8,5 +8,6 @@ export function getNumberedFileNameBase(fileNameBase: string, index: number, tot
 }
 
 export function sanitizeFileNamePart(value: string): string {
-  return value.trim().replace(/[<>:"/\\|?*\x00-\x1f]+/g, '-').replace(/\s+/g, ' ').slice(0, 120)
+  const withoutControlChars = Array.from(value.trim(), (char) => (char.charCodeAt(0) < 32 ? '-' : char)).join('')
+  return withoutControlChars.replace(/[<>:"/\\|?*]+/g, '-').replace(/\s+/g, ' ').slice(0, 120)
 }

@@ -45,7 +45,8 @@ export function getChangedParams(current: TaskParams, next: TaskParams): Partial
   const patch: Partial<TaskParams> = {}
   for (const key of Object.keys(next) as Array<keyof TaskParams>) {
     if (current[key] !== next[key]) {
-      ;(patch as Record<keyof TaskParams, TaskParams[keyof TaskParams]>)[key] = next[key]
+      const typedPatch = patch as Record<keyof TaskParams, TaskParams[keyof TaskParams]>
+      typedPatch[key] = next[key]
     }
   }
   return patch
