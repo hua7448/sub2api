@@ -1,5 +1,57 @@
 # SmartAPI 发布记录
 
+## v0.1.161-smartapi.1
+
+- 发布时间：2026-07-20
+- 官方基线：0.1.161（含 0.1.160）
+- 同步分支：`sync/upstream-2026-07-20`（ff 合入 main）
+- Release URL：https://github.com/hua7448/sub2api/releases/tag/v0.1.161-smartapi.1
+- 镜像：`ghcr.io/hua7448/sub2api:0.1.161-smartapi.1`（多架构 linux/amd64 + linux/arm64）
+- 发布提交：`333d06f3fa6167107a34f009c28a03e66b00e7fa`
+- 上游 HEAD：`19149ca19`（upstream v0.1.161）
+
+### 本次变更
+
+- 同步官方 `v0.1.160` + `v0.1.161` 两个基线（约 70 个 upstream 提交）。
+- 6 个冲突解决，保留 SmartAPI 固定规则：
+  - `backend/cmd/server/VERSION`：sync commit 用基线 `0.1.161`，发布前再设 `0.1.161-smartapi.1`。
+  - `backend/internal/service/wire.go`：同时保留 fork 的 `wire.Bind(modelPricingBoardGroupProvider, *APIKeyService)` 与 upstream 新增的 `ProvideAuthCacheInvalidationWorker`。
+  - `backend/cmd/server/wire_gen.go`：`ProvideAdminHandlers` 调用按签名顺序同时保留 fork 的 `imageGalleryHandler` 与 upstream 新增的 `promptAdminHandler`。
+  - `backend/internal/web/embed_on.go` / `embed_test.go`：fork 的 `injectPlaygroundSettings` / `injectSiteIcon` 与 upstream 新增的 `injectSiteFavicon` / `safeImageURL` 并存（补回被冲突吃掉的函数闭合括号）。
+  - `deploy/docker-compose.yml`：保留 `ghcr.io/hua7448/sub2api` 镜像，拒绝 upstream 的 `sub2api:latest`。
+  - `.goreleaser*.yaml` / `.github/workflows/release.yml`：`prerelease: false`、SmartAPI 文案、`-smartapi.N` tag 示例保留。
+- 上游主要改动：安全（敏感操作 step-up 2FA 默认关闭、OpenAI 兼容 prompt 审计 + 审计事件持久化完整 prompt、入口拒绝聚合）、API key 鉴权（durable auth-cache invalidation outbox）、Grok（OAuth media 付费资格、签名/受保护视频代理、media model mapping、free probe 加密恢复）、路由/池（模型级临时冷却隔离、池模式遵循临时不可调度规则）、计费（上游 Sub2API 计费倍率探测刷新 + 账号展示）、网关（Claude Code 1m 模型后缀归一化、Responses 流 content_part 事件、瞬态账号耗尽归类 503）、部署（Dockerfile 交叉编译去除 QEMU、redis compose 命令参数）。
+
+### 验证记录
+
+- 本地验证：
+  - `gofmt` 通过；`cd backend && go build ./...` 通过。
+  - `cd backend && go test ./...` 全绿（含 `service` 101s、`securityaudit`、`repository`、`migrations`，无 FAIL/skip）。
+  - `pnpm --dir frontend run build` 通过。
+- GitHub Actions：Release workflow run `29701978580` 成功（build-frontend / update-version / release / sync-version-file 全 success），以 tag ref 触发（`headBranch=v0.1.161-smartapi.1`）。
+- Release 校验：`isDraft=false`、`isPrerelease=false`、`/releases/latest` 指向 `v0.1.161-smartapi.1`、assets 含 `checksums.txt` + linux amd64/arm64 + darwin/windows；ghcr 镜像多架构。
+- 4146 试运行（脚本 `deploy/trial-4146.sh`）：trial 容器替换为 `0.1.161-smartapi.1`，`/health` ok，`--version` = `0.1.161-smartapi.1`（commit `333d06f3f`），4 个迁移表均已建（count=0 正常），日志无 error/panic。
+- 生产部署：后台一键热更新到 `0.1.161-smartapi.1`。热更新路径成立依据——迁移 SQL 与前端 dist 均 `go:embed` 进二进制，且本次 `backend/resources/`、`openai/instructions*.txt` 资源文件相对 0.1.159 零改动。生产 `--version` = `0.1.161-smartapi.1`，`/health` ok，4 个迁移表在生产库生效，日志无报错。
+
+### 部署状态
+
+- 本次变更包含数据库迁移（均为加法型 `CREATE TABLE IF NOT EXISTS` / `ADD COLUMN IF NOT EXISTS`，可逆、向后兼容）：
+  - `181_prompt_audit.sql`
+  - `182_prompt_audit_full_prompt.sql`
+  - `183_ops_ingress_reject_aggregates.sql`
+  - `184_auth_cache_invalidation_outbox.sql`
+- 注意：upstream 复用了编号 181——目录里同时存在 `181_group_duplicate_operation_id.sql`（旧）和 `181_prompt_audit.sql`（新）。迁移 runner 按**文件名**（`schema_migrations.filename` 主键 + `sort.Strings`）追踪，两条是不同迁移、各自应用，安全。详见 `docs/FORK_WORKFLOW_CN.md`「经验补充」。
+- 生产已切换：镜像仍为 `ghcr.io/hua7448/sub2api:0.1.136-smartapi.1`（热更新不动镜像 tag），二进制为 `0.1.161-smartapi.1`。
+- 生产发布使用明确版本 tag，不使用 `latest`。
+- 备份：`/root/sub2api-deploy/sub2api-2026-07-19-154640.dump`（41.8MB，迁移前快照）。
+
+### 回滚提示
+
+- 切换前生产状态：镜像 `ghcr.io/hua7448/sub2api:0.1.136-smartapi.1`，二进制 `0.1.159-smartapi.2`（commit `03249e45f`），记录于服务器 `/root/sub2api-deploy/PREV_VERSION.txt`。
+- 热更新回滚：后台一键更新退回 `0.1.159-smartapi.2`。迁移为加法型，退回旧二进制安全（旧版本忽略新表）。
+- 数据级回滚（仅必要时）：用 `sub2api-2026-07-19-154640.dump` 通过 `pg_restore` 恢复生产库。
+- 如需把镜像基线刷新到与二进制一致（消除 0.1.136 → 0.1.161 的镜像漂移），用 `deploy/switch-4145.sh` 做 docker 换镜像；本次未做，留作后续可选。
+
 ## v0.1.159-smartapi.2
 
 - 发布时间：2026-07-17

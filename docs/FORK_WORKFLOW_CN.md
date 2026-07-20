@@ -492,3 +492,49 @@ docker volume rm <production-volume>
 - 构建产物输出到 `site/out/`，已加入根目录 `.gitignore`
 - API Key 等敏感信息必须脱敏，示例中使用 `sk-********************************`
 - 新增页面组件后需要在 `site/app/page.tsx` 中引入并渲染
+
+## 经验补充：同步与远程执行
+
+以下条目来自实际同步（最近一次 `v0.1.161-smartapi.1`，2026-07-20），补充前面章节未展开的注意事项。
+
+### 迁移 runner 按文件名追踪，不按前缀编号
+
+`schema_migrations` 以 **filename 为主键**（`backend/internal/repository/migrations_runner.go`），`sort.Strings(files)` 按文件名顺序执行。upstream 可能复用前缀编号——例如同时存在 `181_group_duplicate_operation_id.sql`（旧）和 `181_prompt_audit.sql`（新）。这是**安全的**：两者是不同迁移、各自应用。同步后看到重复前缀编号不要删除任一文件；确认是否已应用要查 `schema_migrations` 的 filename 列，而不是编号。
+
+### 一键热更新 vs docker 换镜像 的判断
+
+后台一键更新只替换 `/app/sub2api` 二进制。它**够用**的三个条件：
+
+- 迁移 SQL 内嵌进二进制：`backend/migrations/migrations.go` 的 `//go:embed *.sql`；
+- 前端 dist 内嵌进二进制：`backend/internal/web/embed_on.go` 的 `//go:embed all:dist`；
+- 本次发布的资源文件相对上一版本无改动。
+
+检查资源是否改动：
+
+```bash
+git diff <上一 smartapi tag>..upstream/main -- backend/resources/ backend/internal/pkg/openai/
+```
+
+为空 → 可安全热更新。有改动且该资源运行时优先读磁盘（历史 v0.1.145 的 pricing fallback 即如此）→ 必须用 `deploy/switch-4145.sh` 做 docker 换镜像刷新磁盘资源。
+
+长期只热更新会让镜像 tag 落后二进制很多版本（本次生产镜像仍是 `0.1.136-smartapi.1`、二进制已是 `0.1.161`）。功能上由上面的内嵌条件兜底，但建议周期性用 `deploy/switch-4145.sh` 把镜像基线刷到与二进制一致。
+
+### 服务器远程执行：优先用仓库脚本，避免粘贴
+
+当执行环境（agent）没有服务器 SSH 凭据、改由人在服务器终端跑命令时，多行命令粘贴会被终端自动缩进/换行打碎（heredoc 的 `EOF` 带缩进失效、`$(...)` 被拆行、base64 被截断）。**不要**靠聊天里粘贴多行脚本。已沉淀为仓库脚本，服务器一行 curl 执行：
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/hua7448/sub2api/main/deploy/trial-4146.sh  | bash  # 4146 试运行
+curl -fsSL https://raw.githubusercontent.com/hua7448/sub2api/main/deploy/switch-4145.sh | bash  # docker 换镜像（回滚：SWITCH_IMAGE=<旧tag> ...）
+curl -fsSL https://raw.githubusercontent.com/hua7448/sub2api/main/deploy/verify-4145.sh | bash  # 只读验证版本/健康/迁移表
+```
+
+curl 不通 raw 时，在 `/root/sub2api-src` 用 `git fetch origin && git show origin/main:deploy/<script>.sh | bash`。
+
+### 同步冲突解决模式（每个 upstream 基线都会遇到）
+
+- `backend/cmd/server/wire_gen.go`（生成文件）：`ProvideAdminHandlers` 调用参数按 `backend/internal/handler/wire.go` 的签名顺序，同时保留 fork 的 `imageGalleryHandler` 与 upstream 新增 handler（本次为 `promptAdminHandler`）。
+- `backend/internal/service/wire.go`：`ProviderSet` 同时保留 fork 的 `wire.Bind(new(modelPricingBoardGroupProvider), new(*APIKeyService))` 与 upstream 新增 provider（本次为 `ProvideAuthCacheInvalidationWorker`）。
+- `backend/internal/web/embed_on.go` / `embed_test.go`：fork 的 `injectPlaygroundSettings` / `injectSiteIcon` 与 upstream 的 `injectSiteFavicon` / `safeImageURL` 并存，注意补回被冲突标记吃掉的函数闭合 `}`。
+- `backend/cmd/server/VERSION`：sync commit 保留基线号（如 `0.1.161`），发布前再用单独的 `chore: prepare` 提交改成 `0.1.161-smartapi.N`。
+- `deploy/docker-compose.yml`、`.goreleaser*.yaml`、`.github/workflows/release.yml`：保留 fork 固定规则（hua7448 镜像、`prerelease: false`、SmartAPI 文案、`-smartapi.N` 示例）。
