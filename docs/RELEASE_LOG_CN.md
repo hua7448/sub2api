@@ -1,5 +1,55 @@
 # SmartAPI 发布记录
 
+## v0.1.162-smartapi.1
+
+- 状态：发布准备中（尚未推送 tag、尚未执行 4146 试运行、尚未部署生产）
+- 官方基线：0.1.162
+- 同步分支：`sync/upstream-2026-07-22`
+- 发布分支：`release/v0.1.162-smartapi.1`
+- 目标镜像：`ghcr.io/hua7448/sub2api:0.1.162-smartapi.1`
+- 同步提交：`07eba13cd`（merge upstream `v0.1.162`）
+- 上游 tag：`27f094e09`（`v0.1.162`）
+
+### 本次变更
+
+- 同步官方 `v0.1.162` 基线；未合并 `v0.1.162` tag 之后 `upstream/main` 的同基线散提交。
+- 本地仅 1 个冲突：`frontend/src/components/layout/AppHeader.vue`。处理结果：保留 SmartAPI 的 `toolbar-button` 统一样式，同时采用官方新增的 `common.userMenu` 本地化无障碍文案。
+- 官方主要改动：
+  - 客户端真实 IP 解析改为可配置，支持显式可信代理与自定义客户端 IP 请求头，并记录相关审计日志。
+  - 异步生图对象存储改为后台配置，保存即生效，并修复 `image_storage` 等凭证环境变量不可达问题。
+  - 更新检查支持 `UPDATE_GITHUB_TOKEN`，规避 GitHub 未认证 API 限流。
+  - API Key 部分更新时不再静默清空 IP 白/黑名单。
+  - 备份设置拒绝用自动生成临时密钥持久化 S3 `SecretAccessKey`，避免重启后无法解密。
+  - OpenAI/Codex/Grok/Anthropic 兼容链路包含多项 failover、缓存、计费、模型发现和内容类型修复。
+  - 前端暗色模式、批量生图指引多语言、可用渠道滚动、订阅到期显示等体验修复。
+- 保留 SmartAPI 固定规则：
+  - `backend/internal/service/update_service.go` 默认更新源仍为 `hua7448/sub2api`，稳定 tag 后缀仍为 `smartapi`。
+  - `.goreleaser*.yaml` 仍为 `prerelease: false`。
+  - 生产部署仍要求明确版本 tag，不使用 `latest`。
+  - 4146 试运行与 4145 切换脚本默认镜像更新为 `ghcr.io/hua7448/sub2api:0.1.162-smartapi.1`。
+
+### 验证记录
+
+- `git diff --check` 通过。
+- `cd backend && go test ./...` 通过。
+- `pnpm --dir frontend run build` 通过；仅有 Vite dynamic import/chunk size、Browserslist 数据较旧、pnpm ignored build scripts 等非阻断警告。
+
+### 部署状态
+
+- 本次同步未新增 `backend/migrations`，也未修改 ent schema/migrate 文件；不属于数据库迁移发布。
+- 仍需在正式发布前执行 GitHub Actions Release workflow，并确认：
+  - GitHub Release `isPrerelease=false`
+  - `/releases/latest` 指向 `v0.1.162-smartapi.1`
+  - assets 包含 `checksums.txt` 与各平台二进制包
+  - GHCR 镜像 `ghcr.io/hua7448/sub2api:0.1.162-smartapi.1` 可拉取
+- 生产替换前必须先用独立 trial 容器和非生产端口 `4146` 验证登录、API Key、账号调度、计费、备份对象存储配置、客户端 IP 设置、OpenAI/Codex/Grok/Anthropic 转发、异步生图任务、更新检查和用量统计。
+
+### 回滚提示
+
+- 本次无数据库迁移，常规应用回滚风险低于含迁移版本；但新版本可能写入新的后台设置项（客户端 IP 解析、对象存储配置、GitHub token 等）。
+- 如已发布并部署，回滚优先使用后台一键更新退回上一稳定 SmartAPI tag；容器级回滚使用 `deploy/switch-4145.sh` 指定上一明确镜像 tag。
+- 严禁执行 `docker compose down -v`、删除生产数据目录或删除生产 volume。
+
 ## v0.1.161-smartapi.1
 
 - 发布时间：2026-07-20

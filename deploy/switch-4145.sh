@@ -10,7 +10,7 @@
 #   PREV_IMAGE=ghcr.io/hua7448/sub2api:<old-tag> bash deploy/switch-4145.sh   # 回滚
 set -uo pipefail
 
-IMAGE="${SWITCH_IMAGE:-ghcr.io/hua7448/sub2api:0.1.161-smartapi.1}"
+IMAGE="${SWITCH_IMAGE:-ghcr.io/hua7448/sub2api:0.1.162-smartapi.1}"
 APP="sub2api"
 PROD_DB="sub2api-postgres"
 PROD_REDIS="sub2api-redis"
