@@ -2,12 +2,12 @@
 
 ## v0.1.163-smartapi.1
 
-- 状态：GitHub Release 已发布，4146 trial 基础验证通过；尚未部署生产
+- 状态：GitHub Release 已发布，4146 trial 基础验证通过，正式 4145 已通过后台页面热更新到本版本
 - 官方基线：0.1.163
 - 同步分支：`sync/upstream-2026-07-23`
 - 发布分支：`release/v0.1.163-smartapi.1`
 - Release URL：https://github.com/hua7448/sub2api/releases/tag/v0.1.163-smartapi.1
-- 目标镜像：`ghcr.io/hua7448/sub2api:0.1.163-smartapi.1`
+- 发布镜像：`ghcr.io/hua7448/sub2api:0.1.163-smartapi.1`（本次正式服通过后台热更新二进制，不要求生产镜像同步切换）
 - 发布提交：`480927918aa374df3a2a114f87ba3051bcc342c7`
 - 同步提交：`2174beafe`（merge upstream `v0.1.163`）
 - 上游 tag：`d0bdd7e77`（`v0.1.163`）
@@ -31,7 +31,7 @@
   - `backend/internal/service/update_service.go` 默认更新源仍为 `hua7448/sub2api`，稳定 tag 后缀仍为 `smartapi`。
   - `.goreleaser*.yaml` 仍为 `prerelease: false`。
   - 生产部署仍要求明确版本 tag，不使用 `latest`。
-  - 4146 试运行与 4145 切换脚本默认镜像更新为 `ghcr.io/hua7448/sub2api:0.1.163-smartapi.1`。
+  - 4146 试运行与 4145 容器级切换脚本默认镜像更新为 `ghcr.io/hua7448/sub2api:0.1.163-smartapi.1`。
 
 ### 验证记录
 
@@ -54,7 +54,7 @@
   - `isPrerelease=false`
   - `/releases/latest` 指向 `v0.1.163-smartapi.1`
   - assets 包含 `checksums.txt`、linux amd64/arm64、darwin amd64/arm64、windows amd64。
-  - 本地环境没有 `docker`/`crane`/`skopeo`/`oras`，且 GitHub token 缺少 `read:packages`，未在本机独立执行 GHCR manifest inspect；生产切换前需在服务器执行 `docker pull ghcr.io/hua7448/sub2api:0.1.163-smartapi.1` 补齐镜像可拉取验证。
+  - 本地环境没有 `docker`/`crane`/`skopeo`/`oras`，且 GitHub token 缺少 `read:packages`，未在本机独立执行 GHCR manifest inspect；本次生产走后台热更新，不依赖生产拉取新镜像。如后续执行容器级镜像切换，再在服务器执行 `docker pull ghcr.io/hua7448/sub2api:0.1.163-smartapi.1` 补齐镜像可拉取验证。
 
 ### 部署状态
 
@@ -63,8 +63,15 @@
 - 迁移内容为 `groups` 表新增字段：
   - `max_reasoning_effort VARCHAR(20) NOT NULL DEFAULT ''`
   - `reasoning_effort_mappings JSONB NOT NULL DEFAULT '[]'::jsonb`
-- 生产替换前必须先备份数据库；本次已完成 4146 基础健康与迁移验证，建议生产前继续人工验证登录、API Key、分组推理策略、账号调度、计费、OpenAI/Codex/Grok/Anthropic 转发、异步生图任务、用量统计和后台设置。
-- 尚未执行生产 4145 切换。
+- 本次包含迁移，规范要求生产热更新前先备份数据库；本记录暂未采集具体生产备份文件名。本次已完成 4146 基础健康与迁移验证，建议生产侧继续人工验证登录、API Key、分组推理策略、账号调度、计费、OpenAI/Codex/Grok/Anthropic 转发、异步生图任务、用量统计和后台设置。
+- 正式 4145 已通过管理员后台页面热更新，不更新镜像；生产版本判断以 `docker exec sub2api /app/sub2api --version` 为准，不以 `docker inspect .Config.Image` 为准。
+- 用户确认正式版本热更新 OK；生产侧如需补全留痕，可继续执行只读验证脚本：
+
+  ```bash
+  cd /root/sub2api-src
+  git pull --ff-only origin main
+  bash deploy/verify-4145.sh
+  ```
 
 ### 回滚提示
 

@@ -264,7 +264,15 @@ gh api repos/hua7448/sub2api/releases/latest \
 - `/releases/latest` 返回当前 `v...-smartapi.N` tag。
 - assets 中包含 `checksums.txt`、`linux_amd64.tar.gz`、`linux_arm64.tar.gz`。
 
-GitHub Actions 成功后，生产 compose 使用明确镜像：
+GitHub Actions 成功后需要确认完整 Release 可被后台热更新读取；这一步发布产物会包含 GHCR 镜像，但**不代表正式 4145 必须换镜像**。
+
+首个支持 SmartAPI 一键更新的生产镜像部署后，后续常规正式版本默认使用管理员后台“检查更新 / 一键更新”下载本 fork 的完整 release 二进制并重启服务。后台热更新只替换现有容器里的 `/app/sub2api`，因此生产容器镜像 tag 可能继续停留在旧版本；正式版本判断以容器内二进制版本为准：
+
+```bash
+docker exec sub2api /app/sub2api --version
+```
+
+生产容器必须带 `restart: unless-stopped` 或等效重启策略；如果以后重新创建容器，仍应使用最新明确镜像 tag，避免回到旧镜像内置版本：
 
 ```yaml
 services:
@@ -272,11 +280,9 @@ services:
     image: ghcr.io/hua7448/sub2api:0.1.136-smartapi.1
 ```
 
-首个支持 SmartAPI 一键更新的生产镜像部署后，后续小版本可以继续使用管理员后台“检查更新”下载本 fork 的完整 release 二进制并重启服务。容器必须带 `restart: unless-stopped` 或等效重启策略；如果以后重新创建容器，仍应使用最新明确镜像 tag，避免回到旧镜像内置版本。
-
 ## 服务器试运行
 
-正式切换前必须先起新端口试运行实例，例如 `4146`。
+正式热更新或镜像切换前必须先起新端口试运行实例，例如 `4146`。
 
 当前服务器固定的 4146 隔离试运行环境、容器名、更新命令和测试清单见 `docs/TRIAL_DEPLOYMENT_CN.md`。后续 agent 工作应优先按该文档执行，确保测试环境与正式 4145、正式 PostgreSQL、正式 Redis 隔离。
 
@@ -284,57 +290,56 @@ services:
 
 生图广场相关开发、测试、热修发布、提示词库、下载/离页保护、KEY 下拉排查和上线公告模板见 `docs/IMAGE_PLAYGROUND_RUNBOOK_CN.md`。涉及该模块时，先读专项 runbook，再按本发布规范执行。
 
-试运行可以使用服务器手动构建镜像：
+试运行默认使用服务器 `/root/sub2api-src` 手动构建本地镜像，避免把未完成验证的镜像作为正式发布来源：
 
 ```bash
 cd /root/sub2api-src
 git fetch origin
-git checkout <branch-or-tag>
-git pull
-docker build -t sub2api-test:<name> .
+git checkout main
+git pull --ff-only origin main
+
+TRIAL_TAG="$(git rev-parse --short HEAD)"
+TRIAL_IMAGE="sub2api-test:smartapi-${TRIAL_TAG}"
+docker build -t "$TRIAL_IMAGE" .
+docker image inspect "$TRIAL_IMAGE" >/dev/null
+
+TRIAL_IMAGE="$TRIAL_IMAGE" bash deploy/trial-4146.sh
 ```
 
 试运行容器必须：
 
-- 使用 `/root/sub2api-deploy/.env`
-- 连接现有 `sub2api-postgres` 和 `sub2api-redis`
-- 使用独立容器名
+- 只替换 trial 应用容器 `sub2api-image-gallery-trial`
+- 连接 trial PostgreSQL：`sub2api-image-gallery-postgres-trial`
+- 连接 trial Redis：`sub2api-image-gallery-redis-trial`
 - 使用非主服务端口，例如 `4146`
-- 不执行破坏性后台操作
+- 不停止、不删除、不重建正式 4145、正式 PostgreSQL、正式 Redis 或生产数据目录
 
-示例：
-
-```bash
-docker run -d \
-  --name sub2api-smartapi-test \
-  --restart unless-stopped \
-  --network sub2api-deploy_sub2api-network \
-  -p 4146:8080 \
-  --env-file /root/sub2api-deploy/.env \
-  -e SERVER_HOST=0.0.0.0 \
-  -e SERVER_PORT=8080 \
-  -e DATABASE_HOST=sub2api-postgres \
-  -e REDIS_HOST=sub2api-redis \
-  -e AUTO_SETUP=true \
-  -v /root/sub2api-deploy/data:/app/data \
-  ghcr.io/hua7448/sub2api:<version>
-```
-
-如果 `4146` 被旧测试容器占用，先查看并清理旧测试容器，或换临时端口：
+如果 `4146` 被旧测试容器占用，先查看占用情况；只允许清理明确属于 trial 的应用容器，不要清理正式容器或 trial DB/Redis：
 
 ```bash
 docker ps --format 'table {{.Names}}\t{{.Image}}\t{{.Ports}}' | grep 4146 || true
 ss -ltnp | grep ':4146' || true
-docker rm -f sub2api-smartapi-test 2>/dev/null || true
 ```
 
-验证通过后才能进入正式切换。
+验证通过后才能进入正式发布和正式热更新。
 
 ## 正式部署
 
-生产环境只改应用镜像，不动数据库和 Redis 数据目录。
+正式 4145 默认通过管理员后台页面热更新，不需要更新镜像。生产镜像切换不是常规正式发布步骤，只在以下情况使用：
 
-正式部署前备份数据库：
+- 本次变更依赖磁盘静态资源、模板、内置 JSON/YAML 或其他不会被后台热更新替换的文件；
+- 需要周期性刷新镜像基线，减少“镜像 tag 很旧、二进制很新”的漂移；
+- 后台热更新不可用；
+- 需要容器级回滚到指定旧镜像。
+
+后台热更新前必须确认：
+
+- GitHub Release 已发布，且 `/releases/latest` 指向当前 `v...-smartapi.N` 稳定 tag；
+- Release assets 包含当前平台二进制压缩包和 `checksums.txt`；
+- 本次变更可通过二进制生效；如果依赖磁盘资源，必须改走镜像切换；
+- 如包含数据库迁移，先备份生产数据库，并标注回滚兼容性风险。
+
+包含数据库迁移时，热更新前备份数据库：
 
 ```bash
 cd /root/sub2api-deploy
@@ -342,56 +347,59 @@ docker compose exec postgres pg_dump -U sub2api -d sub2api -Fc -f /tmp/sub2api.d
 docker compose cp sub2api-postgres:/tmp/sub2api.dump ./sub2api-$(date +%F-%H%M%S).dump
 ```
 
-更新 `docker-compose.override.yml` 的镜像 tag：
-
-```yaml
-services:
-  sub2api:
-    image: ghcr.io/hua7448/sub2api:<version>
-```
-
-部署：
+热更新前记录当前生产状态：
 
 ```bash
-docker compose pull sub2api
-docker compose up -d sub2api
-docker compose logs -f sub2api
+docker inspect -f '{{.Config.Image}}' sub2api
+docker exec sub2api /app/sub2api --version
 ```
 
-当前生产环境如直接使用 `docker run` 管理 4145 主服务，替换命令为：
+然后在管理员后台执行“检查更新 / 一键更新”。热更新完成后验证：
 
 ```bash
-docker rm -f sub2api
-
-docker run -d \
-  --name sub2api \
-  --restart unless-stopped \
-  --network sub2api-deploy_sub2api-network \
-  -p 4145:8080 \
-  --env-file /root/sub2api-deploy/.env \
-  -e SERVER_HOST=0.0.0.0 \
-  -e SERVER_PORT=8080 \
-  -e DATABASE_HOST=sub2api-postgres \
-  -e REDIS_HOST=sub2api-redis \
-  -e AUTO_SETUP=true \
-  -v /root/sub2api-deploy/data:/app/data \
-  ghcr.io/hua7448/sub2api:<version>
+curl -fsS http://127.0.0.1:4145/health && echo
+docker exec sub2api /app/sub2api --version
+docker logs --tail=200 sub2api
 ```
 
-部署后检查：
+如果本次包含新增 migration，必须追加本次 migration 的专项 SQL 检查。示例：
 
 ```bash
-docker ps --format 'table {{.Names}}\t{{.Image}}\t{{.Status}}\t{{.Ports}}' | grep sub2api
-docker logs -f sub2api
+docker exec sub2api-postgres \
+  psql -U sub2api -d sub2api -tc \
+  "select filename from schema_migrations where filename='<migration_filename.sql>';"
+
+docker exec sub2api-postgres \
+  psql -U sub2api -d sub2api -tc \
+  "<schema-specific verification SQL>"
+```
+
+生产只读验证也可以使用仓库脚本：
+
+```bash
+bash deploy/verify-4145.sh
+```
+
+如需镜像切换，才使用 `deploy/switch-4145.sh` 或 compose 更新明确镜像 tag。镜像切换只替换应用容器，保留生产数据库和 Redis 数据目录，且必须先备份生产库。
+
+## 回滚规则
+
+每次正式发布必须记录上一个生产二进制版本和当前生产镜像 tag。
+
+后台热更新回滚优先使用管理员后台一键更新退回上一稳定 SmartAPI tag。此时镜像 tag 可能不变，验证仍以二进制版本为准：
+
+```bash
 docker exec sub2api /app/sub2api --version
 curl -fsS http://127.0.0.1:4145/health && echo
 ```
 
-## 回滚规则
+只有需要容器级回滚时，才改回旧镜像 tag：
 
-每次正式发布必须记录上一个生产镜像 tag。
+```bash
+SWITCH_IMAGE=ghcr.io/hua7448/sub2api:<previous-version> bash deploy/switch-4145.sh
+```
 
-回滚时只改回旧 tag：
+或使用 compose：
 
 ```yaml
 services:
@@ -438,9 +446,11 @@ docker volume rm <production-volume>
 - 前端构建通过
 - 后端相关测试通过，若未运行需说明原因
 - 服务器试运行端口验证通过
-- 已完成数据库备份
-- 已记录当前生产镜像 tag，具备回滚路径
-- 正式部署使用明确版本 tag，不使用 `latest`
+- GitHub Release 是完整 release，`/releases/latest` 指向当前稳定 SmartAPI tag，且 `isPrerelease=false`
+- 已判断生产是否可后台热更新；若依赖磁盘资源，必须改走镜像切换并写清原因
+- 如包含数据库迁移，已完成生产数据库备份，并明确回滚兼容性风险
+- 已记录当前生产二进制版本和镜像 tag，具备热更新回滚或容器级回滚路径
+- 正式发布和容器级部署都使用明确版本 tag，不使用 `latest`
 
 ## 站点文档维护（site/）
 

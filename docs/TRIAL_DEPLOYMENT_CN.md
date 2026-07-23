@@ -71,17 +71,20 @@ sub2api-image-gallery-redis-trial
 
 ## 更新 trial 镜像
 
-在服务器执行：
+发布试运行默认在服务器 `/root/sub2api-src` 使用当前 `main` 本地构建测试镜像：
 
 ```bash
 cd /root/sub2api-src
 
 git fetch origin
-git checkout feature/image-gallery
-git pull --ff-only origin feature/image-gallery
+git checkout main
+git pull --ff-only origin main
+
+git rev-parse --short HEAD
+cat backend/cmd/server/VERSION
 
 TRIAL_TAG="$(git rev-parse --short HEAD)"
-TRIAL_IMAGE="sub2api-test:image-playground-${TRIAL_TAG}"
+TRIAL_IMAGE="sub2api-test:smartapi-${TRIAL_TAG}"
 echo "$TRIAL_IMAGE"
 
 docker build -t "$TRIAL_IMAGE" .
@@ -113,7 +116,7 @@ test -s /tmp/sub2api-image-gallery-trial.env || { echo "/tmp/sub2api-image-galle
 docker rm -f sub2api-image-gallery-trial
 
 TRIAL_TAG="$(git rev-parse --short HEAD)"
-TRIAL_IMAGE="sub2api-test:image-playground-${TRIAL_TAG}"
+TRIAL_IMAGE="${TRIAL_IMAGE:-sub2api-test:smartapi-${TRIAL_TAG}}"
 docker image inspect "$TRIAL_IMAGE" >/dev/null || {
   echo "本地不存在 $TRIAL_IMAGE，请先 docker build -t \"$TRIAL_IMAGE\" ."
   exit 1
@@ -142,7 +145,19 @@ curl -fsS http://127.0.0.1:4146/health && echo
 docker logs --tail=100 sub2api-image-gallery-trial
 ```
 
-`docker inspect` 输出必须等于刚才的 `TRIAL_IMAGE`，例如 `sub2api-test:image-playground-ac8950aa`。如果仍显示旧 tag，说明 4146 trial 容器没有用新镜像启动。
+`docker inspect` 输出必须等于刚才的 `TRIAL_IMAGE`，例如 `sub2api-test:smartapi-ac8950aa`。如果仍显示旧 tag，说明 4146 trial 容器没有用新镜像启动。
+
+如果本次包含新增或修改的 `backend/migrations/*.sql`，基础健康检查后必须追加本次 migration 的专项检查。检查 `schema_migrations.filename`，不要只按编号判断。示例：
+
+```bash
+docker exec sub2api-image-gallery-postgres-trial \
+  psql -U sub2api -d sub2api -tc \
+  "select filename from schema_migrations where filename='<migration_filename.sql>';"
+
+docker exec sub2api-image-gallery-postgres-trial \
+  psql -U sub2api -d sub2api -tc \
+  "<schema-specific verification SQL>"
+```
 
 ## 生图广场测试清单
 

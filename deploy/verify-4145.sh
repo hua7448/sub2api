@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# 4145 生产只读验证：版本 / 健康 / 4 个迁移表 / 错误扫描。不修改任何东西。
+# 4145 生产只读验证：版本 / 健康 / 当前关键迁移 / 错误扫描。不修改任何东西。
 # 用于一键热更新（或镜像切换）之后确认生产状态。
 set -uo pipefail
 
@@ -22,6 +22,11 @@ for t in prompt_audit_jobs prompt_audit_events ops_ingress_reject_aggregates aut
   docker exec "$PROD_DB" psql -U "$DB_USER" -d "$DB_NAME" -tc "select count(*) from $t;" 2>&1 | tr -d '\n ' || true
   echo
 done
+echo -n "185_group_reasoning_effort_policy.sql: "
+docker exec "$PROD_DB" psql -U "$DB_USER" -d "$DB_NAME" -tc "select filename from schema_migrations where filename='185_group_reasoning_effort_policy.sql';" 2>&1 | tr -d '\n ' || true
+echo
+echo "groups reasoning columns:"
+docker exec "$PROD_DB" psql -U "$DB_USER" -d "$DB_NAME" -tc "select column_name from information_schema.columns where table_name='groups' and column_name in ('max_reasoning_effort','reasoning_effort_mappings') order by column_name;" 2>&1 || true
 
 echo "=== error scan (last 150) ==="
 docker logs --tail=150 "$APP" 2>&1 | grep -iE 'error|panic|fatal' | head -20 || echo "(none)"

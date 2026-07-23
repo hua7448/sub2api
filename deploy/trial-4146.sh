@@ -3,8 +3,9 @@
 # 只替换 sub2api-image-gallery-trial，保留 trial DB/Redis，绝不触碰生产 4145。
 #
 # 用法：
-#   bash scripts/trial-4146.sh                          # 默认跑本 fork 最新发布镜像
-#   TRIAL_IMAGE=ghcr.io/hua7448/sub2api:<tag> bash scripts/trial-4146.sh
+#   TRIAL_IMAGE=sub2api-test:smartapi-<commit> bash deploy/trial-4146.sh  # 发布试运行：跑服务器本地构建镜像
+#   bash deploy/trial-4146.sh                                             # 默认跑脚本内固定发布镜像
+#   TRIAL_IMAGE=ghcr.io/hua7448/sub2api:<tag> bash deploy/trial-4146.sh
 #
 # 详见 docs/TRIAL_DEPLOYMENT_CN.md 与 docs/FORK_WORKFLOW_CN.md。
 set -uo pipefail
@@ -54,6 +55,11 @@ for t in prompt_audit_jobs prompt_audit_events ops_ingress_reject_aggregates aut
   docker exec "$TRIAL_DB" psql -U "$DB_USER" -d "$DB_NAME" -tc "select count(*) from $t;" 2>&1 | tr -d '\n ' || true
   echo
 done
+echo -n "185_group_reasoning_effort_policy.sql: "
+docker exec "$TRIAL_DB" psql -U "$DB_USER" -d "$DB_NAME" -tc "select filename from schema_migrations where filename='185_group_reasoning_effort_policy.sql';" 2>&1 | tr -d '\n ' || true
+echo
+echo "groups reasoning columns:"
+docker exec "$TRIAL_DB" psql -U "$DB_USER" -d "$DB_NAME" -tc "select column_name from information_schema.columns where table_name='groups' and column_name in ('max_reasoning_effort','reasoning_effort_mappings') order by column_name;" 2>&1 || true
 
 echo "=== 8. error scan ==="
 docker logs --tail=150 "$TRIAL_APP" 2>&1 | grep -iE 'migrat|error|panic|fatal' | head -20 || echo "(none)"
