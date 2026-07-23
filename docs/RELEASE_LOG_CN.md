@@ -1,8 +1,67 @@
 # SmartAPI 发布记录
 
-## v0.1.162-smartapi.1
+## v0.1.163-smartapi.1
 
 - 状态：发布准备中（尚未推送 tag、尚未执行 4146 试运行、尚未部署生产）
+- 官方基线：0.1.163
+- 同步分支：`sync/upstream-2026-07-23`
+- 发布分支：`release/v0.1.163-smartapi.1`
+- 目标镜像：`ghcr.io/hua7448/sub2api:0.1.163-smartapi.1`
+- 同步提交：`2174beafe`（merge upstream `v0.1.163`）
+- 上游 tag：`d0bdd7e77`（`v0.1.163`）
+
+### 本次变更
+
+- 同步官方 `v0.1.163` 基线；未合并 `v0.1.163` tag 之后 `upstream/main` 的同基线散提交。
+- 本地 3 个冲突：
+  - `backend/cmd/server/VERSION`：同步阶段保留当前 fork 版本，发布准备阶段改为 `0.1.163-smartapi.1`。
+  - `deploy/docker-compose.yml`：保留 `ghcr.io/hua7448/sub2api` 明确版本镜像，拒绝 upstream 的 `weishaw/sub2api:latest`。
+  - `frontend/src/components/layout/AppHeader.vue`：保留 SmartAPI 的 `app-header` / `toolbar-button` 样式，同时合入官方移动端间距与 Docs 按钮隐藏优化。
+- 官方主要改动：
+  - 分组级 OpenAI 推理策略：支持设置推理力度上限和精确映射，HTTP 与 WebSocket 转发统一强制执行。
+  - Grok 兼容 `/responses/compact`，支持 compact 请求调度 Grok 账号，并支持链式中继受保护视频下载。
+  - Redis 连接支持 ACL username。
+  - 优雅关停超时不再跳过清理流程，避免缓冲用量/计费记录丢失。
+  - hosted `image_generation` 工具图片 token 合并计入 `/responses` 计费；故障转移后同步缓存计费口径对齐。
+  - Grok OAuth 模型同步、策略类 403 模型级隔离、Codex client tools 往返保留、OpenCode/CodeBuddy 缓存会话保留。
+  - 多处移动端布局、iOS 输入框缩放、优惠码过期时间、系统日志清理错误提示、用量筛选竞态等修复。
+- 保留 SmartAPI 固定规则：
+  - `backend/internal/service/update_service.go` 默认更新源仍为 `hua7448/sub2api`，稳定 tag 后缀仍为 `smartapi`。
+  - `.goreleaser*.yaml` 仍为 `prerelease: false`。
+  - 生产部署仍要求明确版本 tag，不使用 `latest`。
+  - 4146 试运行与 4145 切换脚本默认镜像更新为 `ghcr.io/hua7448/sub2api:0.1.163-smartapi.1`。
+
+### 验证记录
+
+- `gofmt` 已对本次变更 Go 文件执行。
+- `git diff --check` 与 `git diff --cached --check` 通过。
+- `pnpm --dir frontend run build` 通过；仅有 Vite dynamic import/chunk size、Browserslist 数据较旧、pnpm ignored build scripts 等非阻断警告。
+- `cd backend && go test ./...` 首次因 `proxy.golang.org` 下载 `golang.org/x/*` 依赖超时失败；改用 `GOPROXY=https://goproxy.cn,direct go test ./...` 后通过。
+
+### 部署状态
+
+- 本次变更包含数据库迁移：
+  - `backend/migrations/185_group_reasoning_effort_policy.sql`
+- 迁移内容为 `groups` 表新增字段：
+  - `max_reasoning_effort VARCHAR(20) NOT NULL DEFAULT ''`
+  - `reasoning_effort_mappings JSONB NOT NULL DEFAULT '[]'::jsonb`
+- 生产替换前必须先备份数据库，并用独立 trial 容器和非生产端口 `4146` 验证登录、API Key、分组推理策略、账号调度、计费、OpenAI/Codex/Grok/Anthropic 转发、异步生图任务、用量统计和后台设置。
+- 仍需在正式发布前执行 GitHub Actions Release workflow，并确认：
+  - GitHub Release `isPrerelease=false`
+  - `/releases/latest` 指向 `v0.1.163-smartapi.1`
+  - assets 包含 `checksums.txt` 与各平台二进制包
+  - GHCR 镜像 `ghcr.io/hua7448/sub2api:0.1.163-smartapi.1` 可拉取
+
+### 回滚提示
+
+- 本次包含数据库迁移。虽然是加字段且带默认值，旧应用通常会忽略新字段，但生产回滚前仍必须评估数据库向后兼容性。
+- 如已发布并部署，回滚优先使用后台一键更新退回上一稳定 SmartAPI tag；容器级回滚使用 `deploy/switch-4145.sh` 指定上一明确镜像 tag。
+- 若迁移后出现数据级问题，使用生产发布前备份恢复数据库；不要直接删除 volume 或数据目录。
+- 严禁执行 `docker compose down -v`、删除生产数据目录或删除生产 volume。
+
+## v0.1.162-smartapi.1
+
+- 状态：已被 `v0.1.163-smartapi.1` 发布准备替代（未推送 tag、未执行 4146 试运行、未部署生产）
 - 官方基线：0.1.162
 - 同步分支：`sync/upstream-2026-07-22`
 - 发布分支：`release/v0.1.162-smartapi.1`

@@ -9,7 +9,7 @@
 # 详见 docs/TRIAL_DEPLOYMENT_CN.md 与 docs/FORK_WORKFLOW_CN.md。
 set -uo pipefail
 
-IMAGE="${TRIAL_IMAGE:-ghcr.io/hua7448/sub2api:0.1.162-smartapi.1}"
+IMAGE="${TRIAL_IMAGE:-ghcr.io/hua7448/sub2api:0.1.163-smartapi.1}"
 TRIAL_APP="sub2api-image-gallery-trial"
 TRIAL_DB="sub2api-image-gallery-postgres-trial"
 TRIAL_REDIS="sub2api-image-gallery-redis-trial"
