@@ -2,11 +2,13 @@
 
 ## v0.1.163-smartapi.1
 
-- 状态：发布准备中（尚未推送 tag、尚未执行 4146 试运行、尚未部署生产）
+- 状态：GitHub Release 已发布，4146 trial 基础验证通过；尚未部署生产
 - 官方基线：0.1.163
 - 同步分支：`sync/upstream-2026-07-23`
 - 发布分支：`release/v0.1.163-smartapi.1`
+- Release URL：https://github.com/hua7448/sub2api/releases/tag/v0.1.163-smartapi.1
 - 目标镜像：`ghcr.io/hua7448/sub2api:0.1.163-smartapi.1`
+- 发布提交：`480927918aa374df3a2a114f87ba3051bcc342c7`
 - 同步提交：`2174beafe`（merge upstream `v0.1.163`）
 - 上游 tag：`d0bdd7e77`（`v0.1.163`）
 
@@ -37,6 +39,22 @@
 - `git diff --check` 与 `git diff --cached --check` 通过。
 - `pnpm --dir frontend run build` 通过；仅有 Vite dynamic import/chunk size、Browserslist 数据较旧、pnpm ignored build scripts 等非阻断警告。
 - `cd backend && go test ./...` 首次因 `proxy.golang.org` 下载 `golang.org/x/*` 依赖超时失败；改用 `GOPROXY=https://goproxy.cn,direct go test ./...` 后通过。
+- 4146 trial 基础验证通过：
+  - `/health` 返回 `{"status":"ok"}`。
+  - `/app/sub2api --version` 输出 `0.1.163-smartapi.1`（build log commit 显示 `docker`，符合服务器本地 trial 镜像构建）。
+  - trial 日志 error scan 为 `(none)`。
+  - `schema_migrations` 已包含 `185_group_reasoning_effort_policy.sql`。
+  - trial DB `groups` 表已包含 `max_reasoning_effort`、`reasoning_effort_mappings` 两列。
+- GitHub Actions Release workflow run `29974813137` 成功：
+  - `headBranch=v0.1.163-smartapi.1`
+  - `headSha=480927918aa374df3a2a114f87ba3051bcc342c7`
+  - `update-version`、`build-frontend`、`release`、`sync-version-file` 全部 success。
+- Release 校验：
+  - `isDraft=false`
+  - `isPrerelease=false`
+  - `/releases/latest` 指向 `v0.1.163-smartapi.1`
+  - assets 包含 `checksums.txt`、linux amd64/arm64、darwin amd64/arm64、windows amd64。
+  - 本地环境没有 `docker`/`crane`/`skopeo`/`oras`，且 GitHub token 缺少 `read:packages`，未在本机独立执行 GHCR manifest inspect；生产切换前需在服务器执行 `docker pull ghcr.io/hua7448/sub2api:0.1.163-smartapi.1` 补齐镜像可拉取验证。
 
 ### 部署状态
 
@@ -45,12 +63,8 @@
 - 迁移内容为 `groups` 表新增字段：
   - `max_reasoning_effort VARCHAR(20) NOT NULL DEFAULT ''`
   - `reasoning_effort_mappings JSONB NOT NULL DEFAULT '[]'::jsonb`
-- 生产替换前必须先备份数据库，并用独立 trial 容器和非生产端口 `4146` 验证登录、API Key、分组推理策略、账号调度、计费、OpenAI/Codex/Grok/Anthropic 转发、异步生图任务、用量统计和后台设置。
-- 仍需在正式发布前执行 GitHub Actions Release workflow，并确认：
-  - GitHub Release `isPrerelease=false`
-  - `/releases/latest` 指向 `v0.1.163-smartapi.1`
-  - assets 包含 `checksums.txt` 与各平台二进制包
-  - GHCR 镜像 `ghcr.io/hua7448/sub2api:0.1.163-smartapi.1` 可拉取
+- 生产替换前必须先备份数据库；本次已完成 4146 基础健康与迁移验证，建议生产前继续人工验证登录、API Key、分组推理策略、账号调度、计费、OpenAI/Codex/Grok/Anthropic 转发、异步生图任务、用量统计和后台设置。
+- 尚未执行生产 4145 切换。
 
 ### 回滚提示
 
