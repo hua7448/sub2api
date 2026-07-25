@@ -321,7 +321,15 @@ docker ps --format 'table {{.Names}}\t{{.Image}}\t{{.Ports}}' | grep 4146 || tru
 ss -ltnp | grep ':4146' || true
 ```
 
-验证通过后才能进入正式发布和正式热更新。
+trial 应用替换并健康后，必须执行只读验证脚本 `deploy/verify-4146.sh`（详见 `docs/TRIAL_DEPLOYMENT_CN.md`）：它自动扫描 `backend/migrations/*.sql` 逐一对比 `schema_migrations`，并做健康 / 版本 / 错误扫描 / 可选内嵌模型抽样，给 PASS/FAIL 汇总与退出码。
+
+```bash
+cd /root/sub2api-src
+bash deploy/verify-4146.sh
+CHECK_MODEL=<当次新增模型> bash deploy/verify-4146.sh   # 如本次有新增定价模型
+```
+
+`verify-4146.sh` 全绿（退出码 0）后才能进入正式发布和正式热更新。
 
 ## 正式部署
 
@@ -445,7 +453,7 @@ docker volume rm <production-volume>
 - `git status` 干净
 - 前端构建通过
 - 后端相关测试通过，若未运行需说明原因
-- 服务器试运行端口验证通过
+- 服务器试运行端口验证通过，且 `deploy/verify-4146.sh` 全绿（退出码 0）
 - GitHub Release 是完整 release，`/releases/latest` 指向当前稳定 SmartAPI tag，且 `isPrerelease=false`
 - 已判断生产是否可后台热更新；若依赖磁盘资源，必须改走镜像切换并写清原因
 - 如包含数据库迁移，已完成生产数据库备份，并明确回滚兼容性风险
@@ -534,7 +542,8 @@ git diff <上一 smartapi tag>..upstream/main -- backend/resources/ backend/inte
 当执行环境（agent）没有服务器 SSH 凭据、改由人在服务器终端跑命令时，多行命令粘贴会被终端自动缩进/换行打碎（heredoc 的 `EOF` 带缩进失效、`$(...)` 被拆行、base64 被截断）。**不要**靠聊天里粘贴多行脚本。已沉淀为仓库脚本，服务器一行 curl 执行：
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/hua7448/sub2api/main/deploy/trial-4146.sh  | bash  # 4146 试运行
+curl -fsSL https://raw.githubusercontent.com/hua7448/sub2api/main/deploy/trial-4146.sh  | bash  # 4146 试运行（启动）
+curl -fsSL https://raw.githubusercontent.com/hua7448/sub2api/main/deploy/verify-4146.sh | bash  # 4146 只读验证（启动后必做，退出码 0 才放行）
 curl -fsSL https://raw.githubusercontent.com/hua7448/sub2api/main/deploy/switch-4145.sh | bash  # docker 换镜像（回滚：SWITCH_IMAGE=<旧tag> ...）
 curl -fsSL https://raw.githubusercontent.com/hua7448/sub2api/main/deploy/verify-4145.sh | bash  # 只读验证版本/健康/迁移表
 ```

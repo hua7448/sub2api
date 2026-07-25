@@ -159,6 +159,18 @@ docker exec sub2api-image-gallery-postgres-trial \
   "<schema-specific verification SQL>"
 ```
 
+## 试运行验证脚本（必做）
+
+手动逐条检查容易漏，且每次都要按当次 migration 清单改命令。仓库提供通用只读验证脚本 `deploy/verify-4146.sh`：它自动扫描当前 checkout 的 `backend/migrations/*.sql`，逐一对比 trial DB 的 `schema_migrations`，并做健康 / 版本 / 错误扫描 / 可选内嵌模型抽样，最后给 PASS/FAIL 汇总与退出码。**每次 trial 启动后、合入 main 前必须执行，全绿才继续。**
+
+```bash
+cd /root/sub2api-src
+bash deploy/verify-4146.sh                            # 基础检查
+CHECK_MODEL=claude-opus-5 bash deploy/verify-4146.sh  # 当次若有新增定价模型，额外确认已内嵌进二进制
+```
+
+`MIGRATIONS_DIR` 默认取仓库根的 `backend/migrations`；trial 镜像必须由同一 checkout 构建，否则 VERSION / migration 清单会对不齐，脚本会报 `checkout VERSION != binary`。退出码 `0 = 全绿`、`1 = 有失败`，据此判断是否放行。不要为绕过失败而修改脚本期望清单——失败说明 trial 没真正起来或迁移没跑完，必须先解决。
+
 ## 生图广场测试清单
 
 浏览器打开：
