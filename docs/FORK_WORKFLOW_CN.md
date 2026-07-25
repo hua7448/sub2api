@@ -347,13 +347,16 @@ CHECK_MODEL=<当次新增模型> bash deploy/verify-4146.sh   # 如本次有新�
 - 本次变更可通过二进制生效；如果依赖磁盘资源，必须改走镜像切换；
 - 如包含数据库迁移，先备份生产数据库，并标注回滚兼容性风险。
 
-包含数据库迁移时，热更新前备份数据库：
+包含数据库迁移时，热更新前备份数据库。当前生产容器是**裸 `docker run` 部署**（容器名 `sub2api` / `sub2api-postgres` / `sub2api-redis`，不是 docker compose service），必须用 `docker exec` / `docker cp` 按容器名操作；用 `docker compose exec/cp` 会报 `no container found for service "sub2api-postgres"`：
 
 ```bash
 cd /root/sub2api-deploy
-docker compose exec postgres pg_dump -U sub2api -d sub2api -Fc -f /tmp/sub2api.dump
-docker compose cp sub2api-postgres:/tmp/sub2api.dump ./sub2api-$(date +%F-%H%M%S).dump
+docker exec sub2api-postgres pg_dump -U sub2api -d sub2api -Fc -f /tmp/sub2api.dump
+docker cp sub2api-postgres:/tmp/sub2api.dump ./sub2api-before-<目标版本>-$(date +%F-%H%M%S).dump
+ls -lh sub2api-before-*.dump
 ```
+
+备份文件名带目标版本前缀（如 `sub2api-before-0.1.165-smartapi.1-20260725-233000.dump`），便于回滚时快速定位。若 `pg_dump -U sub2api` 报用户/权限错，先确认连接参数：`docker inspect -f '{{range .Config.Env}}{{println .}}{{end}}' sub2api | grep -iE '^DATABASE_(USER|NAME|HOST)='`。
 
 热更新前记录当前生产状态：
 
