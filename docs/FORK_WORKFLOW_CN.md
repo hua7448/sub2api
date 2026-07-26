@@ -516,7 +516,7 @@ docker volume rm <production-volume>
 
 ## 经验补充：同步与远程执行
 
-以下条目来自实际同步（最近一次 `v0.1.165-smartapi.1`，2026-07-26），补充前面章节未展开的注意事项。
+以下条目来自实际同步与补丁（最近一次 `v0.1.165-smartapi.3`，2026-07-26），补充前面章节未展开的注意事项。
 
 ### 迁移 runner 按文件名追踪，不按前缀编号
 
@@ -561,3 +561,19 @@ curl 不通 raw 时，在 `/root/sub2api-src` 用 `git fetch origin && git show 
 - `backend/cmd/server/VERSION`：sync commit 保留基线号（如 `0.1.161`），发布前再用单独的 `chore: prepare` 提交改成 `0.1.161-smartapi.N`。
 - `deploy/docker-compose.yml`、`.goreleaser*.yaml`、`.github/workflows/release.yml`：保留 fork 固定规则（hua7448 镜像、`prerelease: false`、SmartAPI 文案、`-smartapi.N` 示例）。
 - `frontend/src/styles/announcement-markdown.css` / `AnnouncementBell.vue`：upstream 把公告富文本样式从 `AnnouncementBell.vue` 内联 `<style>` 移到共享 css 文件（popup+bell 共享），fork 改动会冲突。采纳 upstream 共享结构（Bell 删内联块、保留 `import '@/styles/announcement-markdown.css'`），但把 css 内容替换成 fork 已验证的 anthropic `primary` 主题色版本（替代 upstream `blue`），Bell 视觉零回归、Popup 同步获得 fork 主题。定价类资源同理：`backend/resources/model-pricing/*.json` 走 `pricing_data.go` 的 `//go:embed` 兜底，热更新只换二进制也生效，可用 `CHECK_MODEL=<模型名> bash deploy/verify-4146.sh` 抽样确认。
+
+### 国产模型识别的多处副本（k3 踩坑）
+
+加国产模型的**短名/别名**（如 Moonshot Kimi K3 官方调用名 `k3`，不含 `kimi`/`moonshot` 字样）时，国产/厂商标识散落在**至少 5 处独立副本**，必须全部同步，否则定价看板归类/图标/计费/JSON 任一会出错：
+
+1. `backend/internal/service/billing_service.go`：`initFallbackPricing` 的 `fallbackPrices["<名>"]` + `getFallbackPricing` 路由（白名单语义，未知型号不回退）。
+2. `backend/internal/service/model_pricing_board_service.go`：`isDomesticModelID`（决定 board 是否显示、哪些 group 可见）。
+3. `backend/resources/model-pricing/model_prices_and_context_window.json`：模型条目（`litellm_provider` + 价格），`lookupOfficialPricing` 依赖。
+4. `frontend/src/views/user/ModelPricingBoardView.vue`：`isDomesticModel`（前端副本，`classifyItem` 先判它决定归 domestic/claude/codex 组）+ `modelVendorLabel`（厂商标签）。
+5. `frontend/src/components/common/ModelIcon.vue`：模型名 → 图标映射。
+
+只改后端（1-3）漏前端（4-5），定价看板仍按旧逻辑把 `k3` 归到 Claude 组且无 Kimi 图标——前端 `classifyItem` 有独立 `isDomesticModel` 副本，且 board 的 `item.platform` 取自渠道而非模型名（前端靠 `model_id` 兜底归类，但前提是前端副本都识别它）。bare 短名用**精确匹配** `model == "k3" || strings.HasPrefix(model, "k3-")`，不要 `Contains("k3")`（过宽误匹配）。
+
+附带两坑：
+- **站内 ¥1=$1 口径**：本站 1 元 = 1 美元（数值相等，不按汇率换算）。国产模型 fallback 价用官方人民币数值（如 Kimi K3 ¥20/¥100/¥2 → `$20/$100/$2`），不是汇率换算 `$2.80/$14`，否则 fallback 计费少收约 7 倍。
+- **`verify-4146.sh` VERSION 提取**：版本带 `-smartapi.N` 后缀时，`grep -oE 'Sub2API [0-9][0-9.]*'` 在 `-` 截断漏后缀，与 checkout VERSION 对比 FAIL（误报）。正则改 `[0-9A-Za-z.-]*`。裸基线号（`0.1.165`）不触发，带后缀才触发。
