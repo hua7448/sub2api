@@ -236,7 +236,8 @@ func isDomesticModelID(modelID string) bool {
 		strings.Contains(model, "kimi") ||
 		strings.Contains(model, "moonshot") ||
 		strings.Contains(model, "minimax") ||
-		strings.Contains(model, "doubao")
+		strings.Contains(model, "doubao") ||
+		model == "k3" || strings.HasPrefix(model, "k3-")
 }
 
 func effectiveGroupRate(group AvailableGroupRef, userRates map[int64]float64) (float64, bool) {

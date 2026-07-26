@@ -15,6 +15,7 @@ func TestBillingServiceKimiK3FallbackPricing(t *testing.T) {
 	}{
 		{model: "kimi-k3"},
 		{model: "kimi-3"},
+		{model: "k3"},
 	}
 
 	for _, tt := range tests {
@@ -22,9 +23,9 @@ func TestBillingServiceKimiK3FallbackPricing(t *testing.T) {
 			pricing, err := svc.GetModelPricing(tt.model)
 			require.NoError(t, err)
 			require.NotNil(t, pricing)
-			require.InDelta(t, 2.80e-6, pricing.InputPricePerToken, 1e-12)
-			require.InDelta(t, 14e-6, pricing.OutputPricePerToken, 1e-12)
-			require.InDelta(t, 0.28e-6, pricing.CacheReadPricePerToken, 1e-12)
+			require.InDelta(t, 20e-6, pricing.InputPricePerToken, 1e-12)
+			require.InDelta(t, 100e-6, pricing.OutputPricePerToken, 1e-12)
+			require.InDelta(t, 2e-6, pricing.CacheReadPricePerToken, 1e-12)
 		})
 	}
 }

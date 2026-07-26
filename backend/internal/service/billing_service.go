@@ -483,12 +483,15 @@ func (s *BillingService) initFallbackPricing() {
 	//       交叉验证：https://www.tmtpost.com/7961404.html (USD 口径)
 	// Moonshot V1 (¥2/¥5/¥10 多 tier) 公开页未直接标注 USD 价，本分支不覆盖，避免误计价。
 	// K2-0905 / K2-0711 官方页面未保留定价，不覆盖。
+	// 站内 ¥1=$1 口径：Moonshot 官方 ¥20/¥100/¥2 per MTok 直接按 $20/$100/$2 计价（与 JSON kimi-k3 同价）。
 	s.fallbackPrices["kimi-k3"] = &ModelPricing{
-		InputPricePerToken:     2.80e-6, // ¥20/百万 ≈ $2.80 per MTok
-		OutputPricePerToken:    14e-6,   // ¥100/百万 ≈ $14.00 per MTok
-		CacheReadPricePerToken: 0.28e-6, // ¥2/百万 ≈ $0.28 per MTok
+		InputPricePerToken:     20e-6,  // 站内 $20/MTok（= ¥20）
+		OutputPricePerToken:    100e-6, // 站内 $100/MTok（= ¥100）
+		CacheReadPricePerToken: 2e-6,   // 站内 $2/MTok（= ¥2）
 		SupportsCacheBreakdown: false,
 	}
+	// k3 是 Moonshot 官方调用名（= kimi-k3），同价。
+	s.fallbackPrices["k3"] = s.fallbackPrices["kimi-k3"]
 	s.fallbackPrices["kimi-k2.6"] = &ModelPricing{
 		InputPricePerToken:     0.95e-6, // $0.95 per MTok (cache miss)
 		OutputPricePerToken:    4e-6,    // $4.00 per MTok
@@ -722,8 +725,9 @@ func (s *BillingService) getFallbackPricing(model string) *ModelPricing {
 
 	// 月之暗面 Kimi（kimi-k3 / kimi-k2.7-code / kimi-k2.6 / kimi-for-coding / kimi-k2.5 / kimi-k2-thinking / kimi-k2）
 	// K2-0905 / K2-0711 官方未保留定价，不进入 fallback。
+	// k3 是 Moonshot 官方调用名；bare "k3" 与 "k3-*" 变体按 kimi-k3 同价计费。
 	if strings.Contains(modelLower, "kimi-k3") || strings.Contains(modelLower, "kimi-3") ||
-		strings.Contains(modelLower, "kimi/k3") {
+		strings.Contains(modelLower, "kimi/k3") || modelLower == "k3" || strings.HasPrefix(modelLower, "k3-") {
 		return s.fallbackPrices["kimi-k3"]
 	}
 	if (strings.Contains(modelLower, "kimi-k2.7") || strings.Contains(modelLower, "kimi-k2-7") ||
