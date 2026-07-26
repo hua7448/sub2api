@@ -41,7 +41,7 @@ img="$(docker inspect -f '{{.Config.Image}}' "$TRIAL_APP" 2>/dev/null || true)"
 
 echo "=== 2. health & binary version ==="
 if curl -fsS "http://127.0.0.1:${PORT}/health" >/dev/null 2>&1; then green "health ok (/health)"; else red "health FAILED"; fi
-ver="$(docker exec "$TRIAL_APP" /app/sub2api --version 2>&1 | grep -oE 'Sub2API [0-9][0-9.]*' | head -1 || true)"
+ver="$(docker exec "$TRIAL_APP" /app/sub2api --version 2>&1 | grep -oE 'Sub2API [0-9][0-9A-Za-z.-]*' | head -1 || true)"
 [ -n "$ver" ] && green "binary version: $ver" || red "无法读取二进制版本"
 cv="$(cat "$VERSION_FILE" 2>/dev/null | tr -d '\n ' || true)"
 if [ -n "$cv" ] && [ -n "$ver" ]; then
