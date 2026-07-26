@@ -516,7 +516,7 @@ docker volume rm <production-volume>
 
 ## 经验补充：同步与远程执行
 
-以下条目来自实际同步（最近一次 `v0.1.161-smartapi.1`，2026-07-20），补充前面章节未展开的注意事项。
+以下条目来自实际同步（最近一次 `v0.1.165-smartapi.1`，2026-07-26），补充前面章节未展开的注意事项。
 
 ### 迁移 runner 按文件名追踪，不按前缀编号
 
@@ -560,3 +560,4 @@ curl 不通 raw 时，在 `/root/sub2api-src` 用 `git fetch origin && git show 
 - `backend/internal/web/embed_on.go` / `embed_test.go`：fork 的 `injectPlaygroundSettings` / `injectSiteIcon` 与 upstream 的 `injectSiteFavicon` / `safeImageURL` 并存，注意补回被冲突标记吃掉的函数闭合 `}`。
 - `backend/cmd/server/VERSION`：sync commit 保留基线号（如 `0.1.161`），发布前再用单独的 `chore: prepare` 提交改成 `0.1.161-smartapi.N`。
 - `deploy/docker-compose.yml`、`.goreleaser*.yaml`、`.github/workflows/release.yml`：保留 fork 固定规则（hua7448 镜像、`prerelease: false`、SmartAPI 文案、`-smartapi.N` 示例）。
+- `frontend/src/styles/announcement-markdown.css` / `AnnouncementBell.vue`：upstream 把公告富文本样式从 `AnnouncementBell.vue` 内联 `<style>` 移到共享 css 文件（popup+bell 共享），fork 改动会冲突。采纳 upstream 共享结构（Bell 删内联块、保留 `import '@/styles/announcement-markdown.css'`），但把 css 内容替换成 fork 已验证的 anthropic `primary` 主题色版本（替代 upstream `blue`），Bell 视觉零回归、Popup 同步获得 fork 主题。定价类资源同理：`backend/resources/model-pricing/*.json` 走 `pricing_data.go` 的 `//go:embed` 兜底，热更新只换二进制也生效，可用 `CHECK_MODEL=<模型名> bash deploy/verify-4146.sh` 抽样确认。
