@@ -266,6 +266,8 @@ function classifyItem(item: Pick<ModelPricingBoardItem, 'platform' | 'model_id'>
 function isDomesticModel(item: Pick<ModelPricingBoardItem, 'platform' | 'model_id'>): boolean {
   const platform = item.platform.toLowerCase()
   const model = item.model_id.toLowerCase()
+  // k3 是 Moonshot Kimi K3 官方调用名（不含 kimi/moonshot 字样），单独识别。
+  if (model === 'k3' || model.startsWith('k3-')) return true
   return ['deepseek', 'zhipu', 'glm', 'kimi', 'moonshot', 'minimax', 'doubao'].some((needle) =>
     platform.includes(needle) || model.includes(needle),
   )
@@ -335,7 +337,7 @@ function modelVendorLabel(item: Pick<ModelPricingBoardItem, 'platform' | 'model_
   const combined = `${platform} ${model}`
   if (combined.includes('deepseek')) return 'DeepSeek'
   if (combined.includes('zhipu') || combined.includes('chatglm') || combined.includes('glm')) return 'GLM'
-  if (combined.includes('kimi') || combined.includes('moonshot')) return 'Kimi'
+  if (combined.includes('kimi') || combined.includes('moonshot') || model === 'k3' || model.startsWith('k3-')) return 'Kimi'
   if (combined.includes('minimax')) return 'MiniMax'
   if (combined.includes('doubao')) return 'Doubao'
   return platformLabel(item.platform)
