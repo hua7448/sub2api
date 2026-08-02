@@ -696,6 +696,7 @@ func ProvideImageGalleryService(repo ImageGalleryRepository, settingRepo Setting
 var ProviderSet = wire.NewSet(
 	// Core services
 	NewAuthService,
+	NewPasskeyService,
 	NewUserService,
 	ProvideAPIKeyService,
 	ProvideAPIKeyAuthCacheInvalidator,
