@@ -201,6 +201,7 @@ export interface PublicSettings {
   login_agreement_revision?: string
   login_agreement_documents?: LoginAgreementDocument[]
   turnstile_enabled: boolean
+  passkey_enabled?: boolean
   turnstile_site_key: string
   site_name: string
   site_logo: string
@@ -209,6 +210,7 @@ export interface PublicSettings {
   contact_info: string
   doc_url: string
   home_content: string
+  compact_home_enabled: boolean
   hide_ccs_import_button: boolean
   purchase_subscription_enabled: boolean
   purchase_subscription_url: string
@@ -242,6 +244,8 @@ export interface PublicSettings {
   channel_status_public_enabled: boolean
   available_channels_enabled: boolean
   model_pricing_board_enabled: boolean
+  model_plaza_enabled: boolean
+  model_plaza_require_auth: boolean
   service_quota_enabled: boolean
   affiliate_enabled: boolean
   allow_user_view_error_requests?: boolean

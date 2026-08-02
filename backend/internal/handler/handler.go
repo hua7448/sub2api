@@ -59,13 +59,15 @@ type Handlers struct {
 	OpenAIGateway     *OpenAIGatewayHandler
 	Setting           *SettingHandler
 	Totp              *TotpHandler
+	Passkey           *PasskeyHandler
 	Payment           *PaymentHandler
 	PaymentWebhook    *PaymentWebhookHandler
 	AvailableChannel  *AvailableChannelHandler
 	ModelPricingBoard *ModelPricingBoardHandler
 	ImageGallery      *ImageGalleryHandler
-	BatchImage        *BatchImageHandler
+	ModelPlaza        *ModelPlazaHandler
 	AsyncImage        *AsyncImageHandler
+	BatchImage        *BatchImageHandler
 }
 
 // BuildInfo contains build-time information
