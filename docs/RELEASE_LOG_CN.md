@@ -1,5 +1,48 @@
 # SmartAPI 发布记录
 
+## v0.1.169-smartapi.1
+
+- 状态：GitHub Release 已发布；4146 隔离试运行全绿；尚未执行生产 4145 切换。
+- 官方基线：0.1.169（同步至当时 upstream/main）。
+- 同步分支：`sync/upstream-2026-08-02`。
+- 发布分支：`main`。
+- Release URL：https://github.com/hua7448/sub2api/releases/tag/v0.1.169-smartapi.1
+- 发布镜像：`ghcr.io/hua7448/sub2api:0.1.169-smartapi.1`
+- 发布提交：`f507300d06073d6bb9a73aa69f841796421eea70`
+- 同步提交：`aa7c3cb25`。
+- 上游 HEAD：`b74024c78`。
+
+### 本次变更
+
+- 新增 Passkey（WebAuthn）注册、登录、管理和后台开关；注册与删除要求账户密码确认。
+- 新增模型广场，按分组展示模型、价格、倍率与专属可见范围；保留 fork 原有模型价格看板，二者并存。
+- 后台账号支持筛选结果全选、批量删除并发限制和模型 ID 复制；用户/API Key 更新改为仅更新明确字段，避免覆盖未提交配置。
+- 增强 OpenAI Responses、Codex、GPT-5.6、Claude、Gemini、Grok、Antigravity 的兼容、流式转发、故障转移和用量统计。
+- 新增 Kimi K3 支持及别名处理，修复 GLM-5.2 fallback 匹配，更新 GPT-5.6、Antigravity Gemini 等计费与订阅周期/支付展示。
+- 新增面板接口限流，收紧上游 URL 路径校验，修复安全审计配置解密失败导致设置丢失的问题，并改进 SMTP、Docker/Caddy SSE 与运行权限限制。
+- 保留 SmartAPI 固定规则和定制：fork 更新源、`-smartapi.N` 稳定 tag、`prerelease: false`、生产不用 `latest`、4146 隔离试运行、模型价格看板、生图广场及相关脚本/文档。
+
+### 验证记录
+
+- `cd backend && go test ./...` 通过。
+- `pnpm --dir frontend run build` 通过；仅有既有 Vite dynamic import 与 Browserslist 非阻断提示。
+- 4146 trial `deploy/verify-4146.sh`：`241 PASS / 0 FAIL`，健康检查、二进制版本、全部 migration 和日志扫描均通过。
+- 已确认 `191_passkey_credentials.sql` 应用成功。
+- GitHub Actions Release workflow run `30735842417` 成功，tag ref 为 `v0.1.169-smartapi.1`，head SHA 为 `f507300d0`。
+- Release 校验：`isDraft=false`、`isPrerelease=false`，`/releases/latest` 指向本 tag，assets 包含 `checksums.txt`、linux amd64/arm64、darwin amd64/arm64、windows amd64。
+
+### 部署状态
+
+- 本次包含数据库迁移：`backend/migrations/191_passkey_credentials.sql`，创建 Passkey user handle 与 credential 表及索引。
+- 同时修改 `backend/resources/model-pricing/model_prices_and_context_window.json`；生产升级应使用明确镜像 tag 做容器切换验证，不应只假设二进制热更新足够。
+- 4146 已完成验证，但生产 4145 尚未更新。执行前必须备份生产数据库，记录当前生产二进制版本和镜像 tag。
+
+### 回滚提示
+
+- migration 为新增表和索引，旧应用通常不访问这些对象；但生产回滚前仍须评估数据库兼容性并保留升级前备份。
+- 回滚优先使用后台更新到已记录的上一稳定 SmartAPI tag；容器级回滚只能指定明确旧镜像 tag。
+- 严禁执行 `docker compose down -v`、删除生产数据目录或删除 Docker volume。
+
 ## v0.1.163-smartapi.1
 
 - 状态：GitHub Release 已发布，4146 trial 基础验证通过，正式 4145 已通过后台页面热更新到本版本
