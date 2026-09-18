@@ -1,0 +1,479 @@
+/* ============ Enhanced Badge System with Proper Contrast ============ */
+
+/* Base badge styles with modern interactions */
+.badge-base {
+  @apply inline-flex items-center gap-1.5 rounded-lg px-2.5 py-1 text-xs font-semibold;
+  @apply transition-all duration-200 ease-out;
+  @apply border border-transparent;
+  position: relative;
+  overflow: hidden;
+}
+
+.badge-base::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(135deg, rgba(255, 255, 255, 0.1) 0%, transparent 100%);
+  opacity: 0;
+  transition: opacity 0.2s ease;
+}
+
+.badge-base:hover::before {
+  opacity: 1;
+}
+
+/* Status Badges - Proper Contrast */
+.badge-pending {
+  @apply bg-amber-100 text-amber-900 border-amber-300;
+  box-shadow: 0 1px 3px rgba(245, 158, 11, 0.15);
+}
+
+.badge-pending:hover {
+  @apply bg-amber-200 border-amber-400;
+  box-shadow: 0 2px 6px rgba(245, 158, 11, 0.25);
+  transform: translateY(-1px);
+}
+
+.badge-running {
+  @apply bg-blue-100 text-blue-900 border-blue-300;
+  box-shadow: 0 1px 3px rgba(59, 130, 246, 0.15);
+  animation: pulse-subtle 2s ease-in-out infinite;
+}
+
+.badge-running:hover {
+  @apply bg-blue-200 border-blue-400;
+  box-shadow: 0 2px 6px rgba(59, 130, 246, 0.25);
+}
+
+.badge-succeeded,
+.badge-success {
+  @apply bg-emerald-100 text-emerald-900 border-emerald-300;
+  box-shadow: 0 1px 3px rgba(16, 185, 129, 0.15);
+}
+
+.badge-succeeded:hover,
+.badge-success:hover {
+  @apply bg-emerald-200 border-emerald-400;
+  box-shadow: 0 2px 6px rgba(16, 185, 129, 0.25);
+  transform: translateY(-1px);
+}
+
+.badge-failed,
+.badge-error {
+  @apply bg-rose-100 text-rose-900 border-rose-300;
+  box-shadow: 0 1px 3px rgba(244, 63, 94, 0.15);
+}
+
+.badge-failed:hover,
+.badge-error:hover {
+  @apply bg-rose-200 border-rose-400;
+  box-shadow: 0 2px 6px rgba(244, 63, 94, 0.25);
+  transform: translateY(-1px);
+}
+
+.badge-canceled {
+  @apply bg-gray-200 text-gray-800 border-gray-300;
+  box-shadow: 0 1px 3px rgba(107, 114, 128, 0.15);
+}
+
+.badge-canceled:hover {
+  @apply bg-gray-300 border-gray-400;
+}
+
+/* Request Type Badges */
+.badge-ws-v2 {
+  @apply bg-violet-100 text-violet-900 border-violet-300;
+  box-shadow: 0 1px 3px rgba(139, 92, 246, 0.15);
+}
+
+.badge-ws-v2:hover {
+  @apply bg-violet-200 border-violet-400;
+  box-shadow: 0 2px 6px rgba(139, 92, 246, 0.25);
+  transform: translateY(-1px);
+}
+
+.badge-stream {
+  @apply bg-blue-100 text-blue-900 border-blue-300;
+  box-shadow: 0 1px 3px rgba(59, 130, 246, 0.15);
+}
+
+.badge-stream:hover {
+  @apply bg-blue-200 border-blue-400;
+  box-shadow: 0 2px 6px rgba(59, 130, 246, 0.25);
+  transform: translateY(-1px);
+}
+
+.badge-sync {
+  @apply bg-slate-100 text-slate-900 border-slate-300;
+  box-shadow: 0 1px 3px rgba(100, 116, 139, 0.15);
+}
+
+.badge-sync:hover {
+  @apply bg-slate-200 border-slate-400;
+}
+
+.badge-unknown {
+  @apply bg-amber-100 text-amber-900 border-amber-300;
+  box-shadow: 0 1px 3px rgba(245, 158, 11, 0.15);
+}
+
+/* Billing Mode Badges */
+.badge-per-request {
+  @apply bg-blue-100 text-blue-900 border-blue-300;
+  box-shadow: 0 1px 3px rgba(59, 130, 246, 0.15);
+}
+
+.badge-per-request:hover {
+  @apply bg-blue-200 border-blue-400;
+  box-shadow: 0 2px 6px rgba(59, 130, 246, 0.25);
+  transform: translateY(-1px);
+}
+
+.badge-image {
+  @apply bg-green-100 text-green-900 border-green-300;
+  box-shadow: 0 1px 3px rgba(34, 197, 94, 0.15);
+}
+
+.badge-image:hover {
+  @apply bg-green-200 border-green-400;
+  box-shadow: 0 2px 6px rgba(34, 197, 94, 0.25);
+  transform: translateY(-1px);
+}
+
+.badge-token {
+  @apply bg-slate-100 text-slate-900 border-slate-300;
+  box-shadow: 0 1px 3px rgba(100, 116, 139, 0.15);
+}
+
+.badge-token:hover {
+  @apply bg-slate-200 border-slate-400;
+}
+
+/* Dark Mode Overrides - Proper Contrast */
+.dark-theme .badge-pending {
+  @apply bg-amber-900/40 text-amber-200 border-amber-700/50;
+  box-shadow: 0 1px 3px rgba(245, 158, 11, 0.2), inset 0 1px 0 rgba(245, 158, 11, 0.1);
+}
+
+.dark-theme .badge-pending:hover {
+  @apply bg-amber-900/60 border-amber-600/50;
+  box-shadow: 0 2px 6px rgba(245, 158, 11, 0.3), inset 0 1px 0 rgba(245, 158, 11, 0.15);
+}
+
+.dark-theme .badge-running {
+  @apply bg-blue-900/40 text-blue-200 border-blue-700/50;
+  box-shadow: 0 1px 3px rgba(59, 130, 246, 0.2), inset 0 1px 0 rgba(59, 130, 246, 0.1);
+}
+
+.dark-theme .badge-running:hover {
+  @apply bg-blue-900/60 border-blue-600/50;
+  box-shadow: 0 2px 6px rgba(59, 130, 246, 0.3), inset 0 1px 0 rgba(59, 130, 246, 0.15);
+}
+
+.dark-theme .badge-succeeded,
+.dark-theme .badge-success {
+  @apply bg-emerald-900/40 text-emerald-200 border-emerald-700/50;
+  box-shadow: 0 1px 3px rgba(16, 185, 129, 0.2), inset 0 1px 0 rgba(16, 185, 129, 0.1);
+}
+
+.dark-theme .badge-succeeded:hover,
+.dark-theme .badge-success:hover {
+  @apply bg-emerald-900/60 border-emerald-600/50;
+  box-shadow: 0 2px 6px rgba(16, 185, 129, 0.3), inset 0 1px 0 rgba(16, 185, 129, 0.15);
+}
+
+.dark-theme .badge-failed,
+.dark-theme .badge-error {
+  @apply bg-rose-900/40 text-rose-200 border-rose-700/50;
+  box-shadow: 0 1px 3px rgba(244, 63, 94, 0.2), inset 0 1px 0 rgba(244, 63, 94, 0.1);
+}
+
+.dark-theme .badge-failed:hover,
+.dark-theme .badge-error:hover {
+  @apply bg-rose-900/60 border-rose-600/50;
+  box-shadow: 0 2px 6px rgba(244, 63, 94, 0.3), inset 0 1px 0 rgba(244, 63, 94, 0.15);
+}
+
+.dark-theme .badge-canceled {
+  @apply bg-gray-800/60 text-gray-300 border-gray-700/50;
+}
+
+.dark-theme .badge-ws-v2 {
+  @apply bg-violet-900/40 text-violet-200 border-violet-700/50;
+  box-shadow: 0 1px 3px rgba(139, 92, 246, 0.2), inset 0 1px 0 rgba(139, 92, 246, 0.1);
+}
+
+.dark-theme .badge-ws-v2:hover {
+  @apply bg-violet-900/60 border-violet-600/50;
+  box-shadow: 0 2px 6px rgba(139, 92, 246, 0.3), inset 0 1px 0 rgba(139, 92, 246, 0.15);
+}
+
+.dark-theme .badge-stream {
+  @apply bg-blue-900/40 text-blue-200 border-blue-700/50;
+  box-shadow: 0 1px 3px rgba(59, 130, 246, 0.2), inset 0 1px 0 rgba(59, 130, 246, 0.1);
+}
+
+.dark-theme .badge-stream:hover {
+  @apply bg-blue-900/60 border-blue-600/50;
+  box-shadow: 0 2px 6px rgba(59, 130, 246, 0.3), inset 0 1px 0 rgba(59, 130, 246, 0.15);
+}
+
+.dark-theme .badge-sync {
+  @apply bg-slate-800/60 text-slate-300 border-slate-700/50;
+}
+
+.dark-theme .badge-per-request {
+  @apply bg-blue-900/40 text-blue-200 border-blue-700/50;
+  box-shadow: 0 1px 3px rgba(59, 130, 246, 0.2), inset 0 1px 0 rgba(59, 130, 246, 0.1);
+}
+
+.dark-theme .badge-per-request:hover {
+  @apply bg-blue-900/60 border-blue-600/50;
+  box-shadow: 0 2px 6px rgba(59, 130, 246, 0.3), inset 0 1px 0 rgba(59, 130, 246, 0.15);
+}
+
+.dark-theme .badge-image {
+  @apply bg-green-900/40 text-green-200 border-green-700/50;
+  box-shadow: 0 1px 3px rgba(34, 197, 94, 0.2), inset 0 1px 0 rgba(34, 197, 94, 0.1);
+}
+
+.dark-theme .badge-image:hover {
+  @apply bg-green-900/60 border-green-600/50;
+  box-shadow: 0 2px 6px rgba(34, 197, 94, 0.3), inset 0 1px 0 rgba(34, 197, 94, 0.15);
+}
+
+.dark-theme .badge-token {
+  @apply bg-slate-800/60 text-slate-300 border-slate-700/50;
+}
+
+/* Warning/Alert Box - Proper Contrast */
+.alert-warning {
+  @apply rounded-xl border-2 border-amber-300 bg-amber-50 px-4 py-3 text-sm text-amber-900;
+  box-shadow: 0 2px 8px rgba(245, 158, 11, 0.15);
+  position: relative;
+  overflow: hidden;
+}
+
+.alert-warning::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  top: 0;
+  bottom: 0;
+  width: 4px;
+  background: linear-gradient(180deg, #f59e0b 0%, #d97706 100%);
+}
+
+.dark-theme .alert-warning {
+  @apply border-amber-700/50 bg-amber-900/30 text-amber-100;
+  box-shadow: 0 2px 8px rgba(245, 158, 11, 0.2), inset 0 1px 0 rgba(245, 158, 11, 0.1);
+}
+
+/* Subtle pulse animation for running status */
+@keyframes pulse-subtle {
+  0%, 100% {
+    opacity: 1;
+    box-shadow: 0 1px 3px rgba(59, 130, 246, 0.15);
+  }
+  50% {
+    opacity: 0.9;
+    box-shadow: 0 1px 3px rgba(59, 130, 246, 0.25), 0 0 8px rgba(59, 130, 246, 0.15);
+  }
+}
+
+/* Interactive badge with click effect */
+.badge-interactive {
+  cursor: pointer;
+  user-select: none;
+}
+
+.badge-interactive:active {
+  transform: scale(0.95);
+}
+
+/* ============ Group Badge Dark Mode Support ============ */
+.dark-theme .group-badge-anthropic-subscription {
+  @apply bg-orange-900/40 text-orange-200 border-orange-700/50;
+  box-shadow: 0 1px 3px rgba(251, 146, 60, 0.2), inset 0 1px 0 rgba(251, 146, 60, 0.1);
+}
+
+.dark-theme .group-badge-anthropic-standard {
+  @apply bg-amber-900/30 text-amber-200 border-amber-700/40;
+  box-shadow: 0 1px 3px rgba(245, 158, 11, 0.15), inset 0 1px 0 rgba(245, 158, 11, 0.08);
+}
+
+.dark-theme .group-badge-openai-subscription {
+  @apply bg-emerald-900/40 text-emerald-200 border-emerald-700/50;
+  box-shadow: 0 1px 3px rgba(16, 185, 129, 0.2), inset 0 1px 0 rgba(16, 185, 129, 0.1);
+}
+
+.dark-theme .group-badge-openai-standard {
+  @apply bg-green-900/30 text-green-200 border-green-700/40;
+  box-shadow: 0 1px 3px rgba(34, 197, 94, 0.15), inset 0 1px 0 rgba(34, 197, 94, 0.08);
+}
+
+.dark-theme .group-badge-gemini-subscription {
+  @apply bg-blue-900/40 text-blue-200 border-blue-700/50;
+  box-shadow: 0 1px 3px rgba(59, 130, 246, 0.2), inset 0 1px 0 rgba(59, 130, 246, 0.1);
+}
+
+.dark-theme .group-badge-gemini-standard {
+  @apply bg-sky-900/30 text-sky-200 border-sky-700/40;
+  box-shadow: 0 1px 3px rgba(14, 165, 233, 0.15), inset 0 1px 0 rgba(14, 165, 233, 0.08);
+}
+
+.dark-theme .group-badge-fallback-subscription {
+  @apply bg-violet-900/40 text-violet-200 border-violet-700/50;
+  box-shadow: 0 1px 3px rgba(139, 92, 246, 0.2), inset 0 1px 0 rgba(139, 92, 246, 0.1);
+}
+
+.dark-theme .group-badge-fallback-standard {
+  @apply bg-emerald-900/40 text-emerald-200 border-emerald-700/50;
+  box-shadow: 0 1px 3px rgba(16, 185, 129, 0.2), inset 0 1px 0 rgba(16, 185, 129, 0.1);
+}
+
+/* Group Badge Label Dark Mode */
+.dark-theme .group-label-expired {
+  @apply bg-red-900/50 text-red-200 border-red-700/60;
+}
+
+.dark-theme .group-label-warning {
+  @apply bg-amber-900/50 text-amber-200 border-amber-700/60;
+}
+
+.dark-theme .group-label-anthropic {
+  @apply bg-orange-900/50 text-orange-200 border-orange-700/60;
+}
+
+.dark-theme .group-label-openai {
+  @apply bg-emerald-900/50 text-emerald-200 border-emerald-700/60;
+}
+
+.dark-theme .group-label-gemini {
+  @apply bg-blue-900/50 text-blue-200 border-blue-700/60;
+}
+
+.dark-theme .group-label-fallback {
+  @apply bg-violet-900/50 text-violet-200 border-violet-700/60;
+}
+
+/* ============ Enhanced Button Interactions ============ */
+.btn {
+  position: relative;
+  overflow: hidden;
+}
+
+.btn::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(135deg, rgba(255, 255, 255, 0.1) 0%, transparent 100%);
+  opacity: 0;
+  transition: opacity 0.2s ease;
+  pointer-events: none;
+}
+
+.btn:hover::after {
+  opacity: 1;
+}
+
+.btn-primary {
+  box-shadow: 0 2px 8px rgba(59, 130, 246, 0.25), inset 0 1px 0 rgba(255, 255, 255, 0.1);
+}
+
+.btn-primary:hover {
+  box-shadow: 0 4px 16px rgba(59, 130, 246, 0.35), inset 0 1px 0 rgba(255, 255, 255, 0.15);
+}
+
+.btn-primary:active {
+  box-shadow: 0 1px 4px rgba(59, 130, 246, 0.3), inset 0 2px 4px rgba(0, 0, 0, 0.1);
+}
+
+/* ============ Card Enhancements ============ */
+.card {
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.card:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 8px 24px rgba(59, 130, 246, 0.12);
+}
+
+.card-interactive {
+  cursor: pointer;
+}
+
+.card-interactive:active {
+  transform: translateY(0);
+  box-shadow: 0 2px 8px rgba(59, 130, 246, 0.08);
+}
+
+/* ============ Micro-interactions ============ */
+@keyframes shimmer-slide {
+  0% {
+    transform: translateX(-100%);
+  }
+  100% {
+    transform: translateX(100%);
+  }
+}
+
+.shimmer-effect {
+  position: relative;
+  overflow: hidden;
+}
+
+.shimmer-effect::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background: linear-gradient(
+    90deg,
+    transparent 0%,
+    rgba(255, 255, 255, 0.1) 50%,
+    transparent 100%
+  );
+  animation: shimmer-slide 2s infinite;
+}
+
+/* ============ Status Indicator Dots ============ */
+.status-dot {
+  @apply inline-block w-2 h-2 rounded-full;
+  box-shadow: 0 0 0 2px currentColor, 0 0 8px currentColor;
+  animation: pulse-glow 2s ease-in-out infinite;
+}
+
+@keyframes pulse-glow {
+  0%, 100% {
+    opacity: 1;
+    transform: scale(1);
+  }
+  50% {
+    opacity: 0.8;
+    transform: scale(0.95);
+  }
+}
+
+.status-dot-success {
+  @apply bg-emerald-500;
+  color: rgba(16, 185, 129, 0.3);
+}
+
+.status-dot-warning {
+  @apply bg-amber-500;
+  color: rgba(245, 158, 11, 0.3);
+}
+
+.status-dot-error {
+  @apply bg-rose-500;
+  color: rgba(244, 63, 94, 0.3);
+}
+
+.status-dot-info {
+  @apply bg-blue-500;
+  color: rgba(59, 130, 246, 0.3);
+}
+

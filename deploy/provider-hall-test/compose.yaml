@@ -1,0 +1,85 @@
+name: provider-hall-test
+services:
+  postgres:
+    image: postgres:18-alpine
+    container_name: sub2api-provider-hall-test-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: sub2api_test
+      POSTGRES_USER: sub2api_test
+      POSTGRES_PASSWORD_FILE: /run/secrets/db_password
+    volumes:
+      - ./credentials/db-password:/run/secrets/db_password:ro
+      - pgdata:/var/lib/postgresql
+    healthcheck:
+      test: [CMD-SHELL, "pg_isready -U sub2api_test -d sub2api_test"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+    logging: &logging
+      driver: json-file
+      options:
+        max-size: 10m
+        max-file: "3"
+  redis:
+    image: redis:7-alpine
+    container_name: sub2api-provider-hall-test-redis
+    restart: unless-stopped
+    command: [redis-server, --appendonly, "yes"]
+    volumes:
+      - redisdata:/data
+    healthcheck:
+      test: [CMD, redis-cli, ping]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+    logging: *logging
+  app:
+    image: sub2api-provider-hall:0.1.179-20260912
+    container_name: sub2api-provider-hall-test
+    restart: unless-stopped
+    env_file:
+      - ./credentials/runtime.env
+    environment:
+      AUTO_SETUP: "true"
+      GIN_MODE: release
+      INSTANCE_ID: provider-hall-test
+      INSTANCE_ROLE: primary
+      SERVER_HOST: 0.0.0.0
+      SERVER_PORT: "8080"
+      DATA_DIR: /app/data
+      DATABASE_HOST: postgres
+      DATABASE_PORT: "5432"
+      DATABASE_USER: sub2api_test
+      DATABASE_DBNAME: sub2api_test
+      DATABASE_SSLMODE: disable
+      DATABASE_MAX_OPEN_CONNS: "8"
+      DATABASE_MAX_IDLE_CONNS: "2"
+      REDIS_HOST: redis
+      REDIS_PORT: "6379"
+      REDIS_DB: "0"
+      TZ: America/Los_Angeles
+      SETUP_MIGRATION_TIMEOUT_SECONDS: "300"
+      PROVIDER_HALL_ALLOW_LOOPBACK: "1"
+    ports:
+      - 0.0.0.0:18082:8080
+    volumes:
+      - ./data:/app/data
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    healthcheck:
+      test: [CMD, wget, -q, -O, /dev/null, http://127.0.0.1:8080/health]
+      interval: 10s
+      timeout: 5s
+      start_period: 120s
+      retries: 6
+    logging: *logging
+volumes:
+  pgdata:
+    external: true
+    name: sub2api-provider-hall-test-pgdata
+  redisdata:
+    name: sub2api-provider-hall-test-redisdata

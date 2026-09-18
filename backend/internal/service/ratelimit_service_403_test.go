@@ -1,0 +1,99 @@
+//go:build unit
+
+package service
+
+import (
+	"context"
+	"net/http"
+	"testing"
+	"time"
+
+	"github.com/Wei-Shaw/sub2api/internal/config"
+	"github.com/stretchr/testify/require"
+)
+
+type runtimeBlockRecorder struct {
+	accounts   []*Account
+	until      []time.Time
+	reasons    []string
+	clearedIDs []int64
+}
+
+func (r *runtimeBlockRecorder) BlockAccountScheduling(account *Account, until time.Time, reason string) {
+	r.accounts = append(r.accounts, account)
+	r.until = append(r.until, until)
+	r.reasons = append(r.reasons, reason)
+}
+
+func (r *runtimeBlockRecorder) ClearAccountSchedulingBlock(accountID int64) {
+	r.clearedIDs = append(r.clearedIDs, accountID)
+}
+
+func TestRateLimitService_RuntimeBlockNotificationHonorsKeepStatusActive(t *testing.T) {
+	blocker := &runtimeBlockRecorder{}
+	service := &RateLimitService{runtimeBlocker: blocker}
+	protected := &Account{ID: 300, Extra: map[string]any{KeepStatusActiveExtraKey: true}}
+	normal := &Account{ID: 301}
+
+	service.notifyAccountSchedulingBlocked(protected, time.Now().Add(time.Minute), "transport_error")
+	service.notifyAccountSchedulingBlocked(normal, time.Now().Add(time.Minute), "transport_error")
+
+	require.Len(t, blocker.accounts, 1)
+	require.Equal(t, normal.ID, blocker.accounts[0].ID)
+}
+
+func TestRateLimitService_HandleUpstreamError_OpenAI403FirstHitSetsError(t *testing.T) {
+	repo := &rateLimitAccountRepoStub{}
+	counter := &openAI403CounterCacheStub{counts: []int64{1}}
+	blocker := &runtimeBlockRecorder{}
+	service := NewRateLimitService(repo, nil, &config.Config{}, nil, nil)
+	service.SetOpenAI403CounterCache(counter)
+	service.SetAccountRuntimeBlocker(blocker)
+	account := &Account{
+		ID:       301,
+		Platform: PlatformOpenAI,
+		Type:     AccountTypeOAuth,
+	}
+
+	shouldDisable := service.HandleUpstreamError(
+		context.Background(),
+		account,
+		http.StatusForbidden,
+		http.Header{},
+		[]byte(`{"error":{"message":"temporary edge rejection"}}`),
+	)
+
+	require.True(t, shouldDisable)
+	require.Equal(t, 1, repo.setErrorCalls)
+	require.Equal(t, 0, repo.tempCalls)
+	require.Contains(t, repo.lastErrorMsg, "temporary edge rejection")
+	require.Len(t, blocker.accounts, 1)
+	require.Equal(t, "auth_error", blocker.reasons[0])
+	require.True(t, blocker.until[0].IsZero())
+}
+
+func TestRateLimitService_HandleUpstreamError_OpenAI403AlwaysSetsError(t *testing.T) {
+	repo := &rateLimitAccountRepoStub{}
+	counter := &openAI403CounterCacheStub{counts: []int64{3}}
+	service := NewRateLimitService(repo, nil, &config.Config{}, nil, nil)
+	service.SetOpenAI403CounterCache(counter)
+	account := &Account{
+		ID:       302,
+		Platform: PlatformOpenAI,
+		Type:     AccountTypeOAuth,
+	}
+
+	shouldDisable := service.HandleUpstreamError(
+		context.Background(),
+		account,
+		http.StatusForbidden,
+		http.Header{},
+		[]byte(`{"error":{"message":"workspace forbidden by policy"}}`),
+	)
+
+	require.True(t, shouldDisable)
+	require.Equal(t, 1, repo.setErrorCalls)
+	require.Equal(t, 0, repo.tempCalls)
+	require.Contains(t, repo.lastErrorMsg, "workspace forbidden by policy")
+	require.NotContains(t, repo.lastErrorMsg, "consecutive_403")
+}
