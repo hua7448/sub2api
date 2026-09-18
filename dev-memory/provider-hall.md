@@ -83,3 +83,15 @@
 
 - 新批次/部署/产品决策 → 更新本文件 + 在 `docs/reviews/` 加 `PROVIDER_HALL_<主题>_<日期>.md` 记录
 - 与服务器同步:改完代码在本分支提交;服务器只吃发布包(参照 `deploy/provider-hall-test/README.md`)
+
+## 8. 管理端配置界面重做(2026-09-18)
+
+**动的三个页面**: `components/admin/provider-hall/` 下 `ProviderHallGroups.vue`(改为 `TablePageLayout` + DataTable 可展开主表)、`ProviderHallProfiles.vue`(接上游候选批量建档)、`ProviderHallConfigForm.vue`(加状态摘要与分区)。
+
+- **分组目标改为展开行**,不再是逐组弹窗;草稿按 `group_id` 隔离,保存粒度是「保存本组」。上架/展示名/描述/排序值拆到 `#hall-listing` 弹窗。
+- **`payloadFor` 曾恒发 `version: 0`** → 后端乐观并发校验必然 409。分组版本现在存 `targetVersion[group_id]`,由最近一次 `getTargets`/`saveSettings` 响应提供。改这块时别再把版本丢掉。
+- **`display_order` 现在真的生效**: `ListAdminGroups` 支持 `sort=display_order`(未上架排最后),前端有拖拽排序弹窗,保存走批量接口。
+- **档案候选取全局**: 新增 `GET /profile-candidates`(跨组按模型+协议合并,带 `sources`/`groups`);原按组的 `GET /groups/:id/models` 保留。新增 `DELETE /profiles/:id`,被目标引用时 409 `PROVIDER_HALL_PROFILE_IN_USE` 并带引用分组。注意:省略 target 只是置 `enabled=false`,行仍在,所以引用不会因「移除目标」自动解除。
+- **DataTable 新增 `expandable`**(可选):桌面 `tr[data-expanded-for]`、移动卡片内展开,支持受控 `expandedKeys`。不动其他页面行为。
+- **降智探测还没做**,仓库里没有任何实现。可复用的底子是 `service/provider_hall_verification.go` 的 `ProviderHallBuildSuite`/`ProviderHallVerdict` 断言框架;每次探测真花钱,需要单独一轮设计。生产 `tasks_enabled` 目前关闭。
+- 记录: `docs/reviews/PROVIDER_HALL_ADMIN_UX2_20260918.md`、`CUSTOM_CHANGELOG.md` 同日条目。

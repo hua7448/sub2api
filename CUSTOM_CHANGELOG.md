@@ -2,6 +2,23 @@
 
 本文档记录 `/home/ubuntu/sub2api-source` 中保留的本地功能、生产修复及源码归档。条目按时间倒序维护；以后每次更新必须同时记录需求、行为、源码范围、迁移/配置、验证和部署状态。
 
+## 2026-09-18：供应商大厅管理端配置界面重做（分组内联目标、档案接上游候选、配置分区）
+
+状态：本地实现、隔离验收完成；分支 `release/v0.1.179-provider-hall`，未部署、未推送。
+
+- 需求：管理员配置路径不顺。原「分组与目标」需逐组进弹窗才能看到目标，无法一眼看全；模型档案的模型名靠手输，而候选列表本就来自上游账号映射/平台/混合路由；全局配置 11 个字段平铺，无状态与依赖说明。
+- 分组与目标：改为共享 `TablePageLayout` + 可展开主表，展开区即原弹窗内的目标编辑表。草稿按分组独立保存，新增「保存本组」，不再整页提交；展开时才拉取该组的目标、Key、模型候选。上架/展示名/描述/排序值拆到独立的展示信息弹窗。修复原实现 `payloadFor` 恒发 `version: 0` 导致的保存必然 409。
+- 分组排序：`ListAdminGroups` 新增 `sort=display_order`，按大厅展示顺序排列、未上架最后；新增拖拽排序弹窗，用批量接口一次写入顺序。此前该字段在管理端填了无任何效果。
+- 模型档案：新增 `GET /profile-candidates`，跨全部分组按模型＋协议合并候选（含 `sources` 与 `groups`）；档案页改为列表 + 多选批量建档，从候选中选中的模型/协议锁定只读，手改需显式勾选「手动输入模型名」；新增 `DELETE /profiles/:id`，仍被目标引用时返回 409 并带上引用分组。
+- 全局配置：新增「当前状态」摘要与按依赖顺序的下一步提示；开关按 采集 → 任务 → 展示 分区，未就绪时说明缺失原因；预算 0 提示不限额并显示今日已确认支出；节点区显示发现时间与一键补齐；进入页面自动做一次网关检查。
+- DataTable：新增可选 `expandable` 展开行（桌面 `tr` + 移动卡片两种形态，支持受控 `expandedKeys`），供分组页使用。
+- 源码：`backend/internal/{repository,service,handler/admin,server/routes}` 的 provider-hall 管理链路；前端 `components/admin/provider-hall/{ProviderHallGroups,ProviderHallProfiles,ProviderHallConfigForm}.vue`、`components/common/DataTable.vue`、`api/admin/providerHall.ts`、`helpers.ts`、中英文案、`scripts/provider-hall-admin-smoke.mjs`。
+- 迁移/配置：无新增迁移，无环境变量变更；新增两个管理接口与一个 `sort` 取值，旧接口与响应主体保留（`sources`/`groups` 为附加字段）。
+- 验证：Go ProviderHall 单元（service/admin/dto）通过；localdb 契约在空库及 228～233 升级路径全部通过，含新增的档案删除拒绝/成功、跨分组候选合并去重、展示顺序排序三组用例。前端 typecheck、只读 lint、构建通过；provider-hall 相关 Vitest 10 文件 70 项通过（全量 1763 项，唯一失败为既有 `OAuthAuthorizationFlow.spec.ts`）。隔离 E2E 全绿，含展开目标、创建/复用 Key、保存本组、立即探测、展示信息往返，三种宽度×明暗 36 张截图。
+- 范围：本机 Go 1.26.4、Node 24/pnpm 9，未跑 Docker integration 与全量 CI。降智探测未在本次范围内。
+
+复现命令与证据见 `docs/reviews/PROVIDER_HALL_ADMIN_UX2_20260918.md`。
+
 ## 2026-09-18：供应商大厅管理端配置、测试与调度闭环
 
 状态：本地实现与隔离验收完成，功能分支 `feature/provider-hall-admin-ux` 本地合入并返回 `release/v0.1.179-provider-hall`；未部署、未推送。
