@@ -15,6 +15,7 @@ export function hallError(error: unknown, t: (key: string) => string, fallback =
     PROVIDER_HALL_TARGET_ROUTE_UNSUPPORTED: 'invalidRoute',
     PROVIDER_HALL_NOT_READY: 'notReady',
     PROVIDER_HALL_PROFILE_EXISTS: 'duplicateProfile',
+    PROVIDER_HALL_PROFILE_IN_USE: 'profileInUse',
     PROVIDER_HALL_NOT_FOUND: 'missing',
     PROVIDER_HALL_TASKS_DISABLED: 'tasksDisabled',
     PROVIDER_HALL_BUDGET_EXHAUSTED: 'budgetExhausted',

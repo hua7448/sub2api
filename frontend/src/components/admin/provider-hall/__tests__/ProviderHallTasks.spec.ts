@@ -36,6 +36,17 @@ const globalOptions = () => ({
   plugins: [createI18n({ legacy: false, locale: 'zh', missingWarn: false, fallbackWarn: false, messages })],
   stubs: { Select: SelectStub, BaseDialog: { props: ['show', 'title'], template: '<div v-if="show" role="dialog"><h2>{{ title }}</h2><slot /><slot name="footer" /></div>' }, StatCard: { props: ['title', 'value'], template: '<div class="stat"><span>{{ title }}</span><b>{{ value }}</b></div>' }, AutoRefreshButton: true, Pagination: { props: ['total', 'page', 'pageSize'], template: '<nav class="pagination">{{ total }}</nav>' } },
 })
+/**
+ * Expands the first group's target panel. Targets used to live behind a
+ * per-group dialog; they are now an inline disclosure row on the group table.
+ */
+async function expandFirstGroup(wrapper: ReturnType<typeof mount>) {
+  await flushPromises()
+  const toggles = wrapper.findAll('[data-test="row-expand"]')
+  expect(toggles.length).toBeGreaterThan(0)
+  await toggles[0].trigger('click')
+  await flushPromises()
+}
 const stamp = '2026-09-12T00:00:00Z'
 const profile: hall.ProviderHallProfile = { id: 7, version: 1, updated_at: stamp, updated_by: 1, model: 'gpt-test', protocol: 'responses', supports_tools: false, output_limit: 256, model_aliases: [], reference_input_price: null, reference_cache_price: null, reference_cache_rate: null, reference_confirmed_at: null }
 const group = (id: number): hall.ProviderHallGroup => ({ group_id: id, listed: true, display_name: `Group ${id}`, description: '', display_order: 0, version: 4, updated_at: stamp, updated_by: 1 })
@@ -60,9 +71,7 @@ describe('Provider Hall task buttons', () => {
     let resolveFirst!: (value: hall.ProviderHallEnqueueResult) => void
     vi.mocked(hall.enqueueProbe).mockImplementationOnce(() => new Promise(resolve => { resolveFirst = resolve }))
     const wrapper = mount(ProviderHallGroups, { props: { operatorId: 2, profiles: [profile] }, global: globalOptions() })
-    await flushPromises()
-    await wrapper.findAll('button').find(b => b.text().includes('管理'))!.trigger('click')
-    await flushPromises()
+    await expandFirstGroup(wrapper)
     const probe = wrapper.findAll('button').find(b => b.text() === '立即探测')!
     await probe.trigger('click')
     await probe.trigger('click')
@@ -85,9 +94,7 @@ describe('Provider Hall task buttons', () => {
   it('keeps the key until a queued job has been acknowledged', async () => {
     vi.mocked(hall.enqueueVerification).mockRejectedValueOnce(new Error('network'))
     const wrapper = mount(ProviderHallGroups, { props: { operatorId: 2, profiles: [profile] }, global: globalOptions() })
-    await flushPromises()
-    await wrapper.findAll('button').find(b => b.text().includes('管理'))!.trigger('click')
-    await flushPromises()
+    await expandFirstGroup(wrapper)
     const verify = wrapper.findAll('button').find(b => b.text() === '立即检测')!
     await verify.trigger('click')
     await flushPromises()
@@ -106,10 +113,10 @@ describe('Provider Hall task buttons', () => {
 
   it('keeps a successful save and retries only enqueue with the saved versions', async () => {
     const wrapper = mount(ProviderHallGroups, { props: { operatorId: 2, profiles: [profile] }, global: globalOptions() })
-    await flushPromises()
-    await wrapper.findAll('button').find(b => b.text().includes('管理'))!.trigger('click')
-    await flushPromises()
-    await wrapper.get('input[max="1440"]').setValue('10')
+    await expandFirstGroup(wrapper)
+    const interval = wrapper.get('input[max="1440"]')
+    ;(interval.element as HTMLInputElement).value = '10'
+    await interval.trigger('input')
     vi.mocked(hall.saveSettings).mockResolvedValue({ ...targets(1), version: 5, items: [{ ...targets(1).items[0], version: 2, probe_interval_seconds: 600 }] })
     vi.mocked(hall.enqueueProbe).mockRejectedValueOnce({ reason: 'PROVIDER_HALL_BUDGET_EXHAUSTED' })
     await wrapper.findAll('button').find(b => b.text() === '保存并测试')!.trigger('click')
@@ -119,6 +126,8 @@ describe('Provider Hall task buttons', () => {
     expect((wrapper.get('input[max="1440"]').element as HTMLInputElement).value).toBe('10')
     const first = vi.mocked(hall.enqueueProbe).mock.calls[0]
     expect(first[3]).toEqual({ target_version: 2, profile_version: 1 })
+    // The save bumped the target version, so a later read must reflect it.
+    vi.mocked(hall.getTargets).mockResolvedValue({ ...targets(1), version: 5, items: [{ ...targets(1).items[0], version: 2, probe_interval_seconds: 600 }] })
     vi.mocked(hall.enqueueProbe).mockResolvedValueOnce({ job_id: 11, status: 'queued', reused: false })
     await wrapper.findAll('button').find(b => b.text() === zh.providerHall.probeNow)!.trigger('click')
     await flushPromises()
@@ -131,9 +140,7 @@ describe('Provider Hall task buttons', () => {
     let finish!: (key: hall.ProviderHallProbeKeyOption) => void
     vi.mocked(hall.ensureProbeKey).mockImplementation(() => new Promise(resolve => { finish = resolve }))
     const wrapper = mount(ProviderHallGroups, { props: { operatorId: 2, profiles: [profile] }, global: globalOptions() })
-    await flushPromises()
-    await wrapper.findAll('button').find(b => b.text().includes('管理'))!.trigger('click')
-    await flushPromises()
+    await expandFirstGroup(wrapper)
     const button = wrapper.findAll('button').find(b => b.text() === zh.providerHall.ensureKey)!
     await button.trigger('click')
     await button.trigger('click')
@@ -147,9 +154,7 @@ describe('Provider Hall task buttons', () => {
   it('requires an explicit enable-and-test action for disabled targets', async () => {
     vi.mocked(hall.getTargets).mockImplementation(async id => targets(id, false))
     const wrapper = mount(ProviderHallGroups, { props: { operatorId: 2, profiles: [profile] }, global: globalOptions() })
-    await flushPromises()
-    await wrapper.findAll('button').find(b => b.text().includes('管理'))!.trigger('click')
-    await flushPromises()
+    await expandFirstGroup(wrapper)
     expect(wrapper.text()).toContain('启用并测试')
     expect(hall.enqueueProbe).not.toHaveBeenCalled()
     wrapper.unmount()

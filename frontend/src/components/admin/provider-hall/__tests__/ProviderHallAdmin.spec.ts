@@ -45,6 +45,7 @@ const targets = (id: number): hall.ProviderHallTargetSet => ({ group_id: id, ver
 
 beforeEach(() => {
   vi.clearAllMocks()
+  vi.stubGlobal('confirm', vi.fn(() => true))
   vi.mocked(usersAPI.list).mockResolvedValue({ items: [], total: 0, page: 1, page_size: 50, pages: 0 })
   vi.mocked(groupsAPI.getAllIncludingInactive).mockResolvedValue([{ id: 1, name: 'One', platform: 'openai' }, { id: 2, name: 'Two', platform: 'composite' }] as Awaited<ReturnType<typeof groupsAPI.getAllIncludingInactive>>)
   vi.mocked(usersAPI.getUserApiKeys).mockResolvedValue({ items: [], total: 0, page: 1, page_size: 100, pages: 0 })
@@ -109,50 +110,82 @@ describe('Provider Hall admin configuration', () => {
     wrapper.unmount()
   })
 
-  it('ignores a delayed group response after switching groups', async () => {
-    let resolveFirst!: (value: hall.ProviderHallGroup) => void
-    let firstSignal: AbortSignal | undefined
-    vi.mocked(hall.getGroup).mockImplementation((id, signal) => {
-      if (id === 1) { firstSignal = signal; return new Promise(resolve => { resolveFirst = resolve }) }
-      return Promise.resolve(group(id))
-    })
+  it('sends the group target-set version so the concurrency check can pass', async () => {
+    vi.mocked(hall.getTargets).mockResolvedValue({ ...targets(1), version: 7 })
+    vi.mocked(hall.saveSettings).mockResolvedValue({ ...targets(1), version: 8 })
     const wrapper = mount(ProviderHallGroups, { props: { operatorId: null, profiles: [profile] }, global: globalOptions() })
     await flushPromises()
-    await wrapper.findAll('button').find(b => b.text().includes('管理'))!.trigger('click')
+    await wrapper.findAll('[data-test="row-expand"]')[0].trigger('click')
     await flushPromises()
-    await wrapper.findAll('button').filter(b => b.text().includes('管理'))[1].trigger('click')
+    await wrapper.findAll('button').find(b => b.text() === '保存本组')!.trigger('click')
     await flushPromises()
-    expect(firstSignal?.aborted).toBe(true)
-    expect((wrapper.get('input[maxlength="100"]').element as HTMLInputElement).value).toBe('Group 2')
-    resolveFirst(group(1))
-    await flushPromises()
-    expect((wrapper.get('input[maxlength="100"]').element as HTMLInputElement).value).toBe('Group 2')
+    // Version 0 was the bug: the backend rejects it with a version conflict.
+    expect(hall.saveSettings).toHaveBeenCalledWith(1, expect.objectContaining({ version: 7 }))
     wrapper.unmount()
   })
 
-  it('saves listing and targets together and retains the draft on conflict', async () => {
+  it('scopes probe-key lookups to the group being expanded', async () => {
     const wrapper = mount(ProviderHallGroups, { props: { operatorId: null, profiles: [profile] }, global: globalOptions() })
     await flushPromises()
+    await wrapper.findAll('[data-test="row-expand"]')[0].trigger('click')
+    await flushPromises()
+    expect(hall.getTargets).toHaveBeenCalledWith(1)
+    expect(hall.listProbeKeys).toHaveBeenCalledWith(1)
+    // Targets live inline now, so the group edit dialog stays listing-only.
+    expect(wrapper.find('input[max="1440"]').exists()).toBe(true)
     await wrapper.findAll('button').find(b => b.text().includes('管理'))!.trigger('click')
     await flushPromises()
-    await wrapper.get('input[max="1440"]').setValue('10')
-    vi.mocked(hall.saveSettings).mockRejectedValue({ reason: 'PROVIDER_HALL_VERSION_CONFLICT' })
-    await wrapper.get('form').trigger('submit')
+    expect(wrapper.get('input[maxlength="100"]').element).toBeTruthy()
+    wrapper.unmount()
+  })
+
+  it('saves one expanded group without touching the others', async () => {
+    const wrapper = mount(ProviderHallGroups, { props: { operatorId: null, profiles: [profile] }, global: globalOptions() })
     await flushPromises()
-    expect(hall.saveSettings).toHaveBeenCalledWith(1, expect.objectContaining({ version: 4, items: [expect.objectContaining({ profile_id: 7, probe_interval_seconds: 600 })] }))
+    await wrapper.findAll('[data-test="row-expand"]')[0].trigger('click')
+    await flushPromises()
+    const interval = wrapper.get('input[max="1440"]')
+    ;(interval.element as HTMLInputElement).value = '10'
+    await interval.trigger('input')
+    vi.mocked(hall.saveSettings).mockRejectedValue({ reason: 'PROVIDER_HALL_VERSION_CONFLICT' })
+    await wrapper.findAll('button').find(b => b.text() === '保存本组')!.trigger('click')
+    await flushPromises()
+    expect(hall.saveSettings).toHaveBeenCalledWith(1, expect.objectContaining({ items: [expect.objectContaining({ profile_id: 7, probe_interval_seconds: 600 })] }))
     expect((wrapper.get('input[max="1440"]').element as HTMLInputElement).value).toBe('10')
     expect(wrapper.get('[role="alert"]').text()).toContain('当前输入已保留')
     wrapper.unmount()
   })
 
-  it('rejects an incoherent group and target snapshot', async () => {
-    vi.mocked(hall.getTargets).mockResolvedValue({ ...targets(1), version: 5 })
+  it('keeps each expanded group draft independent', async () => {
+    vi.mocked(hall.getTargets).mockImplementation(async id => targets(id))
+    const wrapper = mount(ProviderHallGroups, { props: { operatorId: null, profiles: [profile] }, global: globalOptions() })
+    await flushPromises()
+    const toggles = wrapper.findAll('[data-test="row-expand"]')
+    await toggles[0].trigger('click')
+    await flushPromises()
+    await wrapper.findAll('[data-test="row-expand"]')[1].trigger('click')
+    await flushPromises()
+    // Two panels are open, each with its own interval input.
+    expect(wrapper.findAll('input[max="1440"]')).toHaveLength(2)
+    const second = wrapper.findAll('input[max="1440"]')[1]
+    ;(second.element as HTMLInputElement).value = '20'
+    await second.trigger('input')
+    const panels = wrapper.findAll('[data-expanded-for]')
+    const secondPanel = panels.find(p => p.attributes('data-expanded-for') === '2')!
+    await secondPanel.findAll('button').find(b => b.text() === '保存本组')!.trigger('click')
+    await flushPromises()
+    // Only the group whose panel was edited is submitted.
+    expect(hall.saveSettings).toHaveBeenCalledWith(2, expect.objectContaining({ items: [expect.objectContaining({ probe_interval_seconds: 1200 })] }))
+    wrapper.unmount()
+  })
+
+  it('reports a conflict instead of rendering a broken panel', async () => {
+    vi.mocked(hall.getTargets).mockRejectedValue({ reason: 'PROVIDER_HALL_NOT_FOUND' })
     const wrapper = mount(ProviderHallGroups, { props: { operatorId: null, profiles: [] }, global: globalOptions() })
     await flushPromises()
-    await wrapper.findAll('button').find(b => b.text().includes('管理'))!.trigger('click')
+    await wrapper.findAll('[data-test="row-expand"]')[0].trigger('click')
     await flushPromises()
-    expect(wrapper.get('[role="alert"]').text()).toContain('配置已被修改')
-    expect(wrapper.find('form').exists()).toBe(false)
+    expect(wrapper.get('[role="alert"]').text()).toContain('分组或档案不存在')
     wrapper.unmount()
   })
 
@@ -160,7 +193,10 @@ describe('Provider Hall admin configuration', () => {
     const wrapper = mount(ProviderHallProfiles, { props: { profiles: [] }, global: globalOptions() })
     await wrapper.findAll('button').find(b => b.text().includes('新增档案'))!.trigger('click')
     await wrapper.get('input[maxlength="200"]').setValue('gpt-zero')
-    await wrapper.findAll('input[type="checkbox"]')[1].setValue(true)
+    // The reference block is toggled by its own checkbox; select it by label so
+    // adding another checkbox to the form cannot silently retarget this test.
+    const referenceToggle = wrapper.findAll('input[type="checkbox"]').find(box => box.element.closest('label')?.textContent?.includes('参考价格基准'))!
+    await referenceToggle.setValue(true)
     for (const input of wrapper.findAll('input[inputmode="decimal"]')) await input.setValue('0')
     await wrapper.get('input[max="100"]').setValue('0')
     await wrapper.get('form').trigger('submit')

@@ -132,6 +132,19 @@ export async function updateProfile(id: number, input: ProviderHallProfileInput)
   return (await apiClient.put<ProviderHallProfile>(`${base}/profiles/${id}`, input)).data
 }
 
+/** Removes an unused profile. A profile any group still targets is refused with 409. */
+export async function deleteProfile(id: number): Promise<{ profile_id: number }> {
+  return (await apiClient.delete<{ profile_id: number }>(`${base}/profiles/${id}`)).data
+}
+
+/**
+ * One merged candidate per model and protocol across every group, for the
+ * profile editor. Unlike `listModels`, it is not scoped to a single group.
+ */
+export async function listProfileCandidates(signal?: AbortSignal): Promise<ProviderHallProfileCandidate[]> {
+  return (await apiClient.get<ProviderHallProfileCandidate[]>(`${base}/profile-candidates`, { signal })).data
+}
+
 // ---- Tasks and operations (batch B6) ----
 
 export type ProviderHallJobKind = 'probe' | 'verification'
@@ -306,11 +319,18 @@ export interface ProviderHallModelCandidate {
   model: string
   protocol: ProviderHallProtocol
   source: string
+  /** Every source that offers this model, when merged across groups. */
+  sources?: string[]
   account_id: number
   upstream_model: string
   available: boolean
   reason: string
+  /** Groups this model/protocol can be probed in. Only the merged listing fills it. */
+  groups?: number[]
 }
+
+/** A merged candidate from `GET /profile-candidates`, keyed by model + protocol. */
+export type ProviderHallProfileCandidate = ProviderHallModelCandidate & { groups: number[] }
 export interface ProviderHallProbeKeyOption { id: number; name: string; status: string; registered: boolean; group_id: number; operator_user_id: number }
 export type ProviderHallSettingsInput = ProviderHallGroupInput & { items: ProviderHallTargetInput[] }
 export async function listGroups(params: { search?: string; platform?: string; listed?: string; sort?: string; page?: number; page_size?: number } = {}, signal?: AbortSignal) {
