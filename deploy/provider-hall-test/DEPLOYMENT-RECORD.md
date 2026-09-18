@@ -81,3 +81,24 @@ Image identities at completion:
 - The same final check showed group `2` health `up` for model `gpt-5.5`. A later automatic verification run had verdict `insufficient` / `sample_error`, so `verified` was temporarily `0`; this reflected latest verification sampling, not lack of real-user TTFT metrics.
 - Final observed balances: operator user balance approximately `99.364932`, ordinary API key `2` quota `100` with used quota approximately `0.215958`.
 - Documentation updated. Production services, Nginx vhosts, Compose image, supplier credentials, PostgreSQL/Redis containers and persistent volumes were not changed.
+
+## 2026-09-17: Deployment Record Consolidation and Pitfall Notes
+
+- Consolidated the deployment and troubleshooting record after the operator confirmed the test instance was sufficient and asked to close the task.
+- Recorded the effective code/deployment locations: deployment root `/opt/sub2api-provider-hall-test`, generated Dockerfile and Compose manifest in that directory, executable `/opt/sub2api-provider-hall-test/image/sub2api`, and original binary archive `/root/sub2apiAIHUB_TEST/sub2api-provider-hall-0.1.179-20260912.tar.gz`. No full source repository is present on this host for this package.
+- Reaffirmed the isolation boundary: app, PostgreSQL and Redis run in Compose project `provider-hall-test`; PostgreSQL and Redis expose no host ports; production Sub2API systemd services, production state tunnels, Nginx virtual hosts, Dujiao-Next and production data were not changed.
+- Documented deployment pitfalls in the operational README:
+  - The supplied artifact was binary-only, so the test image wraps the supplied executable rather than rebuilding from source.
+  - The failed production backup attempt was caused by unavailable PostgreSQL tunnel credentials and produced no valid backup; final test deployment used a new isolated database instead.
+  - PostgreSQL 18 required the corrected `/var/lib/postgresql` volume path.
+  - Runtime env changes require container recreation rather than `docker restart`.
+  - Copying install markers/config can bypass setup incorrectly; final setup used the real wizard/auto-setup path and API login verification.
+  - Loopback Provider Hall origin validation requires `PROVIDER_HALL_ALLOW_LOOPBACK=1`; production-like origin should be HTTPS scheme plus domain only.
+  - Container-local gateway origin must be `http://127.0.0.1:8080`, not the host-published `http://127.0.0.1:18082`.
+  - `http_403` probe failures were caused by zero balance/quota on the test operator/probe credentials, not by upstream reachability.
+  - User-facing TTFT/average latency cards require ordinary user gateway traffic with recorded `ttft_ms`; probe and verification jobs alone are insufficient.
+  - Later scheduled verification jobs can change the latest verified state independently of already-populated real-user metric cards.
+  - Interrupted manual sampling can leave non-dispatched pending samples that create billing backlog until cleaned up.
+- Secret handling remained unchanged: credential values, API keys, supplier keys and passwords were not written to documentation, shell command arguments or deployment records. Only credential file paths and non-secret IDs were recorded.
+- No container image, Compose manifest, database schema, data volume, Nginx vhost, production service or credential value was changed by this documentation pass.
+

@@ -67,7 +67,15 @@
 - **测试库**:PostgreSQL 库/用户 `sub2api_test`,volume `sub2api-provider-hall-test-pgdata`;应用配置 `data/config.yaml`;**真实密钥只在服务器**(`data/config.yaml`、`credentials/` 均 root-only),仓库里是脱敏的 `deploy/provider-hall-test/config.example.yaml`
 - **测试资金**(2026-09-15 注):操作员 user 1 + 探针 API key 1 各充值 100(此前 403 INSUFFICIENT_BALANCE);ordinary key 2 用于刷真实用户指标
 - **当前开关**:`collection_enabled=true`、`display_enabled=true`、`tasks_enabled=false`(9/16 关定时探测防继续花钱);手动探测/验证需临时打开 tasks
-- **完整运维史**: `deploy/provider-hall-test/DEPLOYMENT-RECORD.md`(9/12 隔离初始化 → 9/15 loopback 修正+注资 → 9/16 展示样本+TTFT 补样)
+- **踩坑清单**(9/17 整理自运维记录):
+  - 改容器运行时环境变量必须**重建容器**,`docker restart` 不会生效
+  - PostgreSQL 18 的 volume 必须挂 `/var/lib/postgresql`(挂旧路径 `/var/lib/postgresql/data` 起不来)
+  - 拷贝安装标记/配置文件会**错误地跳过初始化**;要走真实的 AUTO_SETUP/向导 + API 登录验证
+  - loopback 网关 origin 的校验需要 `PROVIDER_HALL_ALLOW_LOOPBACK=1`;生产形态 origin 只应是 `https://域名`(不带路径)
+  - 用户侧 TTFT/平均延迟卡片需要**普通用户网关流量且记录了 ttft_ms**,只跑探针/验证任务刷不出来
+  - 后续定时验证任务会独立更新"最近验证"状态,可能覆盖已填充的真实用户指标卡的 verified 展示
+  - 手动采样被中断会留下未派发的 pending 样本,造成 billing backlog,需标记 unbilled 清理
+- **完整运维史**: `deploy/provider-hall-test/DEPLOYMENT-RECORD.md`(9/12 隔离初始化 → 9/15 loopback 修正+注资 → 9/16 展示样本+TTFT 补样 → 9/17 坑点整理收尾)
 - **过时快照**: `/root/simple/sub2api-clean-source-baibai`(服务器上 9/10 的旧拷贝),别当源码用
 - 本地配套:`deploy/provider-hall-test/`(Dockerfile、compose.yaml、README、backup.sh、prepare-bootstrap.cjs、verify-login.cjs)
 
