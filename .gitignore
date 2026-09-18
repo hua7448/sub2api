@@ -127,6 +127,7 @@ scripts
 #openspec/
 code-reviews/
 AGENTS.md
+!AGENTS.md
 backend/cmd/server/server
 deploy/docker-compose.override.yml
 .gocache/
@@ -140,6 +141,10 @@ docs/*
 !docs/ASYNC_IMAGE_TASKS.md
 !docs/legal/
 !docs/legal/*.md
+!docs/reviews/
+docs/reviews/artifacts/
+!docs/reviews/*.md
+!docs/PROJECT_MAP.md
 .serena/
 .codex/
 frontend/coverage/

@@ -1,4 +1,18 @@
-# sub2api-bmai Project Memory
+# Project Memory
+
+> Updated: 2026-09-18
+
+## ⚠️ 当前项目:供应商大厅版本(provider-hall)
+
+- **分支**: `release/v0.1.179-provider-hall`(孤儿分支,基线上游 v0.1.179 + Provider Hall B2–B8),仓库 `/Users/simple/smartq/sub2api`(origin: hua7448/sub2api)
+- **权威背景文档**: [provider-hall.md](./provider-hall.md) — 分支来源、功能状态、产品契约、本机测试环境、服务器部署(179.255.156.111)
+- **开发记录**: `docs/reviews/PROVIDER_HALL_*.md` + 总计划 `docs/reviews/PROVIDER_HALL_PLAN_20260911.md`
+- **与 main 不合并**(无共同历史,基线已岔开)
+- **下方 bmai 内容是早期项目(2026-03-30)遗留,已过时**,仅供历史参考;其中的 owner、凭据、部署状态与本分支无关。
+
+---
+
+# sub2api-bmai Project Memory(历史遗留,已过时)
 
 > Updated: 2026-03-30
 
