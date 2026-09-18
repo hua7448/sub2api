@@ -30,7 +30,7 @@ func (r *providerHallHandlerRepo) UpdateConfig(_ context.Context, cfg service.Pr
 
 func TestProviderHallAdminAuthentication(t *testing.T) {
 	h := NewProviderHallHandler(nil, nil, nil, nil, nil, nil)
-	for _, method := range []gin.HandlerFunc{h.GetConfig, h.UpdateConfig, h.GetGroup, h.UpdateGroup, h.ListProfiles, h.CreateProfile, h.UpdateProfile, h.GetTargets, h.UpdateTargets} {
+	for _, method := range []gin.HandlerFunc{h.GetConfig, h.UpdateConfig, h.GetGroup, h.UpdateGroup, h.ListProfiles, h.CreateProfile, h.UpdateProfile, h.GetTargets, h.UpdateTargets, h.PreflightConfig, h.CheckGateway, h.ListAdminGroups, h.ListGroupModels, h.RefreshGroupModels, h.ListProbeKeys, h.EnsureProbeKey, h.SaveSettings, h.PreflightGroup, h.BatchGroups} {
 		for _, role := range []string{"", service.RoleUser} {
 			w := httptest.NewRecorder()
 			c, _ := gin.CreateTestContext(w)

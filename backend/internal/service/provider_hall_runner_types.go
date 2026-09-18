@@ -85,6 +85,8 @@ type ProviderHallJobSnapshot struct {
 }
 
 type ProviderHallJob struct {
+	GroupName      string                  `json:"group_name"`
+	Source         string                  `json:"source"`
 	ID             int64                   `json:"id"`
 	Kind           ProviderHallJobKind     `json:"kind"`
 	TargetID       int64                   `json:"target_id"`
@@ -203,9 +205,13 @@ type ProviderHallEnqueueInput struct {
 }
 
 type ProviderHallJobFilter struct {
-	Status  ProviderHallJobStatus
-	Kind    ProviderHallJobKind
-	GroupID int64
+	GroupName string
+	Model     string
+	Source    string
+	ProfileID int64
+	Status    ProviderHallJobStatus
+	Kind      ProviderHallJobKind
+	GroupID   int64
 }
 
 // ProviderHallSchedulableTarget is an enabled target of a listed group with
@@ -218,6 +224,7 @@ type ProviderHallSchedulableTarget struct {
 	TargetVersion               int64
 	ProbeIntervalSeconds        int
 	VerificationIntervalSeconds int
+	AutoScheduleEnabled         bool
 	Listed                      bool
 	Enabled                     bool
 	Profile                     ProviderHallJobProfile

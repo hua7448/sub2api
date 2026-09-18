@@ -21,6 +21,8 @@ const (
 	FieldDisplayEnabled = "display_enabled"
 	// FieldTasksEnabled holds the string denoting the tasks_enabled field in the database.
 	FieldTasksEnabled = "tasks_enabled"
+	// FieldAutoScheduleEnabled holds the string denoting the auto_schedule_enabled field in the database.
+	FieldAutoScheduleEnabled = "auto_schedule_enabled"
 	// FieldDefaultModel holds the string denoting the default_model field in the database.
 	FieldDefaultModel = "default_model"
 	// FieldDefaultProtocol holds the string denoting the default_protocol field in the database.
@@ -51,6 +53,7 @@ var Columns = []string{
 	FieldCollectionEnabled,
 	FieldDisplayEnabled,
 	FieldTasksEnabled,
+	FieldAutoScheduleEnabled,
 	FieldDefaultModel,
 	FieldDefaultProtocol,
 	FieldDefaultRange,
@@ -80,6 +83,8 @@ var (
 	DefaultDisplayEnabled bool
 	// DefaultTasksEnabled holds the default value on creation for the "tasks_enabled" field.
 	DefaultTasksEnabled bool
+	// DefaultAutoScheduleEnabled holds the default value on creation for the "auto_schedule_enabled" field.
+	DefaultAutoScheduleEnabled bool
 	// DefaultDefaultModel holds the default value on creation for the "default_model" field.
 	DefaultDefaultModel string
 	// DefaultModelValidator is a validator for the "default_model" field. It is called by the builders before save.
@@ -182,6 +187,11 @@ func ByDisplayEnabled(opts ...sql.OrderTermOption) OrderOption {
 // ByTasksEnabled orders the results by the tasks_enabled field.
 func ByTasksEnabled(opts ...sql.OrderTermOption) OrderOption {
 	return sql.OrderByField(FieldTasksEnabled, opts...).ToFunc()
+}
+
+// ByAutoScheduleEnabled orders the results by the auto_schedule_enabled field.
+func ByAutoScheduleEnabled(opts ...sql.OrderTermOption) OrderOption {
+	return sql.OrderByField(FieldAutoScheduleEnabled, opts...).ToFunc()
 }
 
 // ByDefaultModel orders the results by the default_model field.

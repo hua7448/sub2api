@@ -23,10 +23,12 @@ export function hallError(error: unknown, t: (key: string) => string, fallback =
     PROVIDER_HALL_JOB_NOT_CANCELLABLE: 'jobNotCancellable',
   }
   const code = extractApiErrorCode(error) ?? ''
+  const metadata = (error as { metadata?: Record<string, string> })?.metadata
+  if (metadata?.reason === 'default_profile_identity') return t('admin.providerHall.defaultIdentityLocked')
   const key = keys[code]
   if (!key) return extractApiErrorMessage(error, t(`admin.providerHall.${fallback}`))
   const field = code === 'PROVIDER_HALL_INVALID_CONFIG' ? invalidField(error) : ''
-  if (!field) return t(`admin.providerHall.${key}`)
+  if (!field) return `${t(`admin.providerHall.${key}`)}${metadata?.profile_id ? ` (#${metadata.profile_id})` : ''}`
   const hintKey = `admin.providerHall.fieldHint.${field}`
   const hint = t(hintKey)
   return `${t(`admin.providerHall.${key}`)}：${hint === hintKey ? field : hint}`
@@ -40,6 +42,12 @@ function invalidField(error: unknown): string {
 
 export function lines(value: string): string[] {
   return value.split(/\r?\n/).map(line => line.trim()).filter(Boolean)
+}
+
+export function jobReason(code: string, t: (key: string) => string): string {
+  const key = `admin.providerHall.reason_${code}`
+  const label = t(key)
+  return label === key ? code : `${label} (${code})`
 }
 
 /** Idempotency key for one admin click; kept until the response returns. */

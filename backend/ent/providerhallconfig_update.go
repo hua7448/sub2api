@@ -72,6 +72,20 @@ func (_u *ProviderHallConfigUpdate) SetNillableTasksEnabled(v *bool) *ProviderHa
 	return _u
 }
 
+// SetAutoScheduleEnabled sets the "auto_schedule_enabled" field.
+func (_u *ProviderHallConfigUpdate) SetAutoScheduleEnabled(v bool) *ProviderHallConfigUpdate {
+	_u.mutation.SetAutoScheduleEnabled(v)
+	return _u
+}
+
+// SetNillableAutoScheduleEnabled sets the "auto_schedule_enabled" field if the given value is not nil.
+func (_u *ProviderHallConfigUpdate) SetNillableAutoScheduleEnabled(v *bool) *ProviderHallConfigUpdate {
+	if v != nil {
+		_u.SetAutoScheduleEnabled(*v)
+	}
+	return _u
+}
+
 // SetDefaultModel sets the "default_model" field.
 func (_u *ProviderHallConfigUpdate) SetDefaultModel(v string) *ProviderHallConfigUpdate {
 	_u.mutation.SetDefaultModel(v)
@@ -332,6 +346,9 @@ func (_u *ProviderHallConfigUpdate) sqlSave(ctx context.Context) (_node int, err
 	if value, ok := _u.mutation.TasksEnabled(); ok {
 		_spec.SetField(providerhallconfig.FieldTasksEnabled, field.TypeBool, value)
 	}
+	if value, ok := _u.mutation.AutoScheduleEnabled(); ok {
+		_spec.SetField(providerhallconfig.FieldAutoScheduleEnabled, field.TypeBool, value)
+	}
 	if value, ok := _u.mutation.DefaultModel(); ok {
 		_spec.SetField(providerhallconfig.FieldDefaultModel, field.TypeString, value)
 	}
@@ -440,6 +457,20 @@ func (_u *ProviderHallConfigUpdateOne) SetTasksEnabled(v bool) *ProviderHallConf
 func (_u *ProviderHallConfigUpdateOne) SetNillableTasksEnabled(v *bool) *ProviderHallConfigUpdateOne {
 	if v != nil {
 		_u.SetTasksEnabled(*v)
+	}
+	return _u
+}
+
+// SetAutoScheduleEnabled sets the "auto_schedule_enabled" field.
+func (_u *ProviderHallConfigUpdateOne) SetAutoScheduleEnabled(v bool) *ProviderHallConfigUpdateOne {
+	_u.mutation.SetAutoScheduleEnabled(v)
+	return _u
+}
+
+// SetNillableAutoScheduleEnabled sets the "auto_schedule_enabled" field if the given value is not nil.
+func (_u *ProviderHallConfigUpdateOne) SetNillableAutoScheduleEnabled(v *bool) *ProviderHallConfigUpdateOne {
+	if v != nil {
+		_u.SetAutoScheduleEnabled(*v)
 	}
 	return _u
 }
@@ -733,6 +764,9 @@ func (_u *ProviderHallConfigUpdateOne) sqlSave(ctx context.Context) (_node *Prov
 	}
 	if value, ok := _u.mutation.TasksEnabled(); ok {
 		_spec.SetField(providerhallconfig.FieldTasksEnabled, field.TypeBool, value)
+	}
+	if value, ok := _u.mutation.AutoScheduleEnabled(); ok {
+		_spec.SetField(providerhallconfig.FieldAutoScheduleEnabled, field.TypeBool, value)
 	}
 	if value, ok := _u.mutation.DefaultModel(); ok {
 		_spec.SetField(providerhallconfig.FieldDefaultModel, field.TypeString, value)

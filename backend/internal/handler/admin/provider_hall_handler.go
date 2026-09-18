@@ -68,7 +68,11 @@ func providerHallID(c *gin.Context) (int64, bool) {
 }
 
 func providerHallBody(c *gin.Context, target any) bool {
-	c.Request.Body = http.MaxBytesReader(c.Writer, c.Request.Body, 64<<10)
+	return providerHallBodyLimit(c, target, 64<<10)
+}
+
+func providerHallBodyLimit(c *gin.Context, target any, limit int64) bool {
+	c.Request.Body = http.MaxBytesReader(c.Writer, c.Request.Body, limit)
 	d := json.NewDecoder(c.Request.Body)
 	d.DisallowUnknownFields()
 	if err := d.Decode(target); err != nil {
@@ -121,7 +125,7 @@ func (h *ProviderHallHandler) UpdateConfig(c *gin.Context) {
 	}
 	result, err := h.service.UpdateConfig(c.Request.Context(), service.ProviderHallConfig{
 		ProviderHallVersion: service.ProviderHallVersion{Version: *input.Version},
-		CollectionEnabled:   input.CollectionEnabled, DisplayEnabled: input.DisplayEnabled, TasksEnabled: input.TasksEnabled,
+		CollectionEnabled:   input.CollectionEnabled, DisplayEnabled: input.DisplayEnabled, TasksEnabled: input.TasksEnabled, AutoScheduleEnabled: input.AutoScheduleEnabled,
 		DefaultModel: input.DefaultModel, DefaultProtocol: input.DefaultProtocol, DefaultRange: input.DefaultRange,
 		GatewayOrigin: input.GatewayOrigin, OperatorUserID: input.OperatorUserID, DailyBudget: input.DailyBudget, ExpectedNodes: input.ExpectedNodes,
 	}, actor)
@@ -213,7 +217,7 @@ func (h *ProviderHallHandler) UpdateTargets(c *gin.Context) {
 	}
 	items := make([]service.ProviderHallTarget, 0, len(*input.Items))
 	for _, item := range *input.Items {
-		items = append(items, service.ProviderHallTarget{ProfileID: item.ProfileID, ProbeKeyID: item.ProbeKeyID, Enabled: item.Enabled,
+		items = append(items, service.ProviderHallTarget{ProfileID: item.ProfileID, ProbeKeyID: item.ProbeKeyID, Enabled: item.Enabled, AutoScheduleEnabled: item.AutoScheduleEnabled,
 			ProbeIntervalSeconds: item.ProbeIntervalSeconds, VerificationIntervalSeconds: item.VerificationIntervalSeconds})
 	}
 	result, err := h.service.SaveTargets(c.Request.Context(), service.ProviderHallTargetSet{

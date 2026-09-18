@@ -3,6 +3,7 @@ package repository
 import (
 	"context"
 	"database/sql"
+	"strconv"
 	"time"
 
 	"github.com/Wei-Shaw/sub2api/ent"
@@ -16,6 +17,7 @@ import (
 	"github.com/Wei-Shaw/sub2api/ent/usagelog"
 	"github.com/Wei-Shaw/sub2api/ent/user"
 	"github.com/Wei-Shaw/sub2api/ent/usersubscription"
+	infraerrors "github.com/Wei-Shaw/sub2api/internal/pkg/errors"
 	"github.com/Wei-Shaw/sub2api/internal/service"
 )
 
@@ -55,6 +57,7 @@ func providerHallReadTargets(ctx context.Context, client *ent.Client, groupID in
 		return nil, err
 	}
 	result.ProviderHallVersion = providerHallGroupFromEnt(listing).ProviderHallVersion
+	result.Listing = providerHallGroupFromEnt(listing)
 	rows, err := client.ProviderHallTarget.Query().Where(providerhalltarget.GroupIDEQ(groupID)).Order(ent.Asc(providerhalltarget.FieldProfileID)).All(ctx)
 	if err != nil {
 		return nil, err
@@ -62,7 +65,7 @@ func providerHallReadTargets(ctx context.Context, client *ent.Client, groupID in
 	for _, row := range rows {
 		result.Items = append(result.Items, service.ProviderHallTarget{
 			ProviderHallVersion: service.ProviderHallVersion{Version: row.Version, UpdatedAt: row.UpdatedAt.UTC(), UpdatedBy: row.UpdatedBy},
-			ID:                  row.ID, GroupID: row.GroupID, ProfileID: row.ProfileID, ProbeKeyID: row.ProbeKeyID, Enabled: row.Enabled,
+			ID:                  row.ID, GroupID: row.GroupID, ProfileID: row.ProfileID, ProbeKeyID: row.ProbeKeyID, Enabled: row.Enabled, AutoScheduleEnabled: &row.AutoScheduleEnabled,
 			ProbeIntervalSeconds: row.ProbeIntervalSeconds, VerificationIntervalSeconds: row.VerificationIntervalSeconds,
 		})
 	}
@@ -98,15 +101,33 @@ func (r *providerHallRepository) SaveTargets(ctx context.Context, input service.
 		if input.Version != 0 {
 			return nil, service.ErrProviderHallConflict
 		}
-		listing, err = tx.ProviderHallGroup.Create().SetID(input.GroupID).SetNillableUpdatedBy(input.UpdatedBy).Save(ctx)
+		if input.Preflight {
+			err = nil
+		} else {
+			listing, err = tx.ProviderHallGroup.Create().SetID(input.GroupID).SetNillableUpdatedBy(input.UpdatedBy).Save(ctx)
+		}
 	} else if err == nil {
 		if listing.Version != input.Version {
 			return nil, service.ErrProviderHallConflict
 		}
-		listing, err = tx.ProviderHallGroup.UpdateOneID(input.GroupID).AddVersion(1).SetNillableUpdatedBy(input.UpdatedBy).Save(ctx)
+		if !input.Preflight {
+			listing, err = tx.ProviderHallGroup.UpdateOneID(input.GroupID).AddVersion(1).SetNillableUpdatedBy(input.UpdatedBy).Save(ctx)
+		}
 	}
 	if err != nil {
 		return nil, err
+	}
+	if input.Listing != nil {
+		l := input.Listing
+		if l.Listed && g.Status != service.StatusActive {
+			return nil, service.ErrProviderHallTargetRoute
+		}
+		if !input.Preflight {
+			if _, err := tx.ProviderHallGroup.UpdateOneID(input.GroupID).SetListed(l.Listed).
+				SetDisplayName(l.DisplayName).SetDescription(l.Description).SetDisplayOrder(l.DisplayOrder).Save(ctx); err != nil {
+				return nil, err
+			}
+		}
 	}
 	oldRows, err := tx.ProviderHallTarget.Query().Where(providerhalltarget.GroupIDEQ(input.GroupID)).All(ctx)
 	if err != nil {
@@ -148,19 +169,29 @@ func (r *providerHallRepository) SaveTargets(ctx context.Context, input service.
 		previous := old[item.ProfileID]
 		newBinding := item.ProbeKeyID != nil && (previous == nil || previous.ProbeKeyID == nil || *previous.ProbeKeyID != *item.ProbeKeyID)
 		if item.Enabled || newBinding {
-			if err := providerHallValidateAndRegisterKey(ctx, tx.Client(), cfg, g, profileMap[item.ProfileID], item.ProbeKeyID, *input.UpdatedBy); err != nil {
-				return nil, err
+			if err := providerHallValidateKey(ctx, tx.Client(), cfg, g, profileMap[item.ProfileID], item.ProbeKeyID, *input.UpdatedBy, !input.Preflight); err != nil {
+				return nil, infraerrors.FromError(err).WithMetadata(map[string]string{"profile_id": strconv.FormatInt(item.ProfileID, 10), "field": "probe_key_id"})
 			}
+		}
+		if input.Preflight {
+			continue
 		}
 		if previous == nil {
 			_, err = tx.ProviderHallTarget.Create().SetGroupID(input.GroupID).SetProfileID(item.ProfileID).
-				SetNillableProbeKeyID(item.ProbeKeyID).SetEnabled(item.Enabled).
+				SetNillableProbeKeyID(item.ProbeKeyID).SetEnabled(item.Enabled).SetNillableAutoScheduleEnabled(item.AutoScheduleEnabled).
 				SetProbeIntervalSeconds(item.ProbeIntervalSeconds).SetVerificationIntervalSeconds(item.VerificationIntervalSeconds).
 				SetNillableUpdatedBy(input.UpdatedBy).Save(ctx)
-		} else {
-			u := tx.ProviderHallTarget.UpdateOneID(previous.ID).AddVersion(1).ClearProbeKeyID().SetEnabled(item.Enabled).
+		} else if previous.Enabled != item.Enabled || !providerHallSameID(previous.ProbeKeyID, item.ProbeKeyID) ||
+			previous.ProbeIntervalSeconds != item.ProbeIntervalSeconds || previous.VerificationIntervalSeconds != item.VerificationIntervalSeconds ||
+			item.AutoScheduleEnabled != nil && previous.AutoScheduleEnabled != *item.AutoScheduleEnabled {
+			u := tx.ProviderHallTarget.UpdateOneID(previous.ID).ClearProbeKeyID().SetEnabled(item.Enabled).SetNillableAutoScheduleEnabled(item.AutoScheduleEnabled).
 				SetProbeIntervalSeconds(item.ProbeIntervalSeconds).SetVerificationIntervalSeconds(item.VerificationIntervalSeconds).
 				SetNillableUpdatedBy(input.UpdatedBy)
+			// Scheduling eligibility does not invalidate a manual job's execution snapshot.
+			// The shared listing version still guards every settings edit.
+			if previous.Enabled != item.Enabled || !providerHallSameID(previous.ProbeKeyID, item.ProbeKeyID) || previous.ProbeIntervalSeconds != item.ProbeIntervalSeconds || previous.VerificationIntervalSeconds != item.VerificationIntervalSeconds {
+				u.AddVersion(1)
+			}
 			if item.ProbeKeyID != nil {
 				u.SetProbeKeyID(*item.ProbeKeyID)
 			}
@@ -170,6 +201,9 @@ func (r *providerHallRepository) SaveTargets(ctx context.Context, input service.
 			return nil, err
 		}
 		delete(old, item.ProfileID)
+	}
+	if input.Preflight {
+		return &input, nil
 	}
 	for _, omitted := range old {
 		if omitted.Enabled {
@@ -189,6 +223,9 @@ func (r *providerHallRepository) SaveTargets(ctx context.Context, input service.
 }
 
 func providerHallValidateAndRegisterKey(ctx context.Context, client *ent.Client, cfg *ent.ProviderHallConfig, g *ent.Group, p *ent.ProviderHallProfile, keyID *int64, actorID int64) error {
+	return providerHallValidateKey(ctx, client, cfg, g, p, keyID, actorID, true)
+}
+func providerHallValidateKey(ctx context.Context, client *ent.Client, cfg *ent.ProviderHallConfig, g *ent.Group, p *ent.ProviderHallProfile, keyID *int64, actorID int64, register bool) error {
 	if cfg.OperatorUserID == nil {
 		return service.ErrProviderHallOperator
 	}
@@ -255,6 +292,9 @@ func providerHallValidateAndRegisterKey(ctx context.Context, client *ent.Client,
 	if used {
 		return service.ErrProviderHallProbeKey
 	}
+	if !register {
+		return nil
+	}
 	_, err = client.ProviderHallProbeKey.Create().SetID(*keyID).SetOperatorUserID(u.ID).SetGroupID(g.ID).
 		SetRegisteredBy(actorID).SetRegisteredAt(now).Save(ctx)
 	return err
@@ -265,4 +305,8 @@ func (r *providerHallRepository) IsProbeKey(ctx context.Context, keyID int64, st
 		return false, nil
 	}
 	return r.client.ProviderHallProbeKey.Query().Where(providerhallprobekey.IDEQ(keyID), providerhallprobekey.RegisteredAtLTE(startedAt.UTC())).Exist(ctx)
+}
+
+func providerHallSameID(a, b *int64) bool {
+	return a == nil && b == nil || a != nil && b != nil && *a == *b
 }

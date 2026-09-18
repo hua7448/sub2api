@@ -70,6 +70,9 @@ func (r *providerHallRepository) UpdateConfig(ctx context.Context, cfg service.P
 		SetDefaultModel(cfg.DefaultModel).SetDefaultProtocol(providerhallconfig.DefaultProtocol(cfg.DefaultProtocol)).
 		SetDefaultRange(providerhallconfig.DefaultRange(cfg.DefaultRange)).SetGatewayOrigin(cfg.GatewayOrigin).
 		SetDailyBudget(budget).SetExpectedNodes(cfg.ExpectedNodes).ClearOperatorUserID()
+	if cfg.AutoScheduleEnabled != nil {
+		u.SetAutoScheduleEnabled(*cfg.AutoScheduleEnabled)
+	}
 	if cfg.OperatorUserID != nil {
 		u.SetOperatorUserID(*cfg.OperatorUserID)
 	}
@@ -103,7 +106,7 @@ func providerHallConfigFromEnt(cfg *ent.ProviderHallConfig) *service.ProviderHal
 	nodes := append([]string{}, cfg.ExpectedNodes...)
 	return &service.ProviderHallConfig{
 		ProviderHallVersion: service.ProviderHallVersion{Version: cfg.Version, UpdatedAt: cfg.UpdatedAt.UTC(), UpdatedBy: cfg.UpdatedBy},
-		CollectionEnabled:   cfg.CollectionEnabled, DisplayEnabled: cfg.DisplayEnabled, TasksEnabled: cfg.TasksEnabled,
+		CollectionEnabled:   cfg.CollectionEnabled, DisplayEnabled: cfg.DisplayEnabled, TasksEnabled: cfg.TasksEnabled, AutoScheduleEnabled: &cfg.AutoScheduleEnabled,
 		DefaultModel: cfg.DefaultModel, DefaultProtocol: string(cfg.DefaultProtocol), DefaultRange: string(cfg.DefaultRange),
 		GatewayOrigin: cfg.GatewayOrigin, OperatorUserID: cfg.OperatorUserID, DailyBudget: cfg.DailyBudget.StringFixed(8), ExpectedNodes: nodes,
 	}
@@ -187,8 +190,33 @@ func (r *providerHallRepository) ListProfiles(ctx context.Context) ([]service.Pr
 		return nil, err
 	}
 	result := make([]service.ProviderHallProfile, 0, len(profiles))
+	targets, err := r.client.ProviderHallTarget.Query().All(ctx)
+	if err != nil {
+		return nil, err
+	}
+	groups, err := r.client.Group.Query().Where(group.DeletedAtIsNil()).All(ctx)
+	if err != nil {
+		return nil, err
+	}
+	names := map[int64]string{}
+	for _, g := range groups {
+		names[g.ID] = g.Name
+	}
+	cfg, err := r.client.ProviderHallConfig.Get(ctx, 1)
+	if err != nil {
+		return nil, err
+	}
 	for _, p := range profiles {
-		result = append(result, *providerHallProfileFromEnt(p))
+		profile := providerHallProfileFromEnt(p)
+		profile.IsDefault = cfg.DefaultModel == p.Model && cfg.DefaultProtocol == providerhallconfig.DefaultProtocol(p.Protocol)
+		for _, target := range targets {
+			if target.ProfileID == p.ID {
+				if name, ok := names[target.GroupID]; ok {
+					profile.Groups = append(profile.Groups, service.ProviderHallProfileGroup{ID: target.GroupID, Name: name})
+				}
+			}
+		}
+		result = append(result, *profile)
 	}
 	return result, nil
 }
@@ -236,7 +264,7 @@ func (r *providerHallRepository) SaveProfile(ctx context.Context, p service.Prov
 			return nil, readErr
 		}
 		if cfg.DefaultModel == old.Model && string(cfg.DefaultProtocol) == string(old.Protocol) && (p.Model != old.Model || p.Protocol != string(old.Protocol)) {
-			return nil, service.ErrProviderHallConflict
+			return nil, service.ErrProviderHallConflict.WithMetadata(map[string]string{"reason": "default_profile_identity", "field": "default_model"})
 		}
 		u := tx.ProviderHallProfile.Update().Where(providerhallprofile.IDEQ(p.ID), providerhallprofile.VersionEQ(p.Version)).
 			AddVersion(1).SetUpdatedAt(time.Now().UTC()).SetModel(p.Model).SetProtocol(providerhallprofile.Protocol(p.Protocol)).

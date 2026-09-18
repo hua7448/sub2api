@@ -37161,30 +37161,31 @@ func (m *PromoCodeUsageMutation) ResetEdge(name string) error {
 // ProviderHallConfigMutation represents an operation that mutates the ProviderHallConfig nodes in the graph.
 type ProviderHallConfigMutation struct {
 	config
-	op                   Op
-	typ                  string
-	id                   *int64
-	collection_enabled   *bool
-	display_enabled      *bool
-	tasks_enabled        *bool
-	default_model        *string
-	default_protocol     *providerhallconfig.DefaultProtocol
-	default_range        *providerhallconfig.DefaultRange
-	gateway_origin       *string
-	operator_user_id     *int64
-	addoperator_user_id  *int64
-	daily_budget         *decimal.Decimal
-	expected_nodes       *[]string
-	appendexpected_nodes []string
-	version              *int64
-	addversion           *int64
-	updated_by           *int64
-	addupdated_by        *int64
-	updated_at           *time.Time
-	clearedFields        map[string]struct{}
-	done                 bool
-	oldValue             func(context.Context) (*ProviderHallConfig, error)
-	predicates           []predicate.ProviderHallConfig
+	op                    Op
+	typ                   string
+	id                    *int64
+	collection_enabled    *bool
+	display_enabled       *bool
+	tasks_enabled         *bool
+	auto_schedule_enabled *bool
+	default_model         *string
+	default_protocol      *providerhallconfig.DefaultProtocol
+	default_range         *providerhallconfig.DefaultRange
+	gateway_origin        *string
+	operator_user_id      *int64
+	addoperator_user_id   *int64
+	daily_budget          *decimal.Decimal
+	expected_nodes        *[]string
+	appendexpected_nodes  []string
+	version               *int64
+	addversion            *int64
+	updated_by            *int64
+	addupdated_by         *int64
+	updated_at            *time.Time
+	clearedFields         map[string]struct{}
+	done                  bool
+	oldValue              func(context.Context) (*ProviderHallConfig, error)
+	predicates            []predicate.ProviderHallConfig
 }
 
 var _ ent.Mutation = (*ProviderHallConfigMutation)(nil)
@@ -37397,6 +37398,42 @@ func (m *ProviderHallConfigMutation) OldTasksEnabled(ctx context.Context) (v boo
 // ResetTasksEnabled resets all changes to the "tasks_enabled" field.
 func (m *ProviderHallConfigMutation) ResetTasksEnabled() {
 	m.tasks_enabled = nil
+}
+
+// SetAutoScheduleEnabled sets the "auto_schedule_enabled" field.
+func (m *ProviderHallConfigMutation) SetAutoScheduleEnabled(b bool) {
+	m.auto_schedule_enabled = &b
+}
+
+// AutoScheduleEnabled returns the value of the "auto_schedule_enabled" field in the mutation.
+func (m *ProviderHallConfigMutation) AutoScheduleEnabled() (r bool, exists bool) {
+	v := m.auto_schedule_enabled
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldAutoScheduleEnabled returns the old "auto_schedule_enabled" field's value of the ProviderHallConfig entity.
+// If the ProviderHallConfig object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *ProviderHallConfigMutation) OldAutoScheduleEnabled(ctx context.Context) (v bool, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldAutoScheduleEnabled is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldAutoScheduleEnabled requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldAutoScheduleEnabled: %w", err)
+	}
+	return oldValue.AutoScheduleEnabled, nil
+}
+
+// ResetAutoScheduleEnabled resets all changes to the "auto_schedule_enabled" field.
+func (m *ProviderHallConfigMutation) ResetAutoScheduleEnabled() {
+	m.auto_schedule_enabled = nil
 }
 
 // SetDefaultModel sets the "default_model" field.
@@ -37896,7 +37933,7 @@ func (m *ProviderHallConfigMutation) Type() string {
 // order to get all numeric fields that were incremented/decremented, call
 // AddedFields().
 func (m *ProviderHallConfigMutation) Fields() []string {
-	fields := make([]string, 0, 13)
+	fields := make([]string, 0, 14)
 	if m.collection_enabled != nil {
 		fields = append(fields, providerhallconfig.FieldCollectionEnabled)
 	}
@@ -37905,6 +37942,9 @@ func (m *ProviderHallConfigMutation) Fields() []string {
 	}
 	if m.tasks_enabled != nil {
 		fields = append(fields, providerhallconfig.FieldTasksEnabled)
+	}
+	if m.auto_schedule_enabled != nil {
+		fields = append(fields, providerhallconfig.FieldAutoScheduleEnabled)
 	}
 	if m.default_model != nil {
 		fields = append(fields, providerhallconfig.FieldDefaultModel)
@@ -37950,6 +37990,8 @@ func (m *ProviderHallConfigMutation) Field(name string) (ent.Value, bool) {
 		return m.DisplayEnabled()
 	case providerhallconfig.FieldTasksEnabled:
 		return m.TasksEnabled()
+	case providerhallconfig.FieldAutoScheduleEnabled:
+		return m.AutoScheduleEnabled()
 	case providerhallconfig.FieldDefaultModel:
 		return m.DefaultModel()
 	case providerhallconfig.FieldDefaultProtocol:
@@ -37985,6 +38027,8 @@ func (m *ProviderHallConfigMutation) OldField(ctx context.Context, name string) 
 		return m.OldDisplayEnabled(ctx)
 	case providerhallconfig.FieldTasksEnabled:
 		return m.OldTasksEnabled(ctx)
+	case providerhallconfig.FieldAutoScheduleEnabled:
+		return m.OldAutoScheduleEnabled(ctx)
 	case providerhallconfig.FieldDefaultModel:
 		return m.OldDefaultModel(ctx)
 	case providerhallconfig.FieldDefaultProtocol:
@@ -38034,6 +38078,13 @@ func (m *ProviderHallConfigMutation) SetField(name string, value ent.Value) erro
 			return fmt.Errorf("unexpected type %T for field %s", value, name)
 		}
 		m.SetTasksEnabled(v)
+		return nil
+	case providerhallconfig.FieldAutoScheduleEnabled:
+		v, ok := value.(bool)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetAutoScheduleEnabled(v)
 		return nil
 	case providerhallconfig.FieldDefaultModel:
 		v, ok := value.(string)
@@ -38216,6 +38267,9 @@ func (m *ProviderHallConfigMutation) ResetField(name string) error {
 		return nil
 	case providerhallconfig.FieldTasksEnabled:
 		m.ResetTasksEnabled()
+		return nil
+	case providerhallconfig.FieldAutoScheduleEnabled:
+		m.ResetAutoScheduleEnabled()
 		return nil
 	case providerhallconfig.FieldDefaultModel:
 		m.ResetDefaultModel()
@@ -40826,6 +40880,7 @@ type ProviderHallTargetMutation struct {
 	probe_key_id                     *int64
 	addprobe_key_id                  *int64
 	enabled                          *bool
+	auto_schedule_enabled            *bool
 	probe_interval_seconds           *int
 	addprobe_interval_seconds        *int
 	verification_interval_seconds    *int
@@ -41157,6 +41212,42 @@ func (m *ProviderHallTargetMutation) ResetEnabled() {
 	m.enabled = nil
 }
 
+// SetAutoScheduleEnabled sets the "auto_schedule_enabled" field.
+func (m *ProviderHallTargetMutation) SetAutoScheduleEnabled(b bool) {
+	m.auto_schedule_enabled = &b
+}
+
+// AutoScheduleEnabled returns the value of the "auto_schedule_enabled" field in the mutation.
+func (m *ProviderHallTargetMutation) AutoScheduleEnabled() (r bool, exists bool) {
+	v := m.auto_schedule_enabled
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldAutoScheduleEnabled returns the old "auto_schedule_enabled" field's value of the ProviderHallTarget entity.
+// If the ProviderHallTarget object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *ProviderHallTargetMutation) OldAutoScheduleEnabled(ctx context.Context) (v bool, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldAutoScheduleEnabled is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldAutoScheduleEnabled requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldAutoScheduleEnabled: %w", err)
+	}
+	return oldValue.AutoScheduleEnabled, nil
+}
+
+// ResetAutoScheduleEnabled resets all changes to the "auto_schedule_enabled" field.
+func (m *ProviderHallTargetMutation) ResetAutoScheduleEnabled() {
+	m.auto_schedule_enabled = nil
+}
+
 // SetProbeIntervalSeconds sets the "probe_interval_seconds" field.
 func (m *ProviderHallTargetMutation) SetProbeIntervalSeconds(i int) {
 	m.probe_interval_seconds = &i
@@ -41465,7 +41556,7 @@ func (m *ProviderHallTargetMutation) Type() string {
 // order to get all numeric fields that were incremented/decremented, call
 // AddedFields().
 func (m *ProviderHallTargetMutation) Fields() []string {
-	fields := make([]string, 0, 9)
+	fields := make([]string, 0, 10)
 	if m.group_id != nil {
 		fields = append(fields, providerhalltarget.FieldGroupID)
 	}
@@ -41477,6 +41568,9 @@ func (m *ProviderHallTargetMutation) Fields() []string {
 	}
 	if m.enabled != nil {
 		fields = append(fields, providerhalltarget.FieldEnabled)
+	}
+	if m.auto_schedule_enabled != nil {
+		fields = append(fields, providerhalltarget.FieldAutoScheduleEnabled)
 	}
 	if m.probe_interval_seconds != nil {
 		fields = append(fields, providerhalltarget.FieldProbeIntervalSeconds)
@@ -41509,6 +41603,8 @@ func (m *ProviderHallTargetMutation) Field(name string) (ent.Value, bool) {
 		return m.ProbeKeyID()
 	case providerhalltarget.FieldEnabled:
 		return m.Enabled()
+	case providerhalltarget.FieldAutoScheduleEnabled:
+		return m.AutoScheduleEnabled()
 	case providerhalltarget.FieldProbeIntervalSeconds:
 		return m.ProbeIntervalSeconds()
 	case providerhalltarget.FieldVerificationIntervalSeconds:
@@ -41536,6 +41632,8 @@ func (m *ProviderHallTargetMutation) OldField(ctx context.Context, name string) 
 		return m.OldProbeKeyID(ctx)
 	case providerhalltarget.FieldEnabled:
 		return m.OldEnabled(ctx)
+	case providerhalltarget.FieldAutoScheduleEnabled:
+		return m.OldAutoScheduleEnabled(ctx)
 	case providerhalltarget.FieldProbeIntervalSeconds:
 		return m.OldProbeIntervalSeconds(ctx)
 	case providerhalltarget.FieldVerificationIntervalSeconds:
@@ -41582,6 +41680,13 @@ func (m *ProviderHallTargetMutation) SetField(name string, value ent.Value) erro
 			return fmt.Errorf("unexpected type %T for field %s", value, name)
 		}
 		m.SetEnabled(v)
+		return nil
+	case providerhalltarget.FieldAutoScheduleEnabled:
+		v, ok := value.(bool)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetAutoScheduleEnabled(v)
 		return nil
 	case providerhalltarget.FieldProbeIntervalSeconds:
 		v, ok := value.(int)
@@ -41780,6 +41885,9 @@ func (m *ProviderHallTargetMutation) ResetField(name string) error {
 		return nil
 	case providerhalltarget.FieldEnabled:
 		m.ResetEnabled()
+		return nil
+	case providerhalltarget.FieldAutoScheduleEnabled:
+		m.ResetAutoScheduleEnabled()
 		return nil
 	case providerhalltarget.FieldProbeIntervalSeconds:
 		m.ResetProbeIntervalSeconds()

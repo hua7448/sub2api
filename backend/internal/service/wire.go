@@ -1106,8 +1106,10 @@ func ProvideProviderHallRunner(jobs ProviderHallJobRepository, cfgRepo ProviderH
 // Readiness flags derive from the wired workers; the admin cannot enable a
 // switch whose implementation is absent. Display readiness is set by the user
 // query service provider once the user API and page are wired.
-func ProvideProviderHallService(repo ProviderHallRepository, groups GroupRepository, users UserRepository, keys *APIKeyService, collector *ProviderHallCollector, aggregator *ProviderHallAggregator, runner *ProviderHallRunner) *ProviderHallService {
+func ProvideProviderHallService(repo ProviderHallRepository, groups GroupRepository, users UserRepository, keys *APIKeyService, collector *ProviderHallCollector, aggregator *ProviderHallAggregator, runner *ProviderHallRunner, accounts AccountRepository, modelFetcher *AccountTestService, modelRoutes CompositeModelRouteRepository) *ProviderHallService {
 	svc := NewProviderHallService(repo, groups, users, keys)
+	svc.accounts, svc.modelFetcher = accounts, modelFetcher
+	svc.modelRoutes = modelRoutes
 	collection := collector != nil && aggregator != nil && aggregator.Ready()
 	svc.SetReadiness(ProviderHallReadiness{
 		Collection: collection,

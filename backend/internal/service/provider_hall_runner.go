@@ -240,7 +240,7 @@ func (r *ProviderHallRunner) RunOnce(ctx context.Context) {
 	}
 	active := make([]int64, 0, len(targets))
 	for _, t := range targets {
-		if t.Enabled && t.Listed && t.ProbeKeyID != nil {
+		if cfg.TasksEnabled && ProviderHallAutoSchedule(cfg.AutoScheduleEnabled) && t.AutoScheduleEnabled && t.Enabled && t.Listed && t.ProbeKeyID != nil {
 			active = append(active, t.TargetID)
 		}
 	}
@@ -250,7 +250,7 @@ func (r *ProviderHallRunner) RunOnce(ctx context.Context) {
 	if _, err := r.jobs.CancelQueuedDrifted(ctx, now); err != nil {
 		r.log.Warn("provider_hall.runner_cancel_drift_failed", zap.Error(err))
 	}
-	if cfg.TasksEnabled {
+	if cfg.TasksEnabled && ProviderHallAutoSchedule(cfg.AutoScheduleEnabled) {
 		r.schedule(ctx, cfg, targets, now)
 	}
 	r.claimAndRun(ctx, cfg, now)
@@ -273,7 +273,7 @@ func (r *ProviderHallRunner) schedule(ctx context.Context, cfg *ProviderHallConf
 		return
 	}
 	for _, t := range targets {
-		if !t.Enabled || !t.Listed || t.ProbeKeyID == nil {
+		if !t.AutoScheduleEnabled || !t.Enabled || !t.Listed || t.ProbeKeyID == nil {
 			continue
 		}
 		snapshot := ProviderHallJobSnapshot{Profile: t.Profile, TargetVersion: t.TargetVersion, ProbeKeyID: *t.ProbeKeyID, OperatorUserID: *cfg.OperatorUserID, GatewayOrigin: cfg.GatewayOrigin}
@@ -332,6 +332,10 @@ func (r *ProviderHallRunner) EnqueueManual(ctx context.Context, kind ProviderHal
 	}
 	if target == nil || !target.Enabled || target.ProbeKeyID == nil {
 		return nil, false, ErrProviderHallTargetDisabled
+	}
+	if expected, ok := ctx.Value(providerHallExpectedVersionKey{}).(ProviderHallExpectedVersions); ok &&
+		(expected.Target != target.TargetVersion || expected.Profile != target.Profile.Version) {
+		return nil, false, ErrProviderHallConflict
 	}
 	now := r.now().UTC()
 	spend, err := r.jobs.SumSpend(ctx, ProviderHallBudgetDay(now))

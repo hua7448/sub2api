@@ -27,16 +27,17 @@ type ProviderHallVersion struct {
 
 type ProviderHallConfig struct {
 	ProviderHallVersion
-	CollectionEnabled bool     `json:"collection_enabled"`
-	DisplayEnabled    bool     `json:"display_enabled"`
-	TasksEnabled      bool     `json:"tasks_enabled"`
-	DefaultModel      string   `json:"default_model"`
-	DefaultProtocol   string   `json:"default_protocol"`
-	DefaultRange      string   `json:"default_range"`
-	GatewayOrigin     string   `json:"gateway_origin"`
-	OperatorUserID    *int64   `json:"operator_user_id"`
-	DailyBudget       string   `json:"daily_budget"`
-	ExpectedNodes     []string `json:"expected_nodes"`
+	CollectionEnabled   bool     `json:"collection_enabled"`
+	DisplayEnabled      bool     `json:"display_enabled"`
+	TasksEnabled        bool     `json:"tasks_enabled"`
+	AutoScheduleEnabled *bool    `json:"auto_schedule_enabled"`
+	DefaultModel        string   `json:"default_model"`
+	DefaultProtocol     string   `json:"default_protocol"`
+	DefaultRange        string   `json:"default_range"`
+	GatewayOrigin       string   `json:"gateway_origin"`
+	OperatorUserID      *int64   `json:"operator_user_id"`
+	DailyBudget         string   `json:"daily_budget"`
+	ExpectedNodes       []string `json:"expected_nodes"`
 }
 
 type ProviderHallGroup struct {
@@ -49,6 +50,8 @@ type ProviderHallGroup struct {
 }
 
 type ProviderHallProfile struct {
+	Groups    []ProviderHallProfileGroup `json:"groups,omitempty"`
+	IsDefault bool                       `json:"is_default"`
 	ProviderHallVersion
 	ID                   int64      `json:"id"`
 	Model                string     `json:"model"`
@@ -60,6 +63,11 @@ type ProviderHallProfile struct {
 	ReferenceCachePrice  *string    `json:"reference_cache_price"`
 	ReferenceCacheRate   *string    `json:"reference_cache_rate"`
 	ReferenceConfirmedAt *time.Time `json:"reference_confirmed_at"`
+}
+
+type ProviderHallProfileGroup struct {
+	ID   int64  `json:"id"`
+	Name string `json:"name"`
 }
 
 type ProviderHallRepository interface {
@@ -87,12 +95,15 @@ type ProviderHallReadiness struct {
 }
 
 type ProviderHallService struct {
-	repo   ProviderHallRepository
-	groups GroupRepository
-	users  UserRepository
-	access ProviderHallGroupAccess
-	ready  ProviderHallReadiness
-	jobs   ProviderHallJobControl
+	repo         ProviderHallRepository
+	groups       GroupRepository
+	users        UserRepository
+	access       ProviderHallGroupAccess
+	ready        ProviderHallReadiness
+	jobs         ProviderHallJobControl
+	accounts     AccountRepository
+	modelFetcher *AccountTestService
+	modelRoutes  CompositeModelRouteRepository
 	// onConfigSaved runs after a successful config save so process caches
 	// derived from it (public settings, injected index.html) refresh at once.
 	onConfigSaved func()
@@ -190,6 +201,18 @@ func providerHallDecimal(value string, precision, scale int) (decimal.Decimal, b
 }
 
 func (s *ProviderHallService) UpdateConfig(ctx context.Context, cfg ProviderHallConfig, actorID int64) (*ProviderHallConfig, error) {
+	validated, err := s.ValidateConfig(ctx, cfg, actorID)
+	if err != nil {
+		return nil, err
+	}
+	saved, err := s.repo.UpdateConfig(ctx, *validated)
+	if err == nil && s.onConfigSaved != nil {
+		s.onConfigSaved()
+	}
+	return saved, err
+}
+
+func (s *ProviderHallService) ValidateConfig(ctx context.Context, cfg ProviderHallConfig, actorID int64) (*ProviderHallConfig, error) {
 	if cfg.Version < 1 || actorID < 1 {
 		return nil, providerHallInvalid("version")
 	}
@@ -282,11 +305,7 @@ func (s *ProviderHallService) UpdateConfig(ctx context.Context, cfg ProviderHall
 		}
 	}
 	cfg.UpdatedBy = &actorID
-	saved, err := s.repo.UpdateConfig(ctx, cfg)
-	if err == nil && s.onConfigSaved != nil {
-		s.onConfigSaved()
-	}
-	return saved, err
+	return &cfg, nil
 }
 
 func (s *ProviderHallService) GetGroup(ctx context.Context, id int64) (*ProviderHallGroup, error) {

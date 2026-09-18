@@ -6,9 +6,10 @@ import ProviderHallConfigForm from '@/components/admin/provider-hall/ProviderHal
 import * as hall from '@/api/admin/providerHall'
 import zh from '@/i18n/locales/zh/admin/providerHall'
 
-vi.mock('vue-router', () => ({ onBeforeRouteLeave: vi.fn() }))
+const { replaceRoute } = vi.hoisted(() => ({ replaceRoute: vi.fn() }))
+vi.mock('vue-router', () => ({ onBeforeRouteLeave: vi.fn(), useRoute: () => ({ query: {} }), useRouter: () => ({ replace: replaceRoute }) }))
 vi.mock('@/components/layout/AppLayout.vue', () => ({ default: { template: '<main><slot /></main>' } }))
-vi.mock('@/api/admin/providerHall', () => ({ getConfig: vi.fn(), listProfiles: vi.fn(), updateConfig: vi.fn() }))
+vi.mock('@/api/admin/providerHall', () => ({ getConfig: vi.fn(), listProfiles: vi.fn(), updateConfig: vi.fn(), preflightConfig: vi.fn(async () => ({ valid: true, disabled_targets: [] })), getHealth: vi.fn(async () => ({ collection: { nodes: [] } })) }))
 vi.mock('@/api/admin/users', () => ({ list: vi.fn(async () => ({ items: [] })) }))
 vi.mock('@/stores/app', () => ({ useAppStore: () => ({ showSuccess: vi.fn() }) }))
 
@@ -32,7 +33,7 @@ function render() {
     global: {
       plugins: [createI18n({ legacy: false, locale: 'zh', missingWarn: false, fallbackWarn: false,
         messages: { zh: { admin: { providerHall: Object.fromEntries(Object.entries(zh.providerHall).map(([key, value]) => [key, () => value])) } } } })],
-      stubs: { AppLayout: { template: '<main><slot /></main>' }, ProviderHallGroups: true, ProviderHallProfiles: true, Select: true },
+      stubs: { AppLayout: { template: '<main><slot /></main>' }, ProviderHallGroups: true, ProviderHallProfiles: true, ProviderHallJobs: true, Select: true },
     },
   })
 }
@@ -51,10 +52,10 @@ describe('Provider Hall reload ordering', () => {
     const budget = form.get('input[inputmode="decimal"]')
     const pending = deferred<hall.ProviderHallConfig>()
     vi.mocked(hall.getConfig).mockReturnValueOnce(pending.promise)
-    await form.get('button[type="button"]').trigger('click')
+    await form.get('.hall-actions button[type="button"]').trigger('click')
     expect(budget.element.matches(':disabled')).toBe(true)
     expect(form.get('button[type="submit"]').attributes('disabled')).toBeDefined()
-    expect(form.get('button[type="button"]').attributes('disabled')).toBeDefined()
+    expect(form.get('.hall-actions button[type="button"]').attributes('disabled')).toBeDefined()
     // A synthetic submit also has to obey the loading guard.
     await form.get('form').trigger('submit')
     expect(hall.updateConfig).not.toHaveBeenCalled()
@@ -75,7 +76,7 @@ describe('Provider Hall reload ordering', () => {
     const form = wrapper.getComponent(ProviderHallConfigForm)
     const pending = deferred<hall.ProviderHallConfig>()
     vi.mocked(hall.getConfig).mockReturnValueOnce(pending.promise)
-    await form.get('button[type="button"]').trigger('click')
+    await form.get('.hall-actions button[type="button"]').trigger('click')
     await form.get('form').trigger('submit')
     expect(hall.updateConfig).not.toHaveBeenCalled()
     pending.resolve({ ...config })
@@ -84,7 +85,7 @@ describe('Provider Hall reload ordering', () => {
     const saving = deferred<hall.ProviderHallConfig>()
     vi.mocked(hall.updateConfig).mockReturnValueOnce(saving.promise)
     await form.get('form').trigger('submit')
-    await form.get('button[type="button"]').trigger('click')
+    await form.get('.hall-actions button[type="button"]').trigger('click')
     expect(hall.getConfig).toHaveBeenCalledTimes(2)
     saving.resolve({ ...config, version: 4, daily_budget: '9' })
     await flushPromises()
@@ -103,7 +104,7 @@ describe('Provider Hall reload ordering', () => {
     const confirm = vi.spyOn(window, 'confirm').mockReturnValue(true)
     const pending = deferred<hall.ProviderHallConfig>()
     vi.mocked(hall.getConfig).mockReturnValueOnce(pending.promise)
-    await form.get('button[type="button"]').trigger('click')
+    await form.get('.hall-actions button[type="button"]').trigger('click')
     expect(form.get('input[inputmode="decimal"]').element.matches(':disabled')).toBe(true)
     pending.reject(new Error('offline'))
     await flushPromises()
@@ -123,7 +124,7 @@ describe('Provider Hall reload ordering', () => {
     await flushPromises()
     const pending = deferred<hall.ProviderHallConfig>()
     vi.mocked(hall.getConfig).mockReturnValueOnce(pending.promise)
-    await wrapper.getComponent(ProviderHallConfigForm).get('button[type="button"]').trigger('click')
+    await wrapper.getComponent(ProviderHallConfigForm).get('.hall-actions button[type="button"]').trigger('click')
     const profile: hall.ProviderHallProfile = { id: 7, version: 4, updated_at: config.updated_at, updated_by: 1,
       model: 'gpt-test', protocol: 'responses', supports_tools: false, output_limit: 256, model_aliases: [],
       reference_input_price: null, reference_cache_price: null, reference_cache_rate: null, reference_confirmed_at: null }
@@ -134,4 +135,17 @@ describe('Provider Hall reload ordering', () => {
     expect(hall.listProfiles).toHaveBeenCalledTimes(1)
     wrapper.unmount()
   })
+})
+
+
+it('keeps group and profile route parameters when navigating between targets and jobs', async () => {
+  const wrapper = render()
+  await flushPromises()
+  wrapper.findComponent({ name: 'ProviderHallGroups' }).vm.$emit('jobs', 17, 29)
+  await flushPromises()
+  expect(replaceRoute).toHaveBeenLastCalledWith({ query: { tab: 'jobs', group: 17, profile: 29, job: undefined } })
+  wrapper.findComponent({ name: 'ProviderHallJobs' }).vm.$emit('target', 17)
+  await flushPromises()
+  expect(replaceRoute).toHaveBeenLastCalledWith({ query: { tab: 'groups', group: 17, profile: undefined, job: undefined } })
+  expect(wrapper.findComponent({ name: 'ProviderHallGroups' }).props('focusGroup')).toBe(17)
 })

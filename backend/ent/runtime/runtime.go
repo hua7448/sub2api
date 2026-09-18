@@ -1622,38 +1622,42 @@ func init() {
 	providerhallconfigDescTasksEnabled := providerhallconfigFields[3].Descriptor()
 	// providerhallconfig.DefaultTasksEnabled holds the default value on creation for the tasks_enabled field.
 	providerhallconfig.DefaultTasksEnabled = providerhallconfigDescTasksEnabled.Default.(bool)
+	// providerhallconfigDescAutoScheduleEnabled is the schema descriptor for auto_schedule_enabled field.
+	providerhallconfigDescAutoScheduleEnabled := providerhallconfigFields[4].Descriptor()
+	// providerhallconfig.DefaultAutoScheduleEnabled holds the default value on creation for the auto_schedule_enabled field.
+	providerhallconfig.DefaultAutoScheduleEnabled = providerhallconfigDescAutoScheduleEnabled.Default.(bool)
 	// providerhallconfigDescDefaultModel is the schema descriptor for default_model field.
-	providerhallconfigDescDefaultModel := providerhallconfigFields[4].Descriptor()
+	providerhallconfigDescDefaultModel := providerhallconfigFields[5].Descriptor()
 	// providerhallconfig.DefaultDefaultModel holds the default value on creation for the default_model field.
 	providerhallconfig.DefaultDefaultModel = providerhallconfigDescDefaultModel.Default.(string)
 	// providerhallconfig.DefaultModelValidator is a validator for the "default_model" field. It is called by the builders before save.
 	providerhallconfig.DefaultModelValidator = providerhallconfigDescDefaultModel.Validators[0].(func(string) error)
 	// providerhallconfigDescGatewayOrigin is the schema descriptor for gateway_origin field.
-	providerhallconfigDescGatewayOrigin := providerhallconfigFields[7].Descriptor()
+	providerhallconfigDescGatewayOrigin := providerhallconfigFields[8].Descriptor()
 	// providerhallconfig.DefaultGatewayOrigin holds the default value on creation for the gateway_origin field.
 	providerhallconfig.DefaultGatewayOrigin = providerhallconfigDescGatewayOrigin.Default.(string)
 	// providerhallconfig.GatewayOriginValidator is a validator for the "gateway_origin" field. It is called by the builders before save.
 	providerhallconfig.GatewayOriginValidator = providerhallconfigDescGatewayOrigin.Validators[0].(func(string) error)
 	// providerhallconfigDescOperatorUserID is the schema descriptor for operator_user_id field.
-	providerhallconfigDescOperatorUserID := providerhallconfigFields[8].Descriptor()
+	providerhallconfigDescOperatorUserID := providerhallconfigFields[9].Descriptor()
 	// providerhallconfig.OperatorUserIDValidator is a validator for the "operator_user_id" field. It is called by the builders before save.
 	providerhallconfig.OperatorUserIDValidator = providerhallconfigDescOperatorUserID.Validators[0].(func(int64) error)
 	// providerhallconfigDescDailyBudget is the schema descriptor for daily_budget field.
-	providerhallconfigDescDailyBudget := providerhallconfigFields[9].Descriptor()
+	providerhallconfigDescDailyBudget := providerhallconfigFields[10].Descriptor()
 	// providerhallconfig.DefaultDailyBudget holds the default value on creation for the daily_budget field.
 	providerhallconfig.DefaultDailyBudget = providerhallconfigDescDailyBudget.Default.(func() decimal.Decimal)
 	// providerhallconfigDescExpectedNodes is the schema descriptor for expected_nodes field.
-	providerhallconfigDescExpectedNodes := providerhallconfigFields[10].Descriptor()
+	providerhallconfigDescExpectedNodes := providerhallconfigFields[11].Descriptor()
 	// providerhallconfig.DefaultExpectedNodes holds the default value on creation for the expected_nodes field.
 	providerhallconfig.DefaultExpectedNodes = providerhallconfigDescExpectedNodes.Default.([]string)
 	// providerhallconfigDescVersion is the schema descriptor for version field.
-	providerhallconfigDescVersion := providerhallconfigFields[11].Descriptor()
+	providerhallconfigDescVersion := providerhallconfigFields[12].Descriptor()
 	// providerhallconfig.DefaultVersion holds the default value on creation for the version field.
 	providerhallconfig.DefaultVersion = providerhallconfigDescVersion.Default.(int64)
 	// providerhallconfig.VersionValidator is a validator for the "version" field. It is called by the builders before save.
 	providerhallconfig.VersionValidator = providerhallconfigDescVersion.Validators[0].(func(int64) error)
 	// providerhallconfigDescUpdatedAt is the schema descriptor for updated_at field.
-	providerhallconfigDescUpdatedAt := providerhallconfigFields[13].Descriptor()
+	providerhallconfigDescUpdatedAt := providerhallconfigFields[14].Descriptor()
 	// providerhallconfig.DefaultUpdatedAt holds the default value on creation for the updated_at field.
 	providerhallconfig.DefaultUpdatedAt = providerhallconfigDescUpdatedAt.Default.(func() time.Time)
 	// providerhallconfig.UpdateDefaultUpdatedAt holds the default value on update for the updated_at field.
@@ -1792,8 +1796,12 @@ func init() {
 	providerhalltargetDescEnabled := providerhalltargetFields[3].Descriptor()
 	// providerhalltarget.DefaultEnabled holds the default value on creation for the enabled field.
 	providerhalltarget.DefaultEnabled = providerhalltargetDescEnabled.Default.(bool)
+	// providerhalltargetDescAutoScheduleEnabled is the schema descriptor for auto_schedule_enabled field.
+	providerhalltargetDescAutoScheduleEnabled := providerhalltargetFields[4].Descriptor()
+	// providerhalltarget.DefaultAutoScheduleEnabled holds the default value on creation for the auto_schedule_enabled field.
+	providerhalltarget.DefaultAutoScheduleEnabled = providerhalltargetDescAutoScheduleEnabled.Default.(bool)
 	// providerhalltargetDescProbeIntervalSeconds is the schema descriptor for probe_interval_seconds field.
-	providerhalltargetDescProbeIntervalSeconds := providerhalltargetFields[4].Descriptor()
+	providerhalltargetDescProbeIntervalSeconds := providerhalltargetFields[5].Descriptor()
 	// providerhalltarget.DefaultProbeIntervalSeconds holds the default value on creation for the probe_interval_seconds field.
 	providerhalltarget.DefaultProbeIntervalSeconds = providerhalltargetDescProbeIntervalSeconds.Default.(int)
 	// providerhalltarget.ProbeIntervalSecondsValidator is a validator for the "probe_interval_seconds" field. It is called by the builders before save.
@@ -1813,7 +1821,7 @@ func init() {
 		}
 	}()
 	// providerhalltargetDescVerificationIntervalSeconds is the schema descriptor for verification_interval_seconds field.
-	providerhalltargetDescVerificationIntervalSeconds := providerhalltargetFields[5].Descriptor()
+	providerhalltargetDescVerificationIntervalSeconds := providerhalltargetFields[6].Descriptor()
 	// providerhalltarget.DefaultVerificationIntervalSeconds holds the default value on creation for the verification_interval_seconds field.
 	providerhalltarget.DefaultVerificationIntervalSeconds = providerhalltargetDescVerificationIntervalSeconds.Default.(int)
 	// providerhalltarget.VerificationIntervalSecondsValidator is a validator for the "verification_interval_seconds" field. It is called by the builders before save.
@@ -1833,13 +1841,13 @@ func init() {
 		}
 	}()
 	// providerhalltargetDescVersion is the schema descriptor for version field.
-	providerhalltargetDescVersion := providerhalltargetFields[6].Descriptor()
+	providerhalltargetDescVersion := providerhalltargetFields[7].Descriptor()
 	// providerhalltarget.DefaultVersion holds the default value on creation for the version field.
 	providerhalltarget.DefaultVersion = providerhalltargetDescVersion.Default.(int64)
 	// providerhalltarget.VersionValidator is a validator for the "version" field. It is called by the builders before save.
 	providerhalltarget.VersionValidator = providerhalltargetDescVersion.Validators[0].(func(int64) error)
 	// providerhalltargetDescUpdatedAt is the schema descriptor for updated_at field.
-	providerhalltargetDescUpdatedAt := providerhalltargetFields[8].Descriptor()
+	providerhalltargetDescUpdatedAt := providerhalltargetFields[9].Descriptor()
 	// providerhalltarget.DefaultUpdatedAt holds the default value on creation for the updated_at field.
 	providerhalltarget.DefaultUpdatedAt = providerhalltargetDescUpdatedAt.Default.(func() time.Time)
 	// providerhalltarget.UpdateDefaultUpdatedAt holds the default value on update for the updated_at field.

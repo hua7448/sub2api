@@ -21,6 +21,8 @@ const (
 	FieldProbeKeyID = "probe_key_id"
 	// FieldEnabled holds the string denoting the enabled field in the database.
 	FieldEnabled = "enabled"
+	// FieldAutoScheduleEnabled holds the string denoting the auto_schedule_enabled field in the database.
+	FieldAutoScheduleEnabled = "auto_schedule_enabled"
 	// FieldProbeIntervalSeconds holds the string denoting the probe_interval_seconds field in the database.
 	FieldProbeIntervalSeconds = "probe_interval_seconds"
 	// FieldVerificationIntervalSeconds holds the string denoting the verification_interval_seconds field in the database.
@@ -42,6 +44,7 @@ var Columns = []string{
 	FieldProfileID,
 	FieldProbeKeyID,
 	FieldEnabled,
+	FieldAutoScheduleEnabled,
 	FieldProbeIntervalSeconds,
 	FieldVerificationIntervalSeconds,
 	FieldVersion,
@@ -68,6 +71,8 @@ var (
 	ProbeKeyIDValidator func(int64) error
 	// DefaultEnabled holds the default value on creation for the "enabled" field.
 	DefaultEnabled bool
+	// DefaultAutoScheduleEnabled holds the default value on creation for the "auto_schedule_enabled" field.
+	DefaultAutoScheduleEnabled bool
 	// DefaultProbeIntervalSeconds holds the default value on creation for the "probe_interval_seconds" field.
 	DefaultProbeIntervalSeconds int
 	// ProbeIntervalSecondsValidator is a validator for the "probe_interval_seconds" field. It is called by the builders before save.
@@ -112,6 +117,11 @@ func ByProbeKeyID(opts ...sql.OrderTermOption) OrderOption {
 // ByEnabled orders the results by the enabled field.
 func ByEnabled(opts ...sql.OrderTermOption) OrderOption {
 	return sql.OrderByField(FieldEnabled, opts...).ToFunc()
+}
+
+// ByAutoScheduleEnabled orders the results by the auto_schedule_enabled field.
+func ByAutoScheduleEnabled(opts ...sql.OrderTermOption) OrderOption {
+	return sql.OrderByField(FieldAutoScheduleEnabled, opts...).ToFunc()
 }
 
 // ByProbeIntervalSeconds orders the results by the probe_interval_seconds field.

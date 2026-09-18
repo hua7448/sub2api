@@ -74,6 +74,11 @@ func Enabled(v bool) predicate.ProviderHallTarget {
 	return predicate.ProviderHallTarget(sql.FieldEQ(FieldEnabled, v))
 }
 
+// AutoScheduleEnabled applies equality check predicate on the "auto_schedule_enabled" field. It's identical to AutoScheduleEnabledEQ.
+func AutoScheduleEnabled(v bool) predicate.ProviderHallTarget {
+	return predicate.ProviderHallTarget(sql.FieldEQ(FieldAutoScheduleEnabled, v))
+}
+
 // ProbeIntervalSeconds applies equality check predicate on the "probe_interval_seconds" field. It's identical to ProbeIntervalSecondsEQ.
 func ProbeIntervalSeconds(v int) predicate.ProviderHallTarget {
 	return predicate.ProviderHallTarget(sql.FieldEQ(FieldProbeIntervalSeconds, v))
@@ -237,6 +242,16 @@ func EnabledEQ(v bool) predicate.ProviderHallTarget {
 // EnabledNEQ applies the NEQ predicate on the "enabled" field.
 func EnabledNEQ(v bool) predicate.ProviderHallTarget {
 	return predicate.ProviderHallTarget(sql.FieldNEQ(FieldEnabled, v))
+}
+
+// AutoScheduleEnabledEQ applies the EQ predicate on the "auto_schedule_enabled" field.
+func AutoScheduleEnabledEQ(v bool) predicate.ProviderHallTarget {
+	return predicate.ProviderHallTarget(sql.FieldEQ(FieldAutoScheduleEnabled, v))
+}
+
+// AutoScheduleEnabledNEQ applies the NEQ predicate on the "auto_schedule_enabled" field.
+func AutoScheduleEnabledNEQ(v bool) predicate.ProviderHallTarget {
+	return predicate.ProviderHallTarget(sql.FieldNEQ(FieldAutoScheduleEnabled, v))
 }
 
 // ProbeIntervalSecondsEQ applies the EQ predicate on the "probe_interval_seconds" field.

@@ -25,6 +25,8 @@ type ProviderHallConfig struct {
 	DisplayEnabled bool `json:"display_enabled,omitempty"`
 	// TasksEnabled holds the value of the "tasks_enabled" field.
 	TasksEnabled bool `json:"tasks_enabled,omitempty"`
+	// AutoScheduleEnabled holds the value of the "auto_schedule_enabled" field.
+	AutoScheduleEnabled bool `json:"auto_schedule_enabled,omitempty"`
 	// DefaultModel holds the value of the "default_model" field.
 	DefaultModel string `json:"default_model,omitempty"`
 	// DefaultProtocol holds the value of the "default_protocol" field.
@@ -57,7 +59,7 @@ func (*ProviderHallConfig) scanValues(columns []string) ([]any, error) {
 			values[i] = new([]byte)
 		case providerhallconfig.FieldDailyBudget:
 			values[i] = new(decimal.Decimal)
-		case providerhallconfig.FieldCollectionEnabled, providerhallconfig.FieldDisplayEnabled, providerhallconfig.FieldTasksEnabled:
+		case providerhallconfig.FieldCollectionEnabled, providerhallconfig.FieldDisplayEnabled, providerhallconfig.FieldTasksEnabled, providerhallconfig.FieldAutoScheduleEnabled:
 			values[i] = new(sql.NullBool)
 		case providerhallconfig.FieldID, providerhallconfig.FieldOperatorUserID, providerhallconfig.FieldVersion, providerhallconfig.FieldUpdatedBy:
 			values[i] = new(sql.NullInt64)
@@ -103,6 +105,12 @@ func (_m *ProviderHallConfig) assignValues(columns []string, values []any) error
 				return fmt.Errorf("unexpected type %T for field tasks_enabled", values[i])
 			} else if value.Valid {
 				_m.TasksEnabled = value.Bool
+			}
+		case providerhallconfig.FieldAutoScheduleEnabled:
+			if value, ok := values[i].(*sql.NullBool); !ok {
+				return fmt.Errorf("unexpected type %T for field auto_schedule_enabled", values[i])
+			} else if value.Valid {
+				_m.AutoScheduleEnabled = value.Bool
 			}
 		case providerhallconfig.FieldDefaultModel:
 			if value, ok := values[i].(*sql.NullString); !ok {
@@ -212,6 +220,9 @@ func (_m *ProviderHallConfig) String() string {
 	builder.WriteString(", ")
 	builder.WriteString("tasks_enabled=")
 	builder.WriteString(fmt.Sprintf("%v", _m.TasksEnabled))
+	builder.WriteString(", ")
+	builder.WriteString("auto_schedule_enabled=")
+	builder.WriteString(fmt.Sprintf("%v", _m.AutoScheduleEnabled))
 	builder.WriteString(", ")
 	builder.WriteString("default_model=")
 	builder.WriteString(_m.DefaultModel)

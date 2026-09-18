@@ -27,6 +27,7 @@ func (ProviderHallConfig) Fields() []ent.Field {
 		field.Bool("collection_enabled").Default(false),
 		field.Bool("display_enabled").Default(false),
 		field.Bool("tasks_enabled").Default(false),
+		field.Bool("auto_schedule_enabled").Default(false),
 		field.String("default_model").Default("").MaxLen(200),
 		field.Enum("default_protocol").Values("responses", "chat_completions", "messages").Default("responses"),
 		field.Enum("default_range").Values("6h", "24h", "7d", "30d").Default("6h"),
@@ -100,6 +101,7 @@ func (ProviderHallTarget) Fields() []ent.Field {
 		field.Int64("profile_id").Positive().Immutable(),
 		field.Int64("probe_key_id").Optional().Nillable().Positive(),
 		field.Bool("enabled").Default(false),
+		field.Bool("auto_schedule_enabled").Default(false),
 		field.Int("probe_interval_seconds").Default(300).Min(60).Max(86400),
 		field.Int("verification_interval_seconds").Default(86400).Min(3600).Max(604800),
 	}, providerHallVersionFields()...)

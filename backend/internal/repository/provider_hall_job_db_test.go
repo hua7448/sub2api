@@ -89,12 +89,15 @@ func newProviderHallJobFixture(t *testing.T, db *sql.DB) *providerHallJobFixture
 	// Daily slots keep the scheduler's own jobs out of the way of the
 	// hand-built scenarios (the slot only changes at midnight UTC).
 	input.Items[0].ProbeIntervalSeconds, input.Items[0].VerificationIntervalSeconds = 86400, 86400
+	auto := true
+	input.Items[0].AutoScheduleEnabled = &auto
 	set, err := f.svc.SaveTargets(ctx, input, f.user.ID)
 	require.NoError(t, err)
 	f.target = set.Items[0]
 	cfg, err := f.repo.GetConfig(ctx)
 	require.NoError(t, err)
 	cfg.CollectionEnabled, cfg.TasksEnabled = true, true
+	cfg.AutoScheduleEnabled = &auto
 	cfg.GatewayOrigin, cfg.DailyBudget, cfg.UpdatedBy = f.gateway.URL, "0", &f.user.ID
 	_, err = f.repo.UpdateConfig(ctx, *cfg)
 	require.NoError(t, err)
@@ -624,9 +627,9 @@ func providerHallJobDatabaseContracts(t *testing.T, db *sql.DB) {
 
 		// The runner refuses a loopback origin without the explicit override.
 		t.Setenv("PROVIDER_HALL_ALLOW_LOOPBACK", "")
-		job2 := f.enqueue(t, service.ProviderHallJobProbe, "")
 		_, err = f.db.ExecContext(ctx, `UPDATE provider_hall_config SET tasks_enabled = true WHERE id = 1`)
 		require.NoError(t, err)
+		job2 := f.enqueue(t, service.ProviderHallJobProbe, "")
 		claimed2, err := f.jobs.Claim(ctx, r.Owner(), time.Now().UTC(), time.Minute)
 		require.NoError(t, err)
 		require.Equal(t, job2.ID, claimed2.ID)

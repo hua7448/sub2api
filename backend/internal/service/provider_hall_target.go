@@ -3,7 +3,9 @@ package service
 import (
 	"context"
 	"sort"
+	"strings"
 	"time"
+	"unicode/utf8"
 
 	infraerrors "github.com/Wei-Shaw/sub2api/internal/pkg/errors"
 )
@@ -23,6 +25,7 @@ type ProviderHallTarget struct {
 	ProfileID                   int64  `json:"profile_id"`
 	ProbeKeyID                  *int64 `json:"probe_key_id"`
 	Enabled                     bool   `json:"enabled"`
+	AutoScheduleEnabled         *bool  `json:"auto_schedule_enabled"`
 	ProbeIntervalSeconds        int    `json:"probe_interval_seconds"`
 	VerificationIntervalSeconds int    `json:"verification_interval_seconds"`
 }
@@ -31,8 +34,10 @@ type ProviderHallTarget struct {
 // Omitted targets are retained disabled so their IDs remain stable for reports.
 type ProviderHallTargetSet struct {
 	ProviderHallVersion
-	GroupID int64                `json:"group_id"`
-	Items   []ProviderHallTarget `json:"items"`
+	GroupID   int64                `json:"group_id"`
+	Items     []ProviderHallTarget `json:"items"`
+	Listing   *ProviderHallGroup   `json:"listing,omitempty"`
+	Preflight bool                 `json:"-"`
 }
 
 func (s *ProviderHallService) GetTargets(ctx context.Context, groupID int64) (*ProviderHallTargetSet, error) {
@@ -48,6 +53,13 @@ func (s *ProviderHallService) SaveTargets(ctx context.Context, input ProviderHal
 	}
 	if len(input.Items) > ProviderHallMaxTargetsPerGroup {
 		return nil, providerHallInvalid("items")
+	}
+	if input.Listing != nil {
+		g := input.Listing
+		if utf8.RuneCountInString(g.DisplayName) > 100 || utf8.RuneCountInString(g.Description) > 2000 || g.DisplayOrder < -2147483648 || g.DisplayOrder > 2147483647 {
+			return nil, providerHallInvalid("group")
+		}
+		g.DisplayName = strings.TrimSpace(g.DisplayName)
 	}
 	seen := map[int64]bool{}
 	items := make([]ProviderHallTarget, 0, len(input.Items))
@@ -73,13 +85,13 @@ func (s *ProviderHallService) SaveTargets(ctx context.Context, input ProviderHal
 		}
 		// Copy writable fields only; IDs and audit metadata are server-owned.
 		items = append(items, ProviderHallTarget{GroupID: input.GroupID, ProfileID: item.ProfileID,
-			ProbeKeyID: item.ProbeKeyID, Enabled: item.Enabled, ProbeIntervalSeconds: item.ProbeIntervalSeconds,
+			ProbeKeyID: item.ProbeKeyID, Enabled: item.Enabled, AutoScheduleEnabled: item.AutoScheduleEnabled, ProbeIntervalSeconds: item.ProbeIntervalSeconds,
 			VerificationIntervalSeconds: item.VerificationIntervalSeconds})
 	}
 	sort.Slice(items, func(i, j int) bool { return items[i].ProfileID < items[j].ProfileID })
 	input.Items, input.UpdatedBy = items, &actorID
 	var previous map[int64]ProviderHallTarget
-	if s.jobs != nil {
+	if s.jobs != nil && !input.Preflight {
 		before, err := s.repo.GetTargets(ctx, input.GroupID)
 		if err != nil {
 			return nil, err
@@ -96,7 +108,7 @@ func (s *ProviderHallService) SaveTargets(ctx context.Context, input ProviderHal
 	// Queued jobs of a disabled or changed target must not send. The runner
 	// also cancels drifted/disabled jobs each tick and re-checks versions at
 	// dispatch, so this hook only shortens the window.
-	if s.jobs != nil {
+	if s.jobs != nil && !input.Preflight {
 		now := time.Now().UTC()
 		for _, t := range saved.Items {
 			old, existed := previous[t.ID]
@@ -145,3 +157,6 @@ func ValidateProviderHallTargetBinding(group *Group, profile *ProviderHallProfil
 	}
 	return nil
 }
+
+// New configurations default to manual-only; nil is used by legacy write clients.
+func ProviderHallAutoSchedule(value *bool) bool { return value != nil && *value }

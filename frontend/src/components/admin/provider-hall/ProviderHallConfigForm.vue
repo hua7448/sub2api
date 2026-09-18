@@ -2,6 +2,7 @@
   <form class="hall-form" :aria-busy="busy" @submit.prevent="save">
     <p v-if="error" role="alert" class="hall-error">{{ error }}</p>
     <fieldset :disabled="busy" class="space-y-5">
+      <h2 class="font-medium">{{ t('admin.providerHall.switchesTitle') }}</h2>
       <div class="grid grid-cols-1 gap-4 sm:grid-cols-3">
         <label v-for="flag in switches" :key="flag.key" class="flex items-start gap-3 text-sm">
           <input v-model="draft[flag.field]" type="checkbox" :disabled="!flag.ready" class="mt-0.5 h-4 w-4" />
@@ -12,21 +13,29 @@
           </span>
         </label>
       </div>
+      <label class="flex items-center gap-3 text-sm"><input v-model="draft.auto_schedule_enabled" type="checkbox" />{{ t('admin.providerHall.autoSchedule') }}</label>
+      <p v-if="(draft.display_enabled || draft.tasks_enabled) && !draft.collection_enabled" class="text-sm text-amber-600">{{ t('admin.providerHall.fieldHint.tasks_enabled') }}</p>
       <div class="hall-fields">
-        <label class="hall-field">
+        <h2 class="font-medium sm:col-span-2">{{ t('admin.providerHall.connectionSettings') }}</h2>
+        <label class="hall-field sm:col-span-2">
           <span>{{ t('admin.providerHall.gatewayOrigin') }}</span>
           <input v-model.trim="draft.gateway_origin" class="input" type="url" maxlength="512" />
+          <button type="button" class="btn btn-secondary" :disabled="busy || checking" @click="checkConnection">{{ t('admin.providerHall.checkGateway') }}</button>
+          <span v-if="connection" role="status" class="text-xs">{{ connection }}</span>
         </label>
+        <h2 class="font-medium sm:col-span-2">{{ t('admin.providerHall.taskSettings') }}</h2>
         <div class="hall-field">
           <label for="hall-operator">{{ t('admin.providerHall.operator') }}</label>
           <Select id="hall-operator" v-model="draft.operator_user_id" :options="operatorOptions" remote clearable
             :loading="usersLoading" :disabled="busy" :aria-label="t('admin.providerHall.operator')" @search="searchUsers" />
+          <span v-if="selectedUser?.id === draft.operator_user_id" class="text-xs text-gray-500">{{ selectedUser.email }} · {{ t(selectedUser.status === 'active' ? 'admin.providerHall.enabled' : 'admin.providerHall.inactive') }} · {{ selectedUser.balance }} USD</span>
         </div>
         <label class="hall-field">
           <span>{{ t('admin.providerHall.budget') }}</span>
           <input v-model="draft.daily_budget" class="input" inputmode="decimal" pattern="[0-9]+(\.[0-9]{1,8})?" required />
           <span class="text-xs text-gray-500">{{ t('admin.providerHall.budgetDay') }}</span>
         </label>
+        <h2 class="font-medium sm:col-span-2">{{ t('admin.providerHall.displaySettings') }}</h2>
         <label class="hall-field">
           <span>{{ t('admin.providerHall.defaultRange') }}</span>
           <select v-model="draft.default_range" class="input">
@@ -37,10 +46,14 @@
           <label for="hall-default-profile">{{ t('admin.providerHall.defaultProfile') }}</label>
           <Select id="hall-default-profile" :model-value="defaultProfileID" :options="profileOptions" :disabled="busy"
             :aria-label="t('admin.providerHall.defaultProfile')" @update:model-value="selectProfile" />
+          <span class="text-xs text-gray-500">{{ profiles.find(p => p.id === defaultProfileID)?.groups?.map(g => g.name).join(', ') || t('admin.providerHall.defaultFallback') }}</span>
         </div>
+        <h2 class="font-medium sm:col-span-2">{{ t('admin.providerHall.collectionSettings') }}</h2>
         <label class="hall-field sm:col-span-2">
           <span>{{ t('admin.providerHall.expectedNodes') }}</span>
           <textarea v-model="nodeText" rows="4" class="input font-mono" spellcheck="false" />
+          <span class="text-xs text-gray-500">{{ t('admin.providerHall.discoveredNodes') }}</span>
+          <div class="flex flex-wrap gap-2"><button v-for="node in nodes" :key="node" type="button" class="btn btn-secondary btn-sm" @click="nodeText = [...new Set([...lines(nodeText), node])].join('\n')">{{ node }}</button></div>
         </label>
       </div>
     </fieldset>
@@ -70,6 +83,13 @@ const nodeText = ref(props.config.expected_nodes.join('\n'))
 const saving = ref(false)
 const busy = computed(() => saving.value || props.loading === true)
 const error = ref('')
+const checking = ref(false), connection = ref(''), nodes = ref<string[]>([])
+async function checkConnection() {
+  if (checking.value) return
+  checking.value = true; connection.value = ''
+  try { const result = await hall.checkGateway(draft.value.gateway_origin); connection.value = t(result.healthy ? 'admin.providerHall.gatewayHealthy' : 'admin.providerHall.gatewayUnhealthy') + ` (${result.status})` }
+  catch (err) { connection.value = hallError(err, t) } finally { checking.value = false }
+}
 const userRows = ref<AdminUser[]>([])
 const selectedUser = ref<AdminUser | null>(null)
 const usersLoading = ref(false)
@@ -84,6 +104,7 @@ watch(() => props.config, config => {
   error.value = ''
   void loadSelectedUser()
 })
+watch(() => draft.value.operator_user_id, () => { void loadSelectedUser() })
 
 const switches = computed(() => {
   const ready = props.config.readiness
@@ -139,14 +160,18 @@ async function save() {
   error.value = ''
   try {
     const d = draft.value
-    const result = await hall.updateConfig({ version: props.config.version, collection_enabled: d.collection_enabled,
+    const input = { version: props.config.version, collection_enabled: d.collection_enabled,
+      auto_schedule_enabled: d.auto_schedule_enabled ?? false,
       display_enabled: d.display_enabled, tasks_enabled: d.tasks_enabled, default_model: d.default_model, default_protocol: d.default_protocol,
       default_range: d.default_range, gateway_origin: d.gateway_origin, operator_user_id: d.operator_user_id,
-      daily_budget: d.daily_budget, expected_nodes: lines(nodeText.value) })
+      daily_budget: d.daily_budget, expected_nodes: lines(nodeText.value) }
+    const preview = await hall.preflightConfig(input)
+    if (preview.disabled_targets.length && !window.confirm(`${t('admin.providerHall.operatorImpact')}\n${preview.disabled_targets.map(target => `#${target.group_id} / ${props.profiles.find(p => p.id === target.profile_id)?.model || target.profile_id}`).join('\n')}`)) return
+    const result = await hall.updateConfig(input)
     if (!disposed) emit('saved', result)
   } catch (err) { if (!disposed) error.value = hallError(err, t) }
   finally { saving.value = false }
 }
-onMounted(() => { void searchUsers(); void loadSelectedUser() })
+onMounted(() => { void searchUsers(); void loadSelectedUser(); void hall.getHealth().then(h => { if (!disposed) nodes.value = h.collection.nodes.map(n => n.node_id) }).catch(() => {}) })
 onUnmounted(() => { disposed = true; userRequest?.abort() })
 </script>

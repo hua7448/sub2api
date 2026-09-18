@@ -25,6 +25,8 @@ type ProviderHallTarget struct {
 	ProbeKeyID *int64 `json:"probe_key_id,omitempty"`
 	// Enabled holds the value of the "enabled" field.
 	Enabled bool `json:"enabled,omitempty"`
+	// AutoScheduleEnabled holds the value of the "auto_schedule_enabled" field.
+	AutoScheduleEnabled bool `json:"auto_schedule_enabled,omitempty"`
 	// ProbeIntervalSeconds holds the value of the "probe_interval_seconds" field.
 	ProbeIntervalSeconds int `json:"probe_interval_seconds,omitempty"`
 	// VerificationIntervalSeconds holds the value of the "verification_interval_seconds" field.
@@ -43,7 +45,7 @@ func (*ProviderHallTarget) scanValues(columns []string) ([]any, error) {
 	values := make([]any, len(columns))
 	for i := range columns {
 		switch columns[i] {
-		case providerhalltarget.FieldEnabled:
+		case providerhalltarget.FieldEnabled, providerhalltarget.FieldAutoScheduleEnabled:
 			values[i] = new(sql.NullBool)
 		case providerhalltarget.FieldID, providerhalltarget.FieldGroupID, providerhalltarget.FieldProfileID, providerhalltarget.FieldProbeKeyID, providerhalltarget.FieldProbeIntervalSeconds, providerhalltarget.FieldVerificationIntervalSeconds, providerhalltarget.FieldVersion, providerhalltarget.FieldUpdatedBy:
 			values[i] = new(sql.NullInt64)
@@ -94,6 +96,12 @@ func (_m *ProviderHallTarget) assignValues(columns []string, values []any) error
 				return fmt.Errorf("unexpected type %T for field enabled", values[i])
 			} else if value.Valid {
 				_m.Enabled = value.Bool
+			}
+		case providerhalltarget.FieldAutoScheduleEnabled:
+			if value, ok := values[i].(*sql.NullBool); !ok {
+				return fmt.Errorf("unexpected type %T for field auto_schedule_enabled", values[i])
+			} else if value.Valid {
+				_m.AutoScheduleEnabled = value.Bool
 			}
 		case providerhalltarget.FieldProbeIntervalSeconds:
 			if value, ok := values[i].(*sql.NullInt64); !ok {
@@ -175,6 +183,9 @@ func (_m *ProviderHallTarget) String() string {
 	builder.WriteString(", ")
 	builder.WriteString("enabled=")
 	builder.WriteString(fmt.Sprintf("%v", _m.Enabled))
+	builder.WriteString(", ")
+	builder.WriteString("auto_schedule_enabled=")
+	builder.WriteString(fmt.Sprintf("%v", _m.AutoScheduleEnabled))
 	builder.WriteString(", ")
 	builder.WriteString("probe_interval_seconds=")
 	builder.WriteString(fmt.Sprintf("%v", _m.ProbeIntervalSeconds))

@@ -3,6 +3,7 @@ import { defineComponent } from 'vue'
 import { flushPromises, mount } from '@vue/test-utils'
 import { createI18n } from 'vue-i18n'
 import ProviderHallGroups from '../ProviderHallGroups.vue'
+import ProviderHallBatchDialog from '../ProviderHallBatchDialog.vue'
 import ProviderHallJobs from '../ProviderHallJobs.vue'
 import ProviderHallJobDetailDialog from '../ProviderHallJobDetailDialog.vue'
 import ProviderHallHealth from '../ProviderHallHealth.vue'
@@ -13,7 +14,7 @@ import zh from '@/i18n/locales/zh/admin/providerHall'
 import en from '@/i18n/locales/en/admin/providerHall'
 
 const showSuccess = vi.fn()
-vi.mock('@/api/admin/providerHall', () => ({ getGroup: vi.fn(), getTargets: vi.fn(), updateGroup: vi.fn(), updateTargets: vi.fn(), enqueueProbe: vi.fn(), enqueueVerification: vi.fn(), listJobs: vi.fn(), getJob: vi.fn(), cancelJob: vi.fn(), getHealth: vi.fn() }))
+vi.mock('@/api/admin/providerHall', () => ({ listGroups: vi.fn(), listModels: vi.fn(async () => []), listProbeKeys: vi.fn(async () => []), saveSettings: vi.fn(), ensureProbeKey: vi.fn(), batchGroups: vi.fn(), getGroup: vi.fn(), getTargets: vi.fn(), updateGroup: vi.fn(), updateTargets: vi.fn(), enqueueProbe: vi.fn(), enqueueVerification: vi.fn(), listJobs: vi.fn(), getJob: vi.fn(), cancelJob: vi.fn(), getHealth: vi.fn() }))
 vi.mock('@/api/admin/groups', () => ({ getAllIncludingInactive: vi.fn() }))
 vi.mock('@/api/admin/users', () => ({ list: vi.fn(), getById: vi.fn(), getUserApiKeys: vi.fn() }))
 vi.mock('@/stores/app', () => ({ useAppStore: () => ({ showSuccess }) }))
@@ -49,6 +50,7 @@ beforeEach(() => {
   vi.mocked(usersAPI.list).mockResolvedValue({ items: [], total: 0, page: 1, page_size: 50, pages: 0 })
   vi.mocked(groupsAPI.getAllIncludingInactive).mockResolvedValue([{ id: 1, name: 'One', platform: 'openai' }] as Awaited<ReturnType<typeof groupsAPI.getAllIncludingInactive>>)
   vi.mocked(usersAPI.getUserApiKeys).mockResolvedValue({ items: [], total: 0, page: 1, page_size: 100, pages: 0 })
+  vi.mocked(hall.listGroups).mockResolvedValue({ items: [{ ...group(1), name: 'One', platform: 'openai', status: 'active', supported: true, reason: '', targets: targets(1).items, models: ['gpt-test'], effective_profile_id: 7 }], total: 1, page: 1, page_size: 20 })
   vi.mocked(hall.getGroup).mockImplementation(async id => group(id))
   vi.mocked(hall.getTargets).mockImplementation(async id => targets(id))
 })
@@ -59,7 +61,9 @@ describe('Provider Hall task buttons', () => {
     vi.mocked(hall.enqueueProbe).mockImplementationOnce(() => new Promise(resolve => { resolveFirst = resolve }))
     const wrapper = mount(ProviderHallGroups, { props: { operatorId: 2, profiles: [profile] }, global: globalOptions() })
     await flushPromises()
-    const probe = wrapper.get('button[aria-label="立即探测 gpt-test"]')
+    await wrapper.findAll('button').find(b => b.text().includes('管理'))!.trigger('click')
+    await flushPromises()
+    const probe = wrapper.findAll('button').find(b => b.text() === '立即探测')!
     await probe.trigger('click')
     await probe.trigger('click')
     expect(hall.enqueueProbe).toHaveBeenCalledTimes(1)
@@ -68,7 +72,7 @@ describe('Provider Hall task buttons', () => {
     await flushPromises()
     expect(showSuccess).toHaveBeenCalledWith('已加入队列：任务 #42')
     const firstKey = vi.mocked(hall.enqueueProbe).mock.calls[0][2]
-    expect(firstKey).toMatch(/^admin-probe-1-7-/)
+    expect(firstKey).toMatch(/^probe:8:1:1-/)
     expect(firstKey.length).toBeLessThanOrEqual(128)
     vi.mocked(hall.enqueueProbe).mockResolvedValueOnce({ job_id: 42, status: 'queued', reused: true })
     await probe.trigger('click')
@@ -78,11 +82,13 @@ describe('Provider Hall task buttons', () => {
     wrapper.unmount()
   })
 
-  it('keeps the key for a transport retry but drops it after a business rejection', async () => {
+  it('keeps the key until a queued job has been acknowledged', async () => {
     vi.mocked(hall.enqueueVerification).mockRejectedValueOnce(new Error('network'))
     const wrapper = mount(ProviderHallGroups, { props: { operatorId: 2, profiles: [profile] }, global: globalOptions() })
     await flushPromises()
-    const verify = wrapper.get('button[aria-label="立即检测 gpt-test"]')
+    await wrapper.findAll('button').find(b => b.text().includes('管理'))!.trigger('click')
+    await flushPromises()
+    const verify = wrapper.findAll('button').find(b => b.text() === '立即检测')!
     await verify.trigger('click')
     await flushPromises()
     vi.mocked(hall.enqueueVerification).mockRejectedValueOnce({ reason: 'PROVIDER_HALL_BUDGET_EXHAUSTED' })
@@ -94,15 +100,58 @@ describe('Provider Hall task buttons', () => {
     vi.mocked(hall.enqueueVerification).mockResolvedValueOnce({ job_id: 9, status: 'queued', reused: false })
     await verify.trigger('click')
     await flushPromises()
-    expect(calls[2][2]).not.toBe(calls[0][2])
+    expect(calls[2][2]).toBe(calls[0][2])
     wrapper.unmount()
   })
 
-  it('disables the buttons for disabled or unsaved targets', async () => {
+  it('keeps a successful save and retries only enqueue with the saved versions', async () => {
+    const wrapper = mount(ProviderHallGroups, { props: { operatorId: 2, profiles: [profile] }, global: globalOptions() })
+    await flushPromises()
+    await wrapper.findAll('button').find(b => b.text().includes('管理'))!.trigger('click')
+    await flushPromises()
+    await wrapper.get('input[max="1440"]').setValue('10')
+    vi.mocked(hall.saveSettings).mockResolvedValue({ ...targets(1), version: 5, items: [{ ...targets(1).items[0], version: 2, probe_interval_seconds: 600 }] })
+    vi.mocked(hall.enqueueProbe).mockRejectedValueOnce({ reason: 'PROVIDER_HALL_BUDGET_EXHAUSTED' })
+    await wrapper.findAll('button').find(b => b.text() === '保存并测试')!.trigger('click')
+    await flushPromises()
+    expect(hall.saveSettings).toHaveBeenCalledTimes(1)
+    expect(wrapper.get('[role="alert"]').text()).toContain('今日预算已用尽')
+    expect((wrapper.get('input[max="1440"]').element as HTMLInputElement).value).toBe('10')
+    const first = vi.mocked(hall.enqueueProbe).mock.calls[0]
+    expect(first[3]).toEqual({ target_version: 2, profile_version: 1 })
+    vi.mocked(hall.enqueueProbe).mockResolvedValueOnce({ job_id: 11, status: 'queued', reused: false })
+    await wrapper.findAll('button').find(b => b.text() === zh.providerHall.probeNow)!.trigger('click')
+    await flushPromises()
+    expect(hall.saveSettings).toHaveBeenCalledTimes(1)
+    expect(vi.mocked(hall.enqueueProbe).mock.calls[1]).toEqual(first)
+    wrapper.unmount()
+  })
+
+  it('ignores repeated dedicated-key clicks while a request is pending', async () => {
+    let finish!: (key: hall.ProviderHallProbeKeyOption) => void
+    vi.mocked(hall.ensureProbeKey).mockImplementation(() => new Promise(resolve => { finish = resolve }))
+    const wrapper = mount(ProviderHallGroups, { props: { operatorId: 2, profiles: [profile] }, global: globalOptions() })
+    await flushPromises()
+    await wrapper.findAll('button').find(b => b.text().includes('管理'))!.trigger('click')
+    await flushPromises()
+    const button = wrapper.findAll('button').find(b => b.text() === zh.providerHall.ensureKey)!
+    await button.trigger('click')
+    await button.trigger('click')
+    expect(hall.ensureProbeKey).toHaveBeenCalledTimes(1)
+    finish({ id: 10, name: 'Provider Hall', status: 'registered', registered: true, group_id: 1, operator_user_id: 2 })
+    await flushPromises()
+    expect(wrapper.text()).toContain('Provider Hall #10')
+    wrapper.unmount()
+  })
+
+  it('requires an explicit enable-and-test action for disabled targets', async () => {
     vi.mocked(hall.getTargets).mockImplementation(async id => targets(id, false))
     const wrapper = mount(ProviderHallGroups, { props: { operatorId: 2, profiles: [profile] }, global: globalOptions() })
     await flushPromises()
-    expect(wrapper.get('button[aria-label="立即探测 gpt-test"]').attributes('disabled')).toBeDefined()
+    await wrapper.findAll('button').find(b => b.text().includes('管理'))!.trigger('click')
+    await flushPromises()
+    expect(wrapper.text()).toContain('启用并测试')
+    expect(hall.enqueueProbe).not.toHaveBeenCalled()
     wrapper.unmount()
   })
 })
@@ -117,6 +166,7 @@ describe('Provider Hall jobs tab', () => {
     expect(wrapper.text()).toContain('排队中')
     expect(wrapper.find('button[aria-label="取消任务 #2"]').exists()).toBe(false)
     await wrapper.get('#hall-job-status').setValue('running')
+    await new Promise(resolve => setTimeout(resolve, 300))
     await flushPromises()
     expect(hall.listJobs).toHaveBeenLastCalledWith(expect.objectContaining({ status: 'running', page: 1 }), expect.any(AbortSignal))
     await wrapper.get('button[aria-label="取消任务 #1"]').trigger('click')
@@ -185,5 +235,33 @@ describe('Provider Hall health tab', () => {
 
   it('has matching Chinese and English locale keys', () => {
     expect(Object.keys(zh.providerHall).sort()).toEqual(Object.keys(en.providerHall).sort())
+  })
+})
+
+
+describe('Provider Hall batch feedback', () => {
+  it('requires a preview, retains failures and reloads their versions before retrying', async () => {
+    const groups = [1, 2].map(id => ({ ...group(id), name: `Group ${id}`, platform: 'openai', status: 'active', supported: true, reason: '', targets: targets(id).items.map(t => ({ ...t, id: id + 7 })), models: ['gpt-test'], effective_profile_id: 7 }))
+    const wrapper = mount(ProviderHallBatchDialog, { props: { show: false, groups, profiles: [profile] }, global: globalOptions() })
+    await wrapper.setProps({ show: true })
+    const button = (label: string) => wrapper.findAll('button').find(b => b.text() === label)!
+    expect(button(zh.providerHall.execute).attributes('disabled')).toBeDefined()
+    vi.mocked(hall.batchGroups).mockResolvedValueOnce([{ id: 1, success: true }, { id: 2, success: true }])
+    await button(zh.providerHall.preview).trigger('click')
+    await flushPromises()
+    expect(hall.batchGroups).toHaveBeenLastCalledWith(expect.arrayContaining([expect.objectContaining({ id: 1, version: 4 }), expect.objectContaining({ id: 2, version: 4 })]), true)
+    vi.mocked(hall.batchGroups).mockResolvedValueOnce([{ id: 1, success: true }, { id: 2, success: false, reason: 'PROVIDER_HALL_VERSION_CONFLICT' }])
+    await button(zh.providerHall.execute).trigger('click')
+    await flushPromises()
+    expect(wrapper.emitted('saved')).toEqual([[[2]]])
+    expect(wrapper.text()).toContain('当前输入已保留')
+    vi.mocked(hall.getTargets).mockResolvedValueOnce({ ...targets(2), version: 9 })
+    await button(zh.providerHall.reloadFailed).trigger('click')
+    await flushPromises()
+    vi.mocked(hall.batchGroups).mockResolvedValueOnce([{ id: 2, success: true }])
+    await button(zh.providerHall.preview).trigger('click')
+    await flushPromises()
+    expect(hall.batchGroups).toHaveBeenLastCalledWith([expect.objectContaining({ id: 2, version: 9 })], true)
+    wrapper.unmount()
   })
 })

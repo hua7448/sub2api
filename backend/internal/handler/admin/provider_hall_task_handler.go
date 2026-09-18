@@ -77,7 +77,15 @@ func (h *ProviderHallHandler) enqueue(c *gin.Context, kind service.ProviderHallJ
 		response.ErrorFrom(c, service.ErrProviderHallNotReady.WithMetadata(map[string]string{"switch": "tasks_enabled"}))
 		return
 	}
-	job, reused, err := h.runner.EnqueueManual(c.Request.Context(), kind, groupID, input.ProfileID, key, actor)
+	ctx := c.Request.Context()
+	if input.TargetVersion != nil || input.ProfileVersion != nil {
+		if input.TargetVersion == nil || input.ProfileVersion == nil || *input.TargetVersion < 1 || *input.ProfileVersion < 1 {
+			response.BadRequest(c, "target_version and profile_version are required together")
+			return
+		}
+		ctx = service.ProviderHallWithExpectedVersions(ctx, *input.TargetVersion, *input.ProfileVersion)
+	}
+	job, reused, err := h.runner.EnqueueManual(ctx, kind, groupID, input.ProfileID, key, actor)
 	if response.ErrorFrom(c, err) {
 		return
 	}
@@ -96,6 +104,19 @@ func (h *ProviderHallHandler) ListJobs(c *gin.Context) {
 		return
 	}
 	filter := service.ProviderHallJobFilter{}
+	filter.GroupName, filter.Model, filter.Source = strings.TrimSpace(c.Query("group_name")), strings.TrimSpace(c.Query("model")), c.Query("source")
+	if filter.Source != "" && filter.Source != "manual" && filter.Source != "scheduled" {
+		response.BadRequest(c, "invalid source")
+		return
+	}
+	if raw := c.Query("profile_id"); raw != "" {
+		id, err := strconv.ParseInt(raw, 10, 64)
+		if err != nil || id < 1 {
+			response.BadRequest(c, "invalid profile_id")
+			return
+		}
+		filter.ProfileID = id
+	}
 	switch status := service.ProviderHallJobStatus(strings.TrimSpace(c.Query("status"))); status {
 	case "", service.ProviderHallJobQueued, service.ProviderHallJobRunning, service.ProviderHallJobSucceeded, service.ProviderHallJobFailed, service.ProviderHallJobCancelled, service.ProviderHallJobUnknown:
 		filter.Status = status
@@ -252,6 +273,8 @@ func (h *ProviderHallHandler) Health(c *gin.Context) {
 	out.Collection.Enabled = cfg.CollectionEnabled
 	out.Budget.Day = service.ProviderHallBudgetDay(now)
 	out.Budget.Budget = cfg.DailyBudget
+	out.TasksEnabled = cfg.TasksEnabled
+	out.AutoScheduleEnabled = service.ProviderHallAutoSchedule(cfg.AutoScheduleEnabled)
 	out.Budget.ConfirmedSpend, out.Budget.UncertainSpend = "0", "0"
 
 	if h.queue != nil {

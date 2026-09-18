@@ -65,6 +65,20 @@ func (_c *ProviderHallConfigCreate) SetNillableTasksEnabled(v *bool) *ProviderHa
 	return _c
 }
 
+// SetAutoScheduleEnabled sets the "auto_schedule_enabled" field.
+func (_c *ProviderHallConfigCreate) SetAutoScheduleEnabled(v bool) *ProviderHallConfigCreate {
+	_c.mutation.SetAutoScheduleEnabled(v)
+	return _c
+}
+
+// SetNillableAutoScheduleEnabled sets the "auto_schedule_enabled" field if the given value is not nil.
+func (_c *ProviderHallConfigCreate) SetNillableAutoScheduleEnabled(v *bool) *ProviderHallConfigCreate {
+	if v != nil {
+		_c.SetAutoScheduleEnabled(*v)
+	}
+	return _c
+}
+
 // SetDefaultModel sets the "default_model" field.
 func (_c *ProviderHallConfigCreate) SetDefaultModel(v string) *ProviderHallConfigCreate {
 	_c.mutation.SetDefaultModel(v)
@@ -258,6 +272,10 @@ func (_c *ProviderHallConfigCreate) defaults() {
 		v := providerhallconfig.DefaultTasksEnabled
 		_c.mutation.SetTasksEnabled(v)
 	}
+	if _, ok := _c.mutation.AutoScheduleEnabled(); !ok {
+		v := providerhallconfig.DefaultAutoScheduleEnabled
+		_c.mutation.SetAutoScheduleEnabled(v)
+	}
 	if _, ok := _c.mutation.DefaultModel(); !ok {
 		v := providerhallconfig.DefaultDefaultModel
 		_c.mutation.SetDefaultModel(v)
@@ -306,6 +324,9 @@ func (_c *ProviderHallConfigCreate) check() error {
 	}
 	if _, ok := _c.mutation.TasksEnabled(); !ok {
 		return &ValidationError{Name: "tasks_enabled", err: errors.New(`ent: missing required field "ProviderHallConfig.tasks_enabled"`)}
+	}
+	if _, ok := _c.mutation.AutoScheduleEnabled(); !ok {
+		return &ValidationError{Name: "auto_schedule_enabled", err: errors.New(`ent: missing required field "ProviderHallConfig.auto_schedule_enabled"`)}
 	}
 	if _, ok := _c.mutation.DefaultModel(); !ok {
 		return &ValidationError{Name: "default_model", err: errors.New(`ent: missing required field "ProviderHallConfig.default_model"`)}
@@ -405,6 +426,10 @@ func (_c *ProviderHallConfigCreate) createSpec() (*ProviderHallConfig, *sqlgraph
 	if value, ok := _c.mutation.TasksEnabled(); ok {
 		_spec.SetField(providerhallconfig.FieldTasksEnabled, field.TypeBool, value)
 		_node.TasksEnabled = value
+	}
+	if value, ok := _c.mutation.AutoScheduleEnabled(); ok {
+		_spec.SetField(providerhallconfig.FieldAutoScheduleEnabled, field.TypeBool, value)
+		_node.AutoScheduleEnabled = value
 	}
 	if value, ok := _c.mutation.DefaultModel(); ok {
 		_spec.SetField(providerhallconfig.FieldDefaultModel, field.TypeString, value)
@@ -531,6 +556,18 @@ func (u *ProviderHallConfigUpsert) SetTasksEnabled(v bool) *ProviderHallConfigUp
 // UpdateTasksEnabled sets the "tasks_enabled" field to the value that was provided on create.
 func (u *ProviderHallConfigUpsert) UpdateTasksEnabled() *ProviderHallConfigUpsert {
 	u.SetExcluded(providerhallconfig.FieldTasksEnabled)
+	return u
+}
+
+// SetAutoScheduleEnabled sets the "auto_schedule_enabled" field.
+func (u *ProviderHallConfigUpsert) SetAutoScheduleEnabled(v bool) *ProviderHallConfigUpsert {
+	u.Set(providerhallconfig.FieldAutoScheduleEnabled, v)
+	return u
+}
+
+// UpdateAutoScheduleEnabled sets the "auto_schedule_enabled" field to the value that was provided on create.
+func (u *ProviderHallConfigUpsert) UpdateAutoScheduleEnabled() *ProviderHallConfigUpsert {
+	u.SetExcluded(providerhallconfig.FieldAutoScheduleEnabled)
 	return u
 }
 
@@ -771,6 +808,20 @@ func (u *ProviderHallConfigUpsertOne) SetTasksEnabled(v bool) *ProviderHallConfi
 func (u *ProviderHallConfigUpsertOne) UpdateTasksEnabled() *ProviderHallConfigUpsertOne {
 	return u.Update(func(s *ProviderHallConfigUpsert) {
 		s.UpdateTasksEnabled()
+	})
+}
+
+// SetAutoScheduleEnabled sets the "auto_schedule_enabled" field.
+func (u *ProviderHallConfigUpsertOne) SetAutoScheduleEnabled(v bool) *ProviderHallConfigUpsertOne {
+	return u.Update(func(s *ProviderHallConfigUpsert) {
+		s.SetAutoScheduleEnabled(v)
+	})
+}
+
+// UpdateAutoScheduleEnabled sets the "auto_schedule_enabled" field to the value that was provided on create.
+func (u *ProviderHallConfigUpsertOne) UpdateAutoScheduleEnabled() *ProviderHallConfigUpsertOne {
+	return u.Update(func(s *ProviderHallConfigUpsert) {
+		s.UpdateAutoScheduleEnabled()
 	})
 }
 
@@ -1202,6 +1253,20 @@ func (u *ProviderHallConfigUpsertBulk) SetTasksEnabled(v bool) *ProviderHallConf
 func (u *ProviderHallConfigUpsertBulk) UpdateTasksEnabled() *ProviderHallConfigUpsertBulk {
 	return u.Update(func(s *ProviderHallConfigUpsert) {
 		s.UpdateTasksEnabled()
+	})
+}
+
+// SetAutoScheduleEnabled sets the "auto_schedule_enabled" field.
+func (u *ProviderHallConfigUpsertBulk) SetAutoScheduleEnabled(v bool) *ProviderHallConfigUpsertBulk {
+	return u.Update(func(s *ProviderHallConfigUpsert) {
+		s.SetAutoScheduleEnabled(v)
+	})
+}
+
+// UpdateAutoScheduleEnabled sets the "auto_schedule_enabled" field to the value that was provided on create.
+func (u *ProviderHallConfigUpsertBulk) UpdateAutoScheduleEnabled() *ProviderHallConfigUpsertBulk {
+	return u.Update(func(s *ProviderHallConfigUpsert) {
+		s.UpdateAutoScheduleEnabled()
 	})
 }
 

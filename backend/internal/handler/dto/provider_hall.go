@@ -7,17 +7,18 @@ import (
 )
 
 type ProviderHallConfigInput struct {
-	Version           *int64   `json:"version"`
-	CollectionEnabled bool     `json:"collection_enabled"`
-	DisplayEnabled    bool     `json:"display_enabled"`
-	TasksEnabled      bool     `json:"tasks_enabled"`
-	DefaultModel      string   `json:"default_model"`
-	DefaultProtocol   string   `json:"default_protocol"`
-	DefaultRange      string   `json:"default_range"`
-	GatewayOrigin     string   `json:"gateway_origin"`
-	OperatorUserID    *int64   `json:"operator_user_id"`
-	DailyBudget       string   `json:"daily_budget"`
-	ExpectedNodes     []string `json:"expected_nodes"`
+	Version             *int64   `json:"version"`
+	CollectionEnabled   bool     `json:"collection_enabled"`
+	DisplayEnabled      bool     `json:"display_enabled"`
+	TasksEnabled        bool     `json:"tasks_enabled"`
+	AutoScheduleEnabled *bool    `json:"auto_schedule_enabled"`
+	DefaultModel        string   `json:"default_model"`
+	DefaultProtocol     string   `json:"default_protocol"`
+	DefaultRange        string   `json:"default_range"`
+	GatewayOrigin       string   `json:"gateway_origin"`
+	OperatorUserID      *int64   `json:"operator_user_id"`
+	DailyBudget         string   `json:"daily_budget"`
+	ExpectedNodes       []string `json:"expected_nodes"`
 }
 
 // ProviderHallReadiness tells the admin page which runtime switches this
@@ -47,6 +48,7 @@ type ProviderHallTargetInput struct {
 	ProfileID                   int64  `json:"profile_id"`
 	ProbeKeyID                  *int64 `json:"probe_key_id"`
 	Enabled                     bool   `json:"enabled"`
+	AutoScheduleEnabled         *bool  `json:"auto_schedule_enabled"`
 	ProbeIntervalSeconds        int    `json:"probe_interval_seconds"`
 	VerificationIntervalSeconds int    `json:"verification_interval_seconds"`
 }
@@ -94,6 +96,8 @@ type ProviderHallMetric[T any] struct {
 // sample and report rows reuse the service types (no key material).
 
 type ProviderHallEnqueueInput struct {
+	TargetVersion  *int64 `json:"target_version"`
+	ProfileVersion *int64 `json:"profile_version"`
 	ProfileID      int64  `json:"profile_id"`
 	IdempotencyKey string `json:"idempotency_key"`
 }
@@ -169,10 +173,12 @@ type ProviderHallHealthJobs struct {
 }
 
 type ProviderHallAdminHealth struct {
-	GeneratedAt    time.Time                        `json:"generated_at"`
-	Collection     ProviderHallHealthCollection     `json:"collection"`
-	Aggregator     ProviderHallHealthAggregator     `json:"aggregator"`
-	Reconciliation ProviderHallHealthReconciliation `json:"reconciliation"`
-	Budget         ProviderHallHealthBudget         `json:"budget"`
-	Jobs           ProviderHallHealthJobs           `json:"jobs"`
+	TasksEnabled        bool                             `json:"tasks_enabled"`
+	AutoScheduleEnabled bool                             `json:"auto_schedule_enabled"`
+	GeneratedAt         time.Time                        `json:"generated_at"`
+	Collection          ProviderHallHealthCollection     `json:"collection"`
+	Aggregator          ProviderHallHealthAggregator     `json:"aggregator"`
+	Reconciliation      ProviderHallHealthReconciliation `json:"reconciliation"`
+	Budget              ProviderHallHealthBudget         `json:"budget"`
+	Jobs                ProviderHallHealthJobs           `json:"jobs"`
 }

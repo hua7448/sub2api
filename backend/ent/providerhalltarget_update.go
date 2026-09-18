@@ -69,6 +69,20 @@ func (_u *ProviderHallTargetUpdate) SetNillableEnabled(v *bool) *ProviderHallTar
 	return _u
 }
 
+// SetAutoScheduleEnabled sets the "auto_schedule_enabled" field.
+func (_u *ProviderHallTargetUpdate) SetAutoScheduleEnabled(v bool) *ProviderHallTargetUpdate {
+	_u.mutation.SetAutoScheduleEnabled(v)
+	return _u
+}
+
+// SetNillableAutoScheduleEnabled sets the "auto_schedule_enabled" field if the given value is not nil.
+func (_u *ProviderHallTargetUpdate) SetNillableAutoScheduleEnabled(v *bool) *ProviderHallTargetUpdate {
+	if v != nil {
+		_u.SetAutoScheduleEnabled(*v)
+	}
+	return _u
+}
+
 // SetProbeIntervalSeconds sets the "probe_interval_seconds" field.
 func (_u *ProviderHallTargetUpdate) SetProbeIntervalSeconds(v int) *ProviderHallTargetUpdate {
 	_u.mutation.ResetProbeIntervalSeconds()
@@ -255,6 +269,9 @@ func (_u *ProviderHallTargetUpdate) sqlSave(ctx context.Context) (_node int, err
 	if value, ok := _u.mutation.Enabled(); ok {
 		_spec.SetField(providerhalltarget.FieldEnabled, field.TypeBool, value)
 	}
+	if value, ok := _u.mutation.AutoScheduleEnabled(); ok {
+		_spec.SetField(providerhalltarget.FieldAutoScheduleEnabled, field.TypeBool, value)
+	}
 	if value, ok := _u.mutation.ProbeIntervalSeconds(); ok {
 		_spec.SetField(providerhalltarget.FieldProbeIntervalSeconds, field.TypeInt, value)
 	}
@@ -342,6 +359,20 @@ func (_u *ProviderHallTargetUpdateOne) SetEnabled(v bool) *ProviderHallTargetUpd
 func (_u *ProviderHallTargetUpdateOne) SetNillableEnabled(v *bool) *ProviderHallTargetUpdateOne {
 	if v != nil {
 		_u.SetEnabled(*v)
+	}
+	return _u
+}
+
+// SetAutoScheduleEnabled sets the "auto_schedule_enabled" field.
+func (_u *ProviderHallTargetUpdateOne) SetAutoScheduleEnabled(v bool) *ProviderHallTargetUpdateOne {
+	_u.mutation.SetAutoScheduleEnabled(v)
+	return _u
+}
+
+// SetNillableAutoScheduleEnabled sets the "auto_schedule_enabled" field if the given value is not nil.
+func (_u *ProviderHallTargetUpdateOne) SetNillableAutoScheduleEnabled(v *bool) *ProviderHallTargetUpdateOne {
+	if v != nil {
+		_u.SetAutoScheduleEnabled(*v)
 	}
 	return _u
 }
@@ -561,6 +592,9 @@ func (_u *ProviderHallTargetUpdateOne) sqlSave(ctx context.Context) (_node *Prov
 	}
 	if value, ok := _u.mutation.Enabled(); ok {
 		_spec.SetField(providerhalltarget.FieldEnabled, field.TypeBool, value)
+	}
+	if value, ok := _u.mutation.AutoScheduleEnabled(); ok {
+		_spec.SetField(providerhalltarget.FieldAutoScheduleEnabled, field.TypeBool, value)
 	}
 	if value, ok := _u.mutation.ProbeIntervalSeconds(); ok {
 		_spec.SetField(providerhalltarget.FieldProbeIntervalSeconds, field.TypeInt, value)

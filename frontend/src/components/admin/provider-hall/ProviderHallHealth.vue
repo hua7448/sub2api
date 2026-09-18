@@ -1,5 +1,5 @@
 <template>
-  <div class="space-y-6">
+  <div class="hall-health space-y-6">
     <div class="flex flex-wrap items-center justify-between gap-3">
       <p class="text-xs text-gray-500">{{ health ? t('admin.providerHall.healthGeneratedAt', { at: formatDate(health.generated_at) }) : '' }}</p>
       <div class="flex items-center gap-2">
@@ -10,11 +10,13 @@
     <p v-if="error" role="alert" class="hall-error">{{ error }}</p>
     <p v-if="loading && !health" role="status" class="py-6 text-sm text-gray-500">{{ t('common.loading') }}</p>
     <template v-if="health">
+      <div class="flex flex-wrap items-center gap-4 border-b border-gray-200 pb-4 text-sm dark:border-dark-700">
+        <span>{{ t('admin.providerHall.tasks') }}: {{ t(health.tasks_enabled ? 'admin.providerHall.enabled' : 'admin.providerHall.inactive') }}</span>
+        <span>{{ t('admin.providerHall.autoSchedule') }}: {{ t(health.auto_schedule_enabled ? 'admin.providerHall.enabled' : 'admin.providerHall.inactive') }}</span>
+        <button class="btn btn-secondary" @click="emit('config')">{{ t('admin.providerHall.settingsEntry') }}</button>
+      </div>
+      <p v-if="health.budget.paused_reason || health.aggregator.last_error" class="hall-error">{{ health.budget.paused_reason ? t(`admin.providerHall.paused_${health.budget.paused_reason}`) : health.aggregator.last_error }}</p>
       <div class="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
-        <StatCard :title="t('admin.providerHall.healthCollectionEnabled')" :value="health.collection.enabled ? t('admin.providerHall.enabled') : t('admin.providerHall.inactive')" :icon="Radio" :icon-variant="health.collection.enabled ? 'success' : 'warning'" />
-        <StatCard :title="t('admin.providerHall.healthQueue')" :value="t('admin.providerHall.healthQueueValue', health.collection.local_queue)" :icon="Layers" :icon-variant="health.collection.local_queue.dropped > 0 ? 'danger' : 'primary'" />
-        <StatCard :title="t('admin.providerHall.healthLag')" :value="health.aggregator.lag_seconds === null ? t('admin.providerHall.never') : t('admin.providerHall.seconds', { n: health.aggregator.lag_seconds })" :icon="Timer" :icon-variant="health.aggregator.lag_seconds !== null && health.aggregator.lag_seconds > 300 ? 'warning' : 'primary'" />
-        <StatCard :title="t('admin.providerHall.healthDirty')" :value="health.aggregator.dirty_count" :icon="ListChecks" icon-variant="primary" />
         <StatCard :title="t('admin.providerHall.healthPending')" :value="health.reconciliation.pending" :icon="Hourglass" icon-variant="primary" />
         <StatCard :title="t('admin.providerHall.healthUncertain')" :value="health.reconciliation.uncertain" :icon="CircleHelp" :icon-variant="health.reconciliation.uncertain > 0 ? 'warning' : 'primary'" />
         <StatCard :title="t('admin.providerHall.healthConfirmedSpend')" :value="`${health.budget.confirmed_spend} / ${health.budget.budget}`" :icon="Wallet" :icon-variant="health.budget.paused_reason === 'budget_exhausted' ? 'danger' : 'success'" />
@@ -48,7 +50,12 @@
         </ul>
         <p v-else class="text-sm text-gray-500">{{ t('admin.providerHall.healthNoGaps') }}</p>
       </section>
-      <div class="grid grid-cols-1 gap-6 lg:grid-cols-3">
+      <details><summary class="cursor-pointer py-3 text-sm font-medium">{{ t('admin.providerHall.diagnostics') }}</summary><div class="mb-6 grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
+        <StatCard :title="t('admin.providerHall.healthCollectionEnabled')" :value="health.collection.enabled ? t('admin.providerHall.enabled') : t('admin.providerHall.inactive')" :icon="Radio" :icon-variant="health.collection.enabled ? 'success' : 'warning'" />
+        <StatCard :title="t('admin.providerHall.healthQueue')" :value="t('admin.providerHall.healthQueueValue', health.collection.local_queue)" :icon="Layers" :icon-variant="health.collection.local_queue.dropped > 0 ? 'danger' : 'primary'" />
+        <StatCard :title="t('admin.providerHall.healthLag')" :value="health.aggregator.lag_seconds === null ? t('admin.providerHall.never') : t('admin.providerHall.seconds', { n: health.aggregator.lag_seconds })" :icon="Timer" :icon-variant="health.aggregator.lag_seconds !== null && health.aggregator.lag_seconds > 300 ? 'warning' : 'primary'" />
+        <StatCard :title="t('admin.providerHall.healthDirty')" :value="health.aggregator.dirty_count" :icon="ListChecks" icon-variant="primary" />
+      </div><div class="grid grid-cols-1 gap-6 lg:grid-cols-3">
         <section class="space-y-2">
           <h2 class="text-base font-semibold">{{ t('admin.providerHall.healthAggregator') }}</h2>
           <dl class="hall-dl">
@@ -73,7 +80,7 @@
             <dt>{{ t('admin.providerHall.healthJobsFailed24h') }}</dt><dd>{{ health.jobs.failed_24h }}</dd>
           </dl>
         </section>
-      </div>
+      </div></details>
     </template>
   </div>
 </template>
@@ -90,6 +97,7 @@ import { formatDate } from '@/utils/format'
 import { hallError } from './helpers'
 
 const { t } = useI18n()
+const emit = defineEmits<{ config: [] }>()
 const health = ref<hall.ProviderHallHealth | null>(null)
 const loading = ref(false)
 const error = ref('')
@@ -114,6 +122,7 @@ onUnmounted(() => request?.abort())
 </script>
 
 <style>
+.hall-health .stat-value { white-space: normal; overflow-wrap: anywhere; font-size: 1.125rem; }
 .hall-dl { @apply grid grid-cols-[auto_1fr] gap-x-4 gap-y-1 text-sm; }
 .hall-dl dt { @apply text-gray-500 dark:text-gray-400; }
 </style>

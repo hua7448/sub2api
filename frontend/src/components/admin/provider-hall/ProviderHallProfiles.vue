@@ -7,12 +7,13 @@
         <button class="btn btn-primary" @click="open()"><Plus :size="16" />{{ t('admin.providerHall.addProfile') }}</button>
       </div>
     </div>
+    <input v-model="search" class="input mb-4 max-w-sm" :placeholder="t('admin.providerHall.searchProfiles')" :aria-label="t('admin.providerHall.searchProfiles')" />
     <div class="overflow-x-auto">
       <table class="hall-table min-w-[650px]">
         <thead><tr><th class="w-[32%]">{{ t('admin.providerHall.model') }}</th><th class="w-[22%]">{{ t('admin.providerHall.protocol') }}</th><th class="w-[16%]">{{ t('admin.providerHall.outputLimit') }}</th><th class="w-[20%]">{{ t('admin.providerHall.tools') }}</th><th class="w-[10%]"><span class="sr-only">{{ t('common.edit') }}</span></th></tr></thead>
         <tbody>
-          <tr v-for="profile in profiles" :key="profile.id">
-            <td class="break-all font-medium">{{ profile.model }}</td>
+          <tr v-for="profile in paged" :key="profile.id">
+            <td class="break-all font-medium">{{ profile.model }}<span v-if="isDefault(profile)" class="ml-2 text-xs text-emerald-600">{{ t('admin.providerHall.defaultMarker') }}</span><span class="block text-xs text-gray-500">{{ profile.groups?.map(g => g.name).join(', ') }}</span><span class="block text-xs text-gray-500">{{ profile.reference_input_price || '-' }} / {{ profile.reference_cache_price || '-' }} · {{ t(referenceValid(profile) ? 'admin.providerHall.referenceValid' : 'admin.providerHall.referenceInvalid') }}</span></td>
             <td>{{ protocols.find(p => p.value === profile.protocol)?.label }}</td>
             <td>{{ profile.output_limit }}</td>
             <td><Check v-if="profile.supports_tools" :size="17" class="text-emerald-600" :aria-label="t('common.yes')" /><span v-else class="text-gray-500">{{ t('common.no') }}</span></td>
@@ -22,9 +23,16 @@
         </tbody>
       </table>
     </div>
+    <Pagination v-if="filtered.length" :total="filtered.length" :page="page" :page-size="20" :show-page-size-selector="false" @update:page="page = $event" />
     <BaseDialog :show="show" :title="t(editingID ? 'admin.providerHall.editProfile' : 'admin.providerHall.addProfile')" width="wide" :close-on-escape="!saving" :show-close-button="!saving" @close="close">
       <form id="hall-profile-form" class="hall-form" @submit.prevent="save">
         <p v-if="error" role="alert" class="hall-error">{{ error }}</p>
+        <p v-if="editingProfile?.groups?.length" class="text-sm">{{ t('admin.providerHall.sharedProfile') }} {{ editingProfile.groups.map(g => g.name).join(', ') }}</p>
+        <p v-if="editingProfile && isDefault(editingProfile)" class="text-sm text-amber-600">{{ t('admin.providerHall.defaultIdentityLocked') }} <button type="button" class="underline" @click="show = false; emit('config')">{{ t('admin.providerHall.settingsEntry') }}</button></p>
+        <div v-if="!editingID" class="mb-4 space-y-3">
+          <Select v-model="sourceGroup" :options="sourceGroups.map(g => ({ value: g.group_id, label: g.name }))" remote searchable :aria-label="t('admin.providerHall.sourceGroup')" @search="loadSourceGroups" />
+          <Select :model-value="null" :options="sourceModels.filter(m => m.available).map((m, i) => ({ value: i, label: `${m.model} / ${m.protocol}` }))" searchable :aria-label="t('admin.providerHall.chooseModels')" @update:model-value="selectModel" />
+        </div>
         <fieldset :disabled="saving" class="hall-fields">
           <label class="hall-field"><span>{{ t('admin.providerHall.model') }}</span><input v-model.trim="draft.model" class="input" maxlength="200" required /></label>
           <label class="hall-field"><span>{{ t('admin.providerHall.protocol') }}</span><select v-model="draft.protocol" class="input"><option v-for="p in protocols" :key="p.value" :value="p.value">{{ p.label }}</option></select></label>
@@ -35,7 +43,7 @@
           <template v-if="hasReference">
             <label class="hall-field"><span>{{ t('admin.providerHall.inputPrice') }}</span><input v-model="draft.reference_input_price" class="input" inputmode="decimal" pattern="[0-9]+(\.[0-9]{1,10})?" required @input="referenceEdited" /></label>
             <label class="hall-field"><span>{{ t('admin.providerHall.cachePrice') }}</span><input v-model="draft.reference_cache_price" class="input" inputmode="decimal" pattern="[0-9]+(\.[0-9]{1,10})?" required @input="referenceEdited" /></label>
-            <label class="hall-field"><span>{{ t('admin.providerHall.cacheRate') }}</span><input v-model="draft.reference_cache_rate" class="input" inputmode="decimal" pattern="(0(\.[0-9]{1,10})?|1(\.0{1,10})?)" required @input="referenceEdited" /></label>
+            <label class="hall-field"><span>{{ t('admin.providerHall.cacheRate') }}</span><input v-model="cachePercent" class="input" type="number" min="0" max="100" step="any" required @input="referenceEdited" /></label>
             <div class="hall-field">
               <span>{{ t('admin.providerHall.confirmedAt') }}</span>
               <div class="flex flex-wrap items-center gap-2"><time class="text-xs">{{ draft.reference_confirmed_at ? new Date(draft.reference_confirmed_at).toLocaleString(locale) : t('admin.providerHall.none') }}</time><button type="button" class="btn btn-secondary" @click="draft.reference_confirmed_at = new Date().toISOString()"><Check :size="16" />{{ t('admin.providerHall.confirmNow') }}</button></div>
@@ -54,15 +62,17 @@
 </template>
 
 <script setup lang="ts">
-import { computed, onUnmounted, ref, watch } from 'vue'
+import { computed, onMounted, onUnmounted, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { Check, Pencil, Plus, RefreshCw, Save } from 'lucide-vue-next'
 import BaseDialog from '@/components/common/BaseDialog.vue'
+import Select from '@/components/common/Select.vue'
+import Pagination from '@/components/common/Pagination.vue'
 import * as hall from '@/api/admin/providerHall'
 import { hallError, lines, protocols } from './helpers'
 
-defineProps<{ profiles: hall.ProviderHallProfile[] }>()
-const emit = defineEmits<{ saved: [hall.ProviderHallProfile]; reload: []; dirty: [boolean] }>()
+const props = defineProps<{ profiles: hall.ProviderHallProfile[]; config?: hall.ProviderHallConfig }>()
+const emit = defineEmits<{ saved: [hall.ProviderHallProfile]; reload: []; dirty: [boolean]; config: [] }>()
 const { t, locale } = useI18n()
 const show = ref(false)
 const saving = ref(false)
@@ -71,6 +81,17 @@ const error = ref('')
 const aliasText = ref('')
 const hasReference = ref(false)
 const draft = ref<hall.ProviderHallProfileInput>(emptyProfile())
+const search = ref(''), page = ref(1), sourceGroup = ref<number | null>(null), sourceGroups = ref<hall.ProviderHallGroupSummary[]>([]), sourceModels = ref<hall.ProviderHallModelCandidate[]>([])
+const filtered = computed(() => props.profiles.filter(p => `${p.model} ${p.protocol} ${p.groups?.map(g => g.name).join(' ')}`.toLowerCase().includes(search.value.toLowerCase())))
+const paged = computed(() => filtered.value.slice((page.value - 1) * 20, page.value * 20))
+const editingProfile = computed(() => props.profiles.find(p => p.id === editingID.value))
+const cachePercent = computed({ get: () => draft.value.reference_cache_rate === null ? '' : String(Number(draft.value.reference_cache_rate) * 100), set: value => { draft.value.reference_cache_rate = value === '' ? null : String(Number(value) / 100) } })
+function referenceValid(p: hall.ProviderHallProfile) { return p.reference_confirmed_at && Date.now() - Date.parse(p.reference_confirmed_at) <= 7 * 86400000 && p.reference_input_price !== null && p.reference_cache_price !== null && p.reference_cache_rate !== null }
+function isDefault(p: hall.ProviderHallProfile) { return props.config ? p.model === props.config.default_model && p.protocol === props.config.default_protocol : p.is_default }
+async function loadSourceGroups(search = '') { try { const result = await hall.listGroups({ search, page_size: 100 }); if (!disposed) sourceGroups.value = result.items.filter(g => g.supported) } catch (err) { error.value = hallError(err, t) } }
+function selectModel(index: unknown) { const m = sourceModels.value.filter(m => m.available)[Number(index)]; if (m) { draft.value.model = m.model; draft.value.protocol = m.protocol } }
+watch(sourceGroup, async id => { if (!id) return; try { const ms = await hall.listModels(id); if (!disposed && sourceGroup.value === id) sourceModels.value = ms } catch (err) { error.value = hallError(err, t) } })
+watch(search, () => { page.value = 1 })
 let disposed = false
 const snapshot = computed(() => JSON.stringify({ ...draft.value, model_aliases: lines(aliasText.value), hasReference: hasReference.value }))
 const initial = ref('')
@@ -94,6 +115,7 @@ function close() {
   if (!saving.value && (!dirty.value || window.confirm(t('admin.providerHall.discard')))) show.value = false
 }
 async function save() {
+  if (saving.value) return
   const d = draft.value
   if (hasReference.value && (!d.reference_confirmed_at || !d.reference_input_price || !d.reference_cache_price || !d.reference_cache_rate)) {
     error.value = t('admin.providerHall.referenceRequired'); return
@@ -112,6 +134,7 @@ async function save() {
   } catch (err) { if (!disposed) error.value = hallError(err, t) }
   finally { saving.value = false }
 }
+onMounted(() => { void loadSourceGroups() })
 onUnmounted(() => { disposed = true })
 </script>
 

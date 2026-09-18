@@ -19,18 +19,18 @@
           <ProviderHallConfigForm :config="config" :profiles="profiles" :loading="loading" @saved="configSaved" @reload="load" @dirty="dirty.config = $event" />
         </section>
         <section id="hall-panel-groups" v-show="tab === 'groups'" role="tabpanel" aria-labelledby="hall-tab-groups" class="py-6">
-          <ProviderHallGroups :profiles="profiles" :operator-id="config.operator_user_id" @dirty="dirty.groups = $event" />
+          <ProviderHallGroups :profiles="profiles" :operator-id="config.operator_user_id" :focus-group="focusGroup" @open="openJob = $event" @jobs="showJobs" @profile="profileSaved" @dirty="dirty.groups = $event" />
         </section>
         <section id="hall-panel-profiles" v-show="tab === 'profiles'" role="tabpanel" aria-labelledby="hall-tab-profiles" class="py-6">
-          <ProviderHallProfiles :profiles="profiles" @saved="profileSaved" @reload="reloadProfiles" @dirty="dirty.profiles = $event" />
+          <ProviderHallProfiles :profiles="profiles" :config="config" @config="tab = 'config'" @saved="profileSaved" @reload="reloadProfiles" @dirty="dirty.profiles = $event" />
         </section>
         <section id="hall-panel-jobs" v-show="tab === 'jobs'" role="tabpanel" aria-labelledby="hall-tab-jobs" class="py-6">
-          <ProviderHallJobs v-if="visited.jobs" @open="openJob = $event" />
+          <ProviderHallJobs v-if="visited.jobs" :focus-group="jobGroup" :focus-profile="jobProfile" :active="tab === 'jobs'" @open="openJob = $event" @target="showTarget" />
         </section>
         <section id="hall-panel-health" v-show="tab === 'health'" role="tabpanel" aria-labelledby="hall-tab-health" class="py-6">
-          <ProviderHallHealth v-if="visited.health" />
+          <ProviderHallHealth v-if="visited.health" @config="tab = 'config'" />
         </section>
-        <ProviderHallJobDetailDialog :job-id="openJob" @close="openJob = null" />
+        <ProviderHallJobDetailDialog :job-id="openJob" @close="openJob = null" @target="openJob = null; showTarget($event)" />
       </template>
     </div>
   </AppLayout>
@@ -39,7 +39,7 @@
 <script setup lang="ts">
 import { nextTick, onMounted, onUnmounted, reactive, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
-import { onBeforeRouteLeave } from 'vue-router'
+import { onBeforeRouteLeave, useRoute, useRouter } from 'vue-router'
 import { Building2, RefreshCw } from 'lucide-vue-next'
 import AppLayout from '@/components/layout/AppLayout.vue'
 import ProviderHallConfigForm from '@/components/admin/provider-hall/ProviderHallConfigForm.vue'
@@ -54,12 +54,23 @@ import { useAppStore } from '@/stores/app'
 
 const { t } = useI18n()
 const app = useAppStore()
-const tabs = ['config', 'groups', 'profiles', 'jobs', 'health'] as const
+const route = useRoute(), router = useRouter()
+const tabs = ['groups', 'profiles', 'config', 'jobs', 'health'] as const
 type Tab = typeof tabs[number]
-const tab = ref<Tab>('config')
+const tab = ref<Tab>(tabs.includes(route.query.tab as Tab) ? route.query.tab as Tab : 'groups')
 // Task and health panels load on first visit so the config page stays cheap.
 const visited = reactive({ jobs: false, health: false })
-const openJob = ref<number | null>(null)
+const openJob = ref<number | null>(Number(route.query.job) || null)
+const focusGroup = ref<number | null>(tab.value === 'groups' ? Number(route.query.group) || null : null), jobGroup = ref<number | null>(Number(route.query.group) || null), jobProfile = ref<number | null>(Number(route.query.profile) || null)
+function showJobs(group: number, profile: number) { jobGroup.value = group; jobProfile.value = profile; tab.value = 'jobs' }
+async function showTarget(group: number) { focusGroup.value = null; await nextTick(); focusGroup.value = group; tab.value = 'groups' }
+// Keep one route writer so tab changes cannot overwrite target/job navigation.
+watch([tab, jobGroup, jobProfile, focusGroup, openJob], ([active, group, profile, focus, job]) => {
+  void router.replace({ query: { ...route.query, tab: active,
+    group: (active === 'jobs' ? group : active === 'groups' ? focus : null) || undefined,
+    profile: active === 'jobs' ? profile || undefined : undefined,
+    job: job || undefined } })
+})
 watch(tab, value => { if (value === 'jobs') visited.jobs = true; if (value === 'health') visited.health = true }, { immediate: true })
 const config = ref<hall.ProviderHallConfig | null>(null)
 const profiles = ref<hall.ProviderHallProfile[]>([])

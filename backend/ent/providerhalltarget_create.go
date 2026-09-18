@@ -62,6 +62,20 @@ func (_c *ProviderHallTargetCreate) SetNillableEnabled(v *bool) *ProviderHallTar
 	return _c
 }
 
+// SetAutoScheduleEnabled sets the "auto_schedule_enabled" field.
+func (_c *ProviderHallTargetCreate) SetAutoScheduleEnabled(v bool) *ProviderHallTargetCreate {
+	_c.mutation.SetAutoScheduleEnabled(v)
+	return _c
+}
+
+// SetNillableAutoScheduleEnabled sets the "auto_schedule_enabled" field if the given value is not nil.
+func (_c *ProviderHallTargetCreate) SetNillableAutoScheduleEnabled(v *bool) *ProviderHallTargetCreate {
+	if v != nil {
+		_c.SetAutoScheduleEnabled(*v)
+	}
+	return _c
+}
+
 // SetProbeIntervalSeconds sets the "probe_interval_seconds" field.
 func (_c *ProviderHallTargetCreate) SetProbeIntervalSeconds(v int) *ProviderHallTargetCreate {
 	_c.mutation.SetProbeIntervalSeconds(v)
@@ -171,6 +185,10 @@ func (_c *ProviderHallTargetCreate) defaults() {
 		v := providerhalltarget.DefaultEnabled
 		_c.mutation.SetEnabled(v)
 	}
+	if _, ok := _c.mutation.AutoScheduleEnabled(); !ok {
+		v := providerhalltarget.DefaultAutoScheduleEnabled
+		_c.mutation.SetAutoScheduleEnabled(v)
+	}
 	if _, ok := _c.mutation.ProbeIntervalSeconds(); !ok {
 		v := providerhalltarget.DefaultProbeIntervalSeconds
 		_c.mutation.SetProbeIntervalSeconds(v)
@@ -214,6 +232,9 @@ func (_c *ProviderHallTargetCreate) check() error {
 	}
 	if _, ok := _c.mutation.Enabled(); !ok {
 		return &ValidationError{Name: "enabled", err: errors.New(`ent: missing required field "ProviderHallTarget.enabled"`)}
+	}
+	if _, ok := _c.mutation.AutoScheduleEnabled(); !ok {
+		return &ValidationError{Name: "auto_schedule_enabled", err: errors.New(`ent: missing required field "ProviderHallTarget.auto_schedule_enabled"`)}
 	}
 	if _, ok := _c.mutation.ProbeIntervalSeconds(); !ok {
 		return &ValidationError{Name: "probe_interval_seconds", err: errors.New(`ent: missing required field "ProviderHallTarget.probe_interval_seconds"`)}
@@ -284,6 +305,10 @@ func (_c *ProviderHallTargetCreate) createSpec() (*ProviderHallTarget, *sqlgraph
 	if value, ok := _c.mutation.Enabled(); ok {
 		_spec.SetField(providerhalltarget.FieldEnabled, field.TypeBool, value)
 		_node.Enabled = value
+	}
+	if value, ok := _c.mutation.AutoScheduleEnabled(); ok {
+		_spec.SetField(providerhalltarget.FieldAutoScheduleEnabled, field.TypeBool, value)
+		_node.AutoScheduleEnabled = value
 	}
 	if value, ok := _c.mutation.ProbeIntervalSeconds(); ok {
 		_spec.SetField(providerhalltarget.FieldProbeIntervalSeconds, field.TypeInt, value)
@@ -390,6 +415,18 @@ func (u *ProviderHallTargetUpsert) SetEnabled(v bool) *ProviderHallTargetUpsert 
 // UpdateEnabled sets the "enabled" field to the value that was provided on create.
 func (u *ProviderHallTargetUpsert) UpdateEnabled() *ProviderHallTargetUpsert {
 	u.SetExcluded(providerhalltarget.FieldEnabled)
+	return u
+}
+
+// SetAutoScheduleEnabled sets the "auto_schedule_enabled" field.
+func (u *ProviderHallTargetUpsert) SetAutoScheduleEnabled(v bool) *ProviderHallTargetUpsert {
+	u.Set(providerhalltarget.FieldAutoScheduleEnabled, v)
+	return u
+}
+
+// UpdateAutoScheduleEnabled sets the "auto_schedule_enabled" field to the value that was provided on create.
+func (u *ProviderHallTargetUpsert) UpdateAutoScheduleEnabled() *ProviderHallTargetUpsert {
+	u.SetExcluded(providerhalltarget.FieldAutoScheduleEnabled)
 	return u
 }
 
@@ -570,6 +607,20 @@ func (u *ProviderHallTargetUpsertOne) SetEnabled(v bool) *ProviderHallTargetUpse
 func (u *ProviderHallTargetUpsertOne) UpdateEnabled() *ProviderHallTargetUpsertOne {
 	return u.Update(func(s *ProviderHallTargetUpsert) {
 		s.UpdateEnabled()
+	})
+}
+
+// SetAutoScheduleEnabled sets the "auto_schedule_enabled" field.
+func (u *ProviderHallTargetUpsertOne) SetAutoScheduleEnabled(v bool) *ProviderHallTargetUpsertOne {
+	return u.Update(func(s *ProviderHallTargetUpsert) {
+		s.SetAutoScheduleEnabled(v)
+	})
+}
+
+// UpdateAutoScheduleEnabled sets the "auto_schedule_enabled" field to the value that was provided on create.
+func (u *ProviderHallTargetUpsertOne) UpdateAutoScheduleEnabled() *ProviderHallTargetUpsertOne {
+	return u.Update(func(s *ProviderHallTargetUpsert) {
+		s.UpdateAutoScheduleEnabled()
 	})
 }
 
@@ -931,6 +982,20 @@ func (u *ProviderHallTargetUpsertBulk) SetEnabled(v bool) *ProviderHallTargetUps
 func (u *ProviderHallTargetUpsertBulk) UpdateEnabled() *ProviderHallTargetUpsertBulk {
 	return u.Update(func(s *ProviderHallTargetUpsert) {
 		s.UpdateEnabled()
+	})
+}
+
+// SetAutoScheduleEnabled sets the "auto_schedule_enabled" field.
+func (u *ProviderHallTargetUpsertBulk) SetAutoScheduleEnabled(v bool) *ProviderHallTargetUpsertBulk {
+	return u.Update(func(s *ProviderHallTargetUpsert) {
+		s.SetAutoScheduleEnabled(v)
+	})
+}
+
+// UpdateAutoScheduleEnabled sets the "auto_schedule_enabled" field to the value that was provided on create.
+func (u *ProviderHallTargetUpsertBulk) UpdateAutoScheduleEnabled() *ProviderHallTargetUpsertBulk {
+	return u.Update(func(s *ProviderHallTargetUpsert) {
+		s.UpdateAutoScheduleEnabled()
 	})
 }
 

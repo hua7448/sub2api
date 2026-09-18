@@ -81,6 +81,7 @@ func TestProviderHallLocalDatabase(t *testing.T) {
 			require.NoError(t, err)
 			db := connect("hall_" + mode)
 			ctx := context.Background()
+			var upgradeGroupID, upgradeProfileID int64
 			if mode != "empty" {
 				cutoff := fmt.Sprintf("%03d_", atoiMigration(t, strings.TrimPrefix(mode, "upgrade_"))+1)
 				previous := fstest.MapFS{}
@@ -95,9 +96,32 @@ func TestProviderHallLocalDatabase(t *testing.T) {
 					previous[name] = &fstest.MapFile{Data: content}
 				}
 				require.NoError(t, applyMigrationsFS(ctx, db, previous))
+				if mode == "upgrade_233" {
+					_, err := db.ExecContext(ctx, `UPDATE provider_hall_config SET tasks_enabled=true WHERE id=1`)
+					require.NoError(t, err)
+					require.NoError(t, db.QueryRowContext(ctx, `INSERT INTO groups (name,platform) VALUES ('migration schedule','openai') RETURNING id`).Scan(&upgradeGroupID))
+					_, err = db.ExecContext(ctx, `INSERT INTO provider_hall_groups (group_id) VALUES ($1)`, upgradeGroupID)
+					require.NoError(t, err)
+					require.NoError(t, db.QueryRowContext(ctx, `INSERT INTO provider_hall_profiles (model,protocol) VALUES ('migration-test','responses') RETURNING id`).Scan(&upgradeProfileID))
+					_, err = db.ExecContext(ctx, `INSERT INTO provider_hall_targets (group_id,profile_id) VALUES ($1,$2)`, upgradeGroupID, upgradeProfileID)
+					require.NoError(t, err)
+				}
 			}
 			require.NoError(t, ApplyMigrations(ctx, db))
 			require.NoError(t, ApplyMigrations(ctx, db), "restart must not apply a migration twice")
+			if mode == "upgrade_233" {
+				var globalAuto, targetAuto bool
+				require.NoError(t, db.QueryRowContext(ctx, `SELECT auto_schedule_enabled FROM provider_hall_config WHERE id=1`).Scan(&globalAuto))
+				require.True(t, globalAuto)
+				require.NoError(t, db.QueryRowContext(ctx, `SELECT auto_schedule_enabled FROM provider_hall_targets WHERE group_id=$1`, upgradeGroupID).Scan(&targetAuto))
+				require.True(t, targetAuto)
+				_, err = db.ExecContext(ctx, `DELETE FROM groups WHERE id=$1`, upgradeGroupID)
+				require.NoError(t, err)
+				_, err = db.ExecContext(ctx, `DELETE FROM provider_hall_profiles WHERE id=$1`, upgradeProfileID)
+				require.NoError(t, err)
+				_, err = db.ExecContext(ctx, `UPDATE provider_hall_config SET tasks_enabled=false,auto_schedule_enabled=false`)
+				require.NoError(t, err)
+			}
 			for _, name := range hallMigrations {
 				var count int
 				require.NoError(t, db.QueryRow(`SELECT count(*) FROM schema_migrations WHERE filename=$1`, name).Scan(&count))

@@ -70,6 +70,11 @@ func TasksEnabled(v bool) predicate.ProviderHallConfig {
 	return predicate.ProviderHallConfig(sql.FieldEQ(FieldTasksEnabled, v))
 }
 
+// AutoScheduleEnabled applies equality check predicate on the "auto_schedule_enabled" field. It's identical to AutoScheduleEnabledEQ.
+func AutoScheduleEnabled(v bool) predicate.ProviderHallConfig {
+	return predicate.ProviderHallConfig(sql.FieldEQ(FieldAutoScheduleEnabled, v))
+}
+
 // DefaultModel applies equality check predicate on the "default_model" field. It's identical to DefaultModelEQ.
 func DefaultModel(v string) predicate.ProviderHallConfig {
 	return predicate.ProviderHallConfig(sql.FieldEQ(FieldDefaultModel, v))
@@ -133,6 +138,16 @@ func TasksEnabledEQ(v bool) predicate.ProviderHallConfig {
 // TasksEnabledNEQ applies the NEQ predicate on the "tasks_enabled" field.
 func TasksEnabledNEQ(v bool) predicate.ProviderHallConfig {
 	return predicate.ProviderHallConfig(sql.FieldNEQ(FieldTasksEnabled, v))
+}
+
+// AutoScheduleEnabledEQ applies the EQ predicate on the "auto_schedule_enabled" field.
+func AutoScheduleEnabledEQ(v bool) predicate.ProviderHallConfig {
+	return predicate.ProviderHallConfig(sql.FieldEQ(FieldAutoScheduleEnabled, v))
+}
+
+// AutoScheduleEnabledNEQ applies the NEQ predicate on the "auto_schedule_enabled" field.
+func AutoScheduleEnabledNEQ(v bool) predicate.ProviderHallConfig {
+	return predicate.ProviderHallConfig(sql.FieldNEQ(FieldAutoScheduleEnabled, v))
 }
 
 // DefaultModelEQ applies the EQ predicate on the "default_model" field.

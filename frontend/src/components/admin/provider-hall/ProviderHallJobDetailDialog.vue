@@ -6,11 +6,11 @@
       <dl class="grid gap-x-6 gap-y-2 sm:grid-cols-2">
         <div><dt class="hall-dt">{{ t('admin.providerHall.jobKind') }}</dt><dd>{{ t(`admin.providerHall.kind_${detail.job.kind}`) }}</dd></div>
         <div><dt class="hall-dt">{{ t('admin.providerHall.jobStatus') }}</dt><dd><span class="hall-pill" :class="`hall-pill-${detail.job.status}`">{{ t(`admin.providerHall.status_${detail.job.status}`) }}</span></dd></div>
-        <div><dt class="hall-dt">{{ t('admin.providerHall.jobGroup') }} / {{ t('admin.providerHall.jobProfile') }}</dt><dd>#{{ detail.job.group_id }} / {{ detail.job.config_snapshot?.profile?.model }} ({{ detail.job.config_snapshot?.profile?.protocol }})</dd></div>
+        <div><dt class="hall-dt">{{ t('admin.providerHall.jobGroup') }} / {{ t('admin.providerHall.jobProfile') }}</dt><dd><button class="text-emerald-600 underline" @click="emit('target', detail.job.group_id)">{{ detail.job.group_name || `#${detail.job.group_id}` }}</button> / {{ detail.job.config_snapshot?.profile?.model }} ({{ detail.job.config_snapshot?.profile?.protocol }})</dd></div>
         <div><dt class="hall-dt">{{ t('admin.providerHall.jobAttempts') }}</dt><dd>{{ detail.job.attempts }}</dd></div>
         <div><dt class="hall-dt">{{ t('admin.providerHall.jobCreated') }}</dt><dd>{{ formatDate(detail.job.created_at) }}</dd></div>
         <div><dt class="hall-dt">{{ t('admin.providerHall.jobFinished') }}</dt><dd>{{ detail.job.finished_at ? formatDate(detail.job.finished_at) : '—' }}</dd></div>
-        <div v-if="detail.job.error_code" class="sm:col-span-2"><dt class="hall-dt">{{ t('admin.providerHall.jobError') }}</dt><dd class="break-all">{{ detail.job.error_code }}<span v-if="detail.job.error_message" class="text-gray-500"> — {{ detail.job.error_message }}</span></dd></div>
+        <div v-if="detail.job.error_code" class="sm:col-span-2"><dt class="hall-dt">{{ t('admin.providerHall.jobError') }}</dt><dd class="break-all">{{ jobReason(detail.job.error_code, t) }}</dd></div>
       </dl>
       <section v-if="detail.verification" class="space-y-2 border-t border-gray-200 pt-4 dark:border-dark-700">
         <h3 class="font-semibold">{{ t('admin.providerHall.report') }}</h3>
@@ -54,10 +54,10 @@ import { useI18n } from 'vue-i18n'
 import BaseDialog from '@/components/common/BaseDialog.vue'
 import * as hall from '@/api/admin/providerHall'
 import { formatDate } from '@/utils/format'
-import { hallError } from './helpers'
+import { hallError, jobReason } from './helpers'
 
 const props = defineProps<{ jobId: number | null }>()
-const emit = defineEmits<{ close: [] }>()
+const emit = defineEmits<{ close: []; target: [number] }>()
 const { t } = useI18n()
 const detail = ref<hall.ProviderHallJobDetail | null>(null)
 const loading = ref(false)
@@ -89,8 +89,9 @@ async function load(id: number) {
   } catch (err) { if (!current.signal.aborted) error.value = hallError(err, t, 'loadFailed') }
   finally { if (!current.signal.aborted) loading.value = false }
 }
+const refreshTimer = setInterval(() => { if (props.jobId && !loading.value && detail.value && ['queued', 'running', 'unknown'].includes(detail.value.job.status)) void load(props.jobId) }, 5000)
 watch(() => props.jobId, id => { if (id !== null) void load(id); else { request?.abort(); detail.value = null } }, { immediate: true })
-onUnmounted(() => request?.abort())
+onUnmounted(() => { request?.abort(); clearInterval(refreshTimer) })
 </script>
 
 <style>

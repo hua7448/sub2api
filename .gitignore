@@ -121,6 +121,10 @@ tests
 CLAUDE.md
 .claude
 scripts
+!frontend/scripts/
+frontend/scripts/*
+!frontend/scripts/provider-hall-e2e.mjs
+!frontend/scripts/provider-hall-admin-smoke.mjs
 !backend/scripts/
 !backend/scripts/resolve-version.sh
 .code-review-state

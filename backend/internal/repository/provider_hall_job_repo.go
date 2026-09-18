@@ -69,6 +69,10 @@ func providerHallScanJob(row providerHallScanner) (*service.ProviderHallJob, err
 		return &t
 	}
 	j.SlotAt, j.NotBefore, j.LeaseUntil, j.StartedAt, j.FinishedAt = nt(slotAt), nt(notBefore), nt(leaseUntil), nt(startedAt), nt(finishedAt)
+	j.Source = "manual"
+	if j.SlotAt != nil {
+		j.Source = "scheduled"
+	}
 	j.CreatedAt, j.UpdatedAt = j.CreatedAt.UTC(), j.UpdatedAt.UTC()
 	if idem.Valid {
 		j.IdempotencyKey = &idem.String
@@ -145,7 +149,7 @@ func providerHallScanSample(row providerHallScanner) (*service.ProviderHallSampl
 
 func (r *providerHallJobRepository) ListSchedulableTargets(ctx context.Context) ([]service.ProviderHallSchedulableTarget, error) {
 	rows, err := r.db.QueryContext(ctx, `
-SELECT t.id, t.group_id, t.profile_id, t.probe_key_id, t.version, t.probe_interval_seconds, t.verification_interval_seconds, t.enabled,
+SELECT t.id, t.group_id, t.profile_id, t.probe_key_id, t.version, t.probe_interval_seconds, t.verification_interval_seconds, t.enabled AND g.id IS NOT NULL AND g.status = 'active', t.auto_schedule_enabled,
        COALESCE(hg.listed, false) AND g.id IS NOT NULL AND g.status = 'active',
        p.id, p.version, p.model, p.protocol, p.supports_tools, p.output_limit, p.model_aliases
 FROM provider_hall_targets t
@@ -162,7 +166,7 @@ ORDER BY t.group_id, t.profile_id`)
 		var t service.ProviderHallSchedulableTarget
 		var probeKey sql.NullInt64
 		var aliases []byte
-		if err := rows.Scan(&t.TargetID, &t.GroupID, &t.ProfileID, &probeKey, &t.TargetVersion, &t.ProbeIntervalSeconds, &t.VerificationIntervalSeconds, &t.Enabled, &t.Listed,
+		if err := rows.Scan(&t.TargetID, &t.GroupID, &t.ProfileID, &probeKey, &t.TargetVersion, &t.ProbeIntervalSeconds, &t.VerificationIntervalSeconds, &t.Enabled, &t.AutoScheduleEnabled, &t.Listed,
 			&t.Profile.ID, &t.Profile.Version, &t.Profile.Model, &t.Profile.Protocol, &t.Profile.SupportsTools, &t.Profile.OutputLimit, &aliases); err != nil {
 			return nil, err
 		}
@@ -192,12 +196,20 @@ func (r *providerHallJobRepository) EnqueueSlot(ctx context.Context, in service.
 	if in.SlotAt == nil {
 		return 0, false, errors.New("provider hall: slot_at required")
 	}
+	tx, err := r.db.BeginTx(ctx, nil)
+	if err != nil {
+		return 0, false, err
+	}
+	defer func() { _ = tx.Rollback() }()
+	if err := providerHallAdmitJob(ctx, tx, in); err != nil {
+		return 0, false, err
+	}
 	snapshot, err := providerHallSnapshotJSON(in.Snapshot)
 	if err != nil {
 		return 0, false, err
 	}
 	var id int64
-	err = r.db.QueryRowContext(ctx, `
+	err = tx.QueryRowContext(ctx, `
 INSERT INTO provider_hall_jobs (kind, target_id, group_id, profile_id, config_snapshot, slot_at, not_before)
 VALUES ($1, $2, $3, $4, $5, $6, $7)
 ON CONFLICT (target_id, kind, slot_at) WHERE slot_at IS NOT NULL DO NOTHING
@@ -208,7 +220,7 @@ RETURNING id`, string(in.Kind), in.TargetID, in.GroupID, in.ProfileID, snapshot,
 	if err != nil {
 		return 0, false, err
 	}
-	return id, true, nil
+	return id, true, tx.Commit()
 }
 
 func providerHallNullTime(t *time.Time) any {
@@ -219,6 +231,14 @@ func providerHallNullTime(t *time.Time) any {
 }
 
 func (r *providerHallJobRepository) EnqueueManual(ctx context.Context, in service.ProviderHallEnqueueInput) (*service.ProviderHallJob, bool, error) {
+	tx, err := r.db.BeginTx(ctx, nil)
+	if err != nil {
+		return nil, false, err
+	}
+	defer func() { _ = tx.Rollback() }()
+	if err := providerHallAdmitJob(ctx, tx, in); err != nil {
+		return nil, false, err
+	}
 	snapshot, err := providerHallSnapshotJSON(in.Snapshot)
 	if err != nil {
 		return nil, false, err
@@ -231,23 +251,86 @@ func (r *providerHallJobRepository) EnqueueManual(ctx context.Context, in servic
 	if in.RequestedBy != nil {
 		requestedBy = *in.RequestedBy
 	}
-	row := r.db.QueryRowContext(ctx, `
+	row := tx.QueryRowContext(ctx, `
 INSERT INTO provider_hall_jobs (kind, target_id, group_id, profile_id, config_snapshot, not_before, idempotency_key, requested_by)
 VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
 ON CONFLICT (idempotency_key) WHERE idempotency_key IS NOT NULL DO NOTHING
 RETURNING `+providerHallJobColumns, string(in.Kind), in.TargetID, in.GroupID, in.ProfileID, snapshot, providerHallNullTime(in.NotBefore), idem, requestedBy)
 	job, err := providerHallScanJob(row)
 	if err == nil {
-		return job, false, nil
+		return job, false, tx.Commit()
 	}
 	if !errors.Is(err, sql.ErrNoRows) || idem == nil {
 		return nil, false, err
 	}
-	existing, err := providerHallScanJob(r.db.QueryRowContext(ctx, `SELECT `+providerHallJobColumns+` FROM provider_hall_jobs WHERE idempotency_key = $1`, idem))
+	existing, err := providerHallScanJob(tx.QueryRowContext(ctx, `SELECT `+providerHallJobColumns+` FROM provider_hall_jobs WHERE idempotency_key = $1`, idem))
 	if err != nil {
 		return nil, false, err
 	}
-	return existing, true, nil
+	if existing.TargetID != in.TargetID || existing.Kind != in.Kind || existing.Snapshot.TargetVersion != in.Snapshot.TargetVersion || existing.Snapshot.Profile.Version != in.Snapshot.Profile.Version {
+		return nil, false, service.ErrProviderHallConflict
+	}
+	return existing, true, tx.Commit()
+}
+
+func providerHallAdmitJob(ctx context.Context, tx *sql.Tx, in service.ProviderHallEnqueueInput) error {
+	client := ent.NewClient(ent.Driver(entsql.NewDriver(dialect.Postgres, entsql.Conn{ExecQuerier: tx})))
+	cfg, err := client.ProviderHallConfig.Query().Where(providerhallconfig.IDEQ(1)).ForUpdate().Only(ctx)
+	if err != nil {
+		return err
+	}
+	if !cfg.TasksEnabled || cfg.OperatorUserID == nil || cfg.GatewayOrigin == "" {
+		return service.ErrProviderHallTasksDisabled
+	}
+	t, err := client.ProviderHallTarget.Get(ctx, in.TargetID)
+	if err != nil {
+		return err
+	}
+	if !t.Enabled {
+		return service.ErrProviderHallTargetDisabled
+	}
+	p, err := client.ProviderHallProfile.Get(ctx, in.ProfileID)
+	if err != nil {
+		return err
+	}
+	if t.GroupID != in.GroupID || t.ProfileID != in.ProfileID || t.Version != in.Snapshot.TargetVersion || p.Version != in.Snapshot.Profile.Version || t.ProbeKeyID == nil || *t.ProbeKeyID != in.Snapshot.ProbeKeyID || *cfg.OperatorUserID != in.Snapshot.OperatorUserID || cfg.GatewayOrigin != in.Snapshot.GatewayOrigin {
+		return service.ErrProviderHallConflict
+	}
+	g, err := client.Group.Query().Where(group.IDEQ(in.GroupID), group.DeletedAtIsNil()).Only(ctx)
+	if err != nil {
+		return err
+	}
+	if in.SlotAt != nil {
+		l, e := client.ProviderHallGroup.Get(ctx, in.GroupID)
+		if e != nil {
+			return e
+		}
+		if !cfg.AutoScheduleEnabled || !t.AutoScheduleEnabled || !l.Listed {
+			return service.ErrProviderHallTargetDisabled
+		}
+	}
+	if err := providerHallValidateKey(ctx, client, cfg, g, p, t.ProbeKeyID, 0, false); err != nil {
+		return err
+	}
+	registered, err := client.ProviderHallProbeKey.Get(ctx, *t.ProbeKeyID)
+	if err != nil {
+		return service.ErrProviderHallProbeKey
+	}
+	if registered.GroupID != g.ID || registered.OperatorUserID != *cfg.OperatorUserID {
+		return service.ErrProviderHallProbeKey
+	}
+	var spent string
+	if err := tx.QueryRowContext(ctx, `SELECT COALESCE(sum(actual_cost),0)::text FROM provider_hall_spend WHERE budget_day=$1::date AND status='confirmed'`, service.ProviderHallBudgetDay(time.Now())).Scan(&spent); err != nil {
+		return err
+	}
+	confirmed, err := decimal.NewFromString(spent)
+	if err != nil {
+		return err
+	}
+	if service.ProviderHallBudgetExhausted(cfg.DailyBudget.String(), confirmed) {
+		return service.ErrProviderHallBudgetExhausted
+	}
+	return nil
 }
 
 func (r *providerHallJobRepository) CancelQueuedNotIn(ctx context.Context, activeTargetIDs []int64, reason string, now time.Time) (int64, error) {
@@ -256,7 +339,7 @@ func (r *providerHallJobRepository) CancelQueuedNotIn(ctx context.Context, activ
 	}
 	res, err := r.db.ExecContext(ctx, `
 UPDATE provider_hall_jobs SET status = 'cancelled', error_code = $2, finished_at = $3, updated_at = $3, lease_owner = NULL, lease_until = NULL
-WHERE status = 'queued' AND target_id <> ALL($1::bigint[])`, pq.Array(activeTargetIDs), reason, now.UTC())
+WHERE status = 'queued' AND slot_at IS NOT NULL AND target_id <> ALL($1::bigint[])`, pq.Array(activeTargetIDs), reason, now.UTC())
 	if err != nil {
 		return 0, err
 	}
@@ -277,9 +360,14 @@ WHERE status = 'queued' AND target_id = $1`, targetID, reason, now.UTC())
 // live target/profile versions or probe key.
 func (r *providerHallJobRepository) CancelQueuedDrifted(ctx context.Context, now time.Time) (int64, error) {
 	res, err := r.db.ExecContext(ctx, `
-UPDATE provider_hall_jobs j SET status = 'cancelled', error_code = 'config_changed', finished_at = $1, updated_at = $1
-FROM provider_hall_targets t, provider_hall_profiles p
-WHERE j.status = 'queued' AND t.id = j.target_id AND p.id = j.profile_id AND (
+UPDATE provider_hall_jobs j SET status = 'cancelled', error_code = CASE WHEN NOT c.tasks_enabled THEN 'tasks_disabled' WHEN NOT t.enabled OR g.deleted_at IS NOT NULL OR g.status <> 'active' OR (j.slot_at IS NOT NULL AND (NOT c.auto_schedule_enabled OR NOT t.auto_schedule_enabled OR NOT hg.listed)) THEN 'target_disabled' ELSE 'config_changed' END, finished_at = $1, updated_at = $1
+FROM provider_hall_targets t, provider_hall_profiles p, provider_hall_config c, groups g, provider_hall_groups hg
+WHERE j.status = 'queued' AND t.id = j.target_id AND p.id = j.profile_id AND c.id=1 AND g.id=j.group_id AND hg.group_id=j.group_id AND (
+      NOT c.tasks_enabled OR NOT t.enabled OR g.deleted_at IS NOT NULL OR g.status <> 'active'
+   OR (j.slot_at IS NOT NULL AND (NOT c.auto_schedule_enabled OR NOT t.auto_schedule_enabled OR NOT hg.listed))
+   OR (j.config_snapshot->>'operator_user_id')::bigint IS DISTINCT FROM c.operator_user_id
+   OR j.config_snapshot->>'gateway_origin' IS DISTINCT FROM c.gateway_origin
+   OR
       (j.config_snapshot->>'target_version')::bigint <> t.version
    OR (j.config_snapshot->'profile'->>'version')::bigint <> p.version
    OR (j.config_snapshot->>'probe_key_id')::bigint IS DISTINCT FROM t.probe_key_id)`, now.UTC())
@@ -458,7 +546,7 @@ func (r *providerHallJobRepository) TryDispatch(ctx context.Context, in service.
 	client := ent.NewClient(ent.Driver(entsql.NewDriver(dialect.Postgres, entsql.Conn{ExecQuerier: tx})))
 
 	// 1. Switches, target, listing and snapshot versions.
-	cfg, err := client.ProviderHallConfig.Query().Where(providerhallconfig.IDEQ(1)).Only(ctx)
+	cfg, err := client.ProviderHallConfig.Query().Where(providerhallconfig.IDEQ(1)).ForUpdate().Only(ctx)
 	if err != nil {
 		return service.ProviderHallDispatchOutcome{}, err
 	}
@@ -473,7 +561,7 @@ func (r *providerHallJobRepository) TryDispatch(ctx context.Context, in service.
 		return service.ProviderHallDispatchOutcome{}, err
 	}
 	listing, err := client.ProviderHallGroup.Query().Where(providerhallgroup.IDEQ(job.GroupID)).Only(ctx)
-	if ent.IsNotFound(err) || err == nil && !listing.Listed {
+	if ent.IsNotFound(err) || err == nil && job.SlotAt != nil && (!listing.Listed || !cfg.AutoScheduleEnabled || !target.AutoScheduleEnabled) {
 		return cancel(service.ProviderHallJobCodeTargetDisabled, "group not listed")
 	}
 	if err != nil {
@@ -865,6 +953,24 @@ func (r *providerHallJobRepository) ListJobs(ctx context.Context, f service.Prov
 	}
 	where := []string{"true"}
 	args := []any{}
+	if f.GroupName != "" {
+		args = append(args, "%"+f.GroupName+"%")
+		where = append(where, fmt.Sprintf("group_id IN (SELECT id FROM groups WHERE name ILIKE $%d)", len(args)))
+	}
+	if f.Model != "" {
+		args = append(args, "%"+f.Model+"%")
+		where = append(where, fmt.Sprintf("config_snapshot->'profile'->>'model' ILIKE $%d", len(args)))
+	}
+	if f.Source == "manual" {
+		where = append(where, "slot_at IS NULL")
+	}
+	if f.Source == "scheduled" {
+		where = append(where, "slot_at IS NOT NULL")
+	}
+	if f.ProfileID > 0 {
+		args = append(args, f.ProfileID)
+		where = append(where, fmt.Sprintf("profile_id = $%d", len(args)))
+	}
 	if f.Status != "" {
 		args = append(args, string(f.Status))
 		where = append(where, fmt.Sprintf("status = $%d", len(args)))
@@ -896,13 +1002,44 @@ func (r *providerHallJobRepository) ListJobs(ctx context.Context, f service.Prov
 		}
 		out = append(out, *j)
 	}
-	return out, total, rows.Err()
+	if err := rows.Err(); err != nil {
+		return nil, 0, err
+	}
+	_ = rows.Close()
+	ids := []int64{}
+	for _, j := range out {
+		ids = append(ids, j.GroupID)
+	}
+	names, err := r.db.QueryContext(ctx, `SELECT id,name FROM groups WHERE id=ANY($1::bigint[])`, pq.Array(ids))
+	if err != nil {
+		return nil, 0, err
+	}
+	defer func() { _ = names.Close() }()
+	m := map[int64]string{}
+	for names.Next() {
+		var id int64
+		var name string
+		if err := names.Scan(&id, &name); err != nil {
+			return nil, 0, err
+		}
+		m[id] = name
+	}
+	for i := range out {
+		out[i].GroupName = m[out[i].GroupID]
+	}
+	return out, total, names.Err()
 }
 
 func (r *providerHallJobRepository) GetJob(ctx context.Context, id int64) (*service.ProviderHallJob, error) {
 	job, err := providerHallScanJob(r.db.QueryRowContext(ctx, `SELECT `+providerHallJobColumns+` FROM provider_hall_jobs WHERE id = $1`, id))
 	if errors.Is(err, sql.ErrNoRows) {
 		return nil, service.ErrProviderHallNotFound
+	}
+	if err == nil {
+		e := r.db.QueryRowContext(ctx, `SELECT name FROM groups WHERE id=$1`, job.GroupID).Scan(&job.GroupName)
+		if e != nil && !errors.Is(e, sql.ErrNoRows) {
+			return nil, e
+		}
 	}
 	return job, err
 }

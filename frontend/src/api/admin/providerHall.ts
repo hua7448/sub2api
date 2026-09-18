@@ -21,6 +21,7 @@ export interface ProviderHallConfig extends ProviderHallVersion {
   collection_enabled: boolean
   display_enabled: boolean
   tasks_enabled: boolean
+  auto_schedule_enabled?: boolean
   default_model: string
   default_protocol: ProviderHallProtocol
   default_range: ProviderHallRange
@@ -39,6 +40,8 @@ export interface ProviderHallGroup extends ProviderHallVersion {
 }
 
 export interface ProviderHallProfile extends ProviderHallVersion {
+  groups?: { id: number; name: string }[]
+  is_default?: boolean
   id: number
   model: string
   protocol: ProviderHallProtocol
@@ -57,16 +60,19 @@ export interface ProviderHallTargetInput {
   profile_id: number
   probe_key_id: number | null
   enabled: boolean
+  auto_schedule_enabled?: boolean
   probe_interval_seconds?: number
   verification_interval_seconds?: number
 }
 
-export interface ProviderHallTarget extends ProviderHallVersion, Required<ProviderHallTargetInput> {
+export interface ProviderHallTarget extends ProviderHallVersion, Required<Omit<ProviderHallTargetInput, 'auto_schedule_enabled'>> {
+  auto_schedule_enabled?: boolean
   id: number
   group_id: number
 }
 
 export interface ProviderHallTargetSet extends ProviderHallVersion {
+  listing?: ProviderHallGroup
   group_id: number
   items: ProviderHallTarget[]
 }
@@ -107,6 +113,7 @@ export async function updateTargets(id: number, input: ProviderHallTargetSetInpu
     profile_id: item.profile_id,
     probe_key_id: item.probe_key_id,
     enabled: item.enabled,
+    auto_schedule_enabled: item.auto_schedule_enabled,
     probe_interval_seconds: item.probe_interval_seconds,
     verification_interval_seconds: item.verification_interval_seconds
   }))
@@ -141,6 +148,8 @@ export interface ProviderHallJobSnapshot {
 }
 
 export interface ProviderHallJob {
+  group_name?: string
+  source?: 'manual' | 'scheduled'
   id: number
   kind: ProviderHallJobKind
   target_id: number
@@ -226,6 +235,10 @@ export interface ProviderHallEnqueueResult { job_id: number; status: ProviderHal
 export interface ProviderHallPaged<T> { items: T[]; total: number; page: number; page_size: number; pages: number }
 
 export interface ProviderHallJobFilter {
+  group_name?: string
+  model?: string
+  source?: string
+  profile_id?: number | null
   status?: ProviderHallJobStatus | ''
   kind?: ProviderHallJobKind | ''
   group_id?: number | null
@@ -247,6 +260,8 @@ export interface ProviderHallHealthNode {
 export interface ProviderHallHealthGap { id: number; node_id: string; epoch_id: number; scope: string; started_at: string; reason: string }
 
 export interface ProviderHallHealth {
+  tasks_enabled?: boolean
+  auto_schedule_enabled?: boolean
   generated_at: string
   collection: {
     enabled: boolean
@@ -265,16 +280,77 @@ function enqueueBody(profileId: number, idempotencyKey: string) {
   return { profile_id: profileId, idempotency_key: idempotencyKey }
 }
 
-export async function enqueueProbe(groupId: number, profileId: number, idempotencyKey: string): Promise<ProviderHallEnqueueResult> {
-  return (await apiClient.post<ProviderHallEnqueueResult>(`${base}/groups/${groupId}/probes`, enqueueBody(profileId, idempotencyKey))).data
+export async function enqueueProbe(groupId: number, profileId: number, idempotencyKey: string, versions?: { target_version: number; profile_version: number }): Promise<ProviderHallEnqueueResult> {
+  return (await apiClient.post<ProviderHallEnqueueResult>(`${base}/groups/${groupId}/probes`, { ...enqueueBody(profileId, idempotencyKey), ...versions })).data
 }
 
-export async function enqueueVerification(groupId: number, profileId: number, idempotencyKey: string): Promise<ProviderHallEnqueueResult> {
-  return (await apiClient.post<ProviderHallEnqueueResult>(`${base}/groups/${groupId}/verifications`, enqueueBody(profileId, idempotencyKey))).data
+export async function enqueueVerification(groupId: number, profileId: number, idempotencyKey: string, versions?: { target_version: number; profile_version: number }): Promise<ProviderHallEnqueueResult> {
+  return (await apiClient.post<ProviderHallEnqueueResult>(`${base}/groups/${groupId}/verifications`, { ...enqueueBody(profileId, idempotencyKey), ...versions })).data
+}
+
+export interface ProviderHallGroupSummary extends ProviderHallGroup {
+  key_statuses?: Record<string, number>
+  latest_probe?: ProviderHallAdminResult | null
+  latest_verification?: ProviderHallAdminResult | null
+  name: string
+  platform: string
+  status: string
+  supported: boolean
+  reason: string
+  targets: ProviderHallTarget[]
+  models: string[]
+  effective_profile_id: number | null
+}
+export interface ProviderHallAdminResult { job_id: number; status: string; verdict: string; at: string }
+export interface ProviderHallModelCandidate {
+  model: string
+  protocol: ProviderHallProtocol
+  source: string
+  account_id: number
+  upstream_model: string
+  available: boolean
+  reason: string
+}
+export interface ProviderHallProbeKeyOption { id: number; name: string; status: string; registered: boolean; group_id: number; operator_user_id: number }
+export type ProviderHallSettingsInput = ProviderHallGroupInput & { items: ProviderHallTargetInput[] }
+export async function listGroups(params: { search?: string; platform?: string; listed?: string; sort?: string; page?: number; page_size?: number } = {}, signal?: AbortSignal) {
+  return (await apiClient.get<{ items: ProviderHallGroupSummary[]; total: number; page: number; page_size: number }>(`${base}/groups`, { params, signal })).data
+}
+export async function listModels(id: number, signal?: AbortSignal) {
+  return (await apiClient.get<ProviderHallModelCandidate[]>(`${base}/groups/${id}/models`, { signal })).data
+}
+export async function refreshModels(id: number) {
+  return (await apiClient.post<{ account_id: number; success: boolean; error?: string; models: ProviderHallModelCandidate[] }[]>(`${base}/groups/${id}/models/refresh`)).data
+}
+export async function listProbeKeys(id: number, signal?: AbortSignal) {
+  return (await apiClient.get<ProviderHallProbeKeyOption[]>(`${base}/groups/${id}/probe-keys`, { signal })).data
+}
+export async function ensureProbeKey(id: number, profile_id: number) {
+  return (await apiClient.post<ProviderHallProbeKeyOption>(`${base}/groups/${id}/probe-keys`, { profile_id })).data
+}
+export async function saveSettings(id: number, input: ProviderHallSettingsInput) {
+  return (await apiClient.put<ProviderHallTargetSet>(`${base}/groups/${id}/settings`, input)).data
+}
+export async function preflightGroup(id: number, input: ProviderHallSettingsInput) {
+  return (await apiClient.post<ProviderHallTargetSet>(`${base}/groups/${id}/preflight`, input)).data
+}
+export async function preflightConfig(input: ProviderHallConfigInput) {
+  return (await apiClient.post<{ valid: boolean; disabled_targets: ProviderHallTarget[] }>(`${base}/config/preflight`, input)).data
+}
+export async function checkGateway(origin: string) {
+  return (await apiClient.post<{ status: number; healthy: boolean }>(`${base}/config/check-gateway`, { origin })).data
+}
+export interface ProviderHallBatchResult { id: number; success: boolean; error?: string; reason?: string; metadata?: Record<string, string>; settings?: ProviderHallTargetSet }
+export async function batchGroups(groups: (ProviderHallSettingsInput & { id: number })[], preview: boolean) {
+  return (await apiClient.post<ProviderHallBatchResult[]>(`${base}/groups/batch`, { groups, preview })).data
 }
 
 export async function listJobs(filter: ProviderHallJobFilter = {}, signal?: AbortSignal): Promise<ProviderHallPaged<ProviderHallJob>> {
   const params: Record<string, string | number> = {}
+  if (filter.group_name) params.group_name = filter.group_name
+  if (filter.model) params.model = filter.model
+  if (filter.source) params.source = filter.source
+  if (filter.profile_id) params.profile_id = filter.profile_id
   if (filter.status) params.status = filter.status
   if (filter.kind) params.kind = filter.kind
   if (filter.group_id) params.group_id = filter.group_id
