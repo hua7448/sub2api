@@ -103,6 +103,32 @@ func (h *ProviderHallHandler) ListGroupModels(c *gin.Context) {
 	}
 }
 
+// ListAllProfileCandidates serves the profile editor: one merged candidate per
+// model and protocol across every group, so the admin picks a model once
+// instead of re-picking a source group.
+func (h *ProviderHallHandler) ListAllProfileCandidates(c *gin.Context) {
+	if _, ok := providerHallAdmin(c); !ok {
+		return
+	}
+	out, err := h.service.ListAllModelCandidates(c.Request.Context())
+	if !response.ErrorFrom(c, err) {
+		response.Success(c, out)
+	}
+}
+
+func (h *ProviderHallHandler) DeleteProfile(c *gin.Context) {
+	if _, ok := providerHallAdmin(c); !ok {
+		return
+	}
+	id, ok := providerHallID(c)
+	if !ok {
+		return
+	}
+	if err := h.service.DeleteProfile(c.Request.Context(), id); !response.ErrorFrom(c, err) {
+		response.Success(c, map[string]int64{"profile_id": id})
+	}
+}
+
 func (h *ProviderHallHandler) RefreshGroupModels(c *gin.Context) {
 	if _, ok := providerHallAdmin(c); !ok {
 		return

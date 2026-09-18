@@ -6,6 +6,7 @@ import (
 	"context"
 	"database/sql"
 	"encoding/json"
+	"fmt"
 	"sync"
 	"testing"
 	"time"
@@ -167,5 +168,80 @@ func providerHallManagementContracts(t *testing.T, db *sql.DB) {
 				}
 			}
 		}
+	})
+	t.Run("profile_delete_is_refused_while_a_group_still_targets_it", func(t *testing.T) {
+		f := newProviderHallTargetFixture(t, db)
+		management := f.repo.(service.ProviderHallManagementRepository)
+		key := f.key(t)
+		input := f.input(key.ID)
+		if _, err := f.svc.SaveTargets(ctx, input, f.user.ID); err != nil {
+			require.NoError(t, err)
+		}
+		// The enabled target still references the profile, so deletion is
+		// refused and the referencing group is reported back.
+		groups, err := management.DeleteProfile(ctx, f.profiles[0].ID)
+		require.NoError(t, err)
+		require.Equal(t, []int64{f.group.ID}, groups)
+		require.ErrorIs(t, f.svc.DeleteProfile(ctx, f.profiles[0].ID), service.ErrProviderHallProfileInUse)
+		// Detaching the target only disables the row; probe history keeps the
+		// reference alive, so the delete is still refused.
+		set, err := f.repo.GetTargets(ctx, f.group.ID)
+		require.NoError(t, err)
+		set.Items = nil
+		_, err = f.svc.SaveTargets(ctx, *set, f.user.ID)
+		require.NoError(t, err)
+		require.ErrorIs(t, f.svc.DeleteProfile(ctx, f.profiles[0].ID), service.ErrProviderHallProfileInUse)
+		profiles, err := f.repo.ListProfiles(ctx)
+		require.NoError(t, err)
+		found := false
+		for _, p := range profiles {
+			found = found || p.ID == f.profiles[0].ID
+		}
+		require.True(t, found, "the refused delete must not remove the profile")
+		// Once nothing references it, the delete succeeds and is then not found.
+		_, err = db.ExecContext(ctx, `DELETE FROM provider_hall_targets WHERE group_id=$1`, f.group.ID)
+		require.NoError(t, err)
+		require.NoError(t, f.svc.DeleteProfile(ctx, f.profiles[0].ID))
+		require.ErrorIs(t, f.svc.DeleteProfile(ctx, f.profiles[0].ID), service.ErrProviderHallNotFound)
+	})
+	t.Run("profile_candidates_merge_across_groups_without_duplicates", func(t *testing.T) {
+		f := newProviderHallTargetFixture(t, db)
+		management := f.repo.(service.ProviderHallManagementRepository)
+		merged, err := management.ListAllModelCandidates(ctx)
+		require.NoError(t, err)
+		seen := map[string]bool{}
+		for _, c := range merged {
+			key := c.Model + ":" + c.Protocol
+			require.False(t, seen[key], "merged candidates must be unique per model and protocol")
+			seen[key] = true
+			require.NotEmpty(t, c.Groups, "every merged candidate names the groups it applies to")
+			require.NotEmpty(t, c.Source)
+		}
+		if _, err := management.ListModelCandidates(ctx, f.group.ID); err != nil {
+			require.NoError(t, err)
+		}
+	})
+	t.Run("admin_group_listing_follows_hall_display_order", func(t *testing.T) {
+		f := newProviderHallTargetFixture(t, db)
+		second, err := f.client.Group.Create().SetName(fmt.Sprintf("hall-order-%d", time.Now().UnixNano())).SetPlatform(service.PlatformOpenAI).Save(ctx)
+		require.NoError(t, err)
+		t.Cleanup(func() {
+			_, err := db.ExecContext(ctx, `DELETE FROM provider_hall_groups WHERE group_id=$1`, second.ID)
+			require.NoError(t, err)
+			_, err = db.ExecContext(ctx, `DELETE FROM groups WHERE id=$1`, second.ID)
+			require.NoError(t, err)
+		})
+		// second is listed at position 0; f.group is unlisted and must sort last.
+		_, err = f.client.ProviderHallGroup.Create().SetID(second.ID).SetListed(true).SetDisplayOrder(0).Save(ctx)
+		require.NoError(t, err)
+		page, err := f.repo.(service.ProviderHallManagementRepository).ListAdminGroups(ctx, service.ProviderHallGroupFilter{Sort: "display_order", Page: 1, PageSize: 100})
+		require.NoError(t, err)
+		index := map[int64]int{}
+		for i, item := range page.Items {
+			index[item.GroupID] = i
+		}
+		require.Contains(t, index, second.ID)
+		require.Contains(t, index, f.group.ID)
+		require.Less(t, index[second.ID], index[f.group.ID], "listed groups precede unlisted ones")
 	})
 }

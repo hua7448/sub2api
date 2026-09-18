@@ -2,6 +2,7 @@ package service
 
 import (
 	"context"
+	"strconv"
 	"strings"
 	"time"
 )
@@ -132,19 +133,25 @@ type ProviderHallProbeKeyOption struct {
 	OperatorUserID int64  `json:"operator_user_id"`
 }
 type ProviderHallModelCandidate struct {
-	Model         string `json:"model"`
-	Protocol      string `json:"protocol"`
-	Source        string `json:"source"`
-	AccountID     int64  `json:"account_id"`
-	UpstreamModel string `json:"upstream_model"`
-	Available     bool   `json:"available"`
-	Reason        string `json:"reason"`
+	Model         string   `json:"model"`
+	Protocol      string   `json:"protocol"`
+	Source        string   `json:"source"`
+	Sources       []string `json:"sources,omitempty"`
+	AccountID     int64    `json:"account_id"`
+	UpstreamModel string   `json:"upstream_model"`
+	Available     bool     `json:"available"`
+	Reason        string   `json:"reason"`
+	// Groups lists the groups this model/protocol can be probed in. Only the
+	// cross-group listing fills it; the per-group listing leaves it nil.
+	Groups []int64 `json:"groups,omitempty"`
 }
 type ProviderHallManagementRepository interface {
 	ListAdminGroups(context.Context, ProviderHallGroupFilter) (*ProviderHallGroupPage, error)
 	ListProbeKeys(context.Context, int64) ([]ProviderHallProbeKeyOption, error)
 	EnsureProbeKey(context.Context, int64, int64, int64) (*ProviderHallProbeKeyOption, error)
 	ListModelCandidates(context.Context, int64) ([]ProviderHallModelCandidate, error)
+	ListAllModelCandidates(context.Context) ([]ProviderHallModelCandidate, error)
+	DeleteProfile(context.Context, int64) ([]int64, error)
 }
 
 func (s *ProviderHallService) management() (ProviderHallManagementRepository, error) {
@@ -168,6 +175,47 @@ func (s *ProviderHallService) ListModelCandidates(ctx context.Context, groupID i
 		return nil, err
 	}
 	return r.ListModelCandidates(ctx, groupID)
+}
+
+// ListAllModelCandidates is the profile editor's source list: the union of
+// every group's candidates, merged by model and protocol.
+func (s *ProviderHallService) ListAllModelCandidates(ctx context.Context) ([]ProviderHallModelCandidate, error) {
+	r, err := s.management()
+	if err != nil {
+		return nil, err
+	}
+	return r.ListAllModelCandidates(ctx)
+}
+
+// DeleteProfile removes an unused profile. A profile that any group still
+// targets is refused with the referencing group IDs, because the target row
+// and its probe history depend on it.
+func (s *ProviderHallService) DeleteProfile(ctx context.Context, id int64) error {
+	if id < 1 {
+		return providerHallInvalid("profile_id")
+	}
+	r, err := s.management()
+	if err != nil {
+		return err
+	}
+	groups, err := r.DeleteProfile(ctx, id)
+	if err != nil {
+		return err
+	}
+	if len(groups) > 0 {
+		return ErrProviderHallProfileInUse.WithMetadata(map[string]string{
+			"groups": strings.Join(int64sToStrings(groups), ","),
+		})
+	}
+	return nil
+}
+
+func int64sToStrings(values []int64) []string {
+	out := make([]string, 0, len(values))
+	for _, v := range values {
+		out = append(out, strconv.FormatInt(v, 10))
+	}
+	return out
 }
 func (s *ProviderHallService) ListProbeKeys(ctx context.Context, groupID int64) ([]ProviderHallProbeKeyOption, error) {
 	r, err := s.management()

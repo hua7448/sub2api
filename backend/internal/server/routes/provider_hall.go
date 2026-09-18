@@ -26,6 +26,8 @@ func registerProviderHallRoutes(admin *gin.RouterGroup, h *handler.Handlers) {
 	hall.GET("/profiles", h.Admin.ProviderHall.ListProfiles)
 	hall.POST("/profiles", h.Admin.ProviderHall.CreateProfile)
 	hall.PUT("/profiles/:id", h.Admin.ProviderHall.UpdateProfile)
+	hall.DELETE("/profiles/:id", h.Admin.ProviderHall.DeleteProfile)
+	hall.GET("/profile-candidates", h.Admin.ProviderHall.ListAllProfileCandidates)
 	// Task and operations endpoints (batch B6).
 	hall.POST("/groups/:id/probes", h.Admin.ProviderHall.EnqueueProbe)
 	hall.POST("/groups/:id/verifications", h.Admin.ProviderHall.EnqueueVerification)

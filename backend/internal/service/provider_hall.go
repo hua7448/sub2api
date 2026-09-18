@@ -16,6 +16,7 @@ var (
 	ErrProviderHallNotFound      = infraerrors.NotFound("PROVIDER_HALL_NOT_FOUND", "provider hall resource not found")
 	ErrProviderHallConflict      = infraerrors.Conflict("PROVIDER_HALL_VERSION_CONFLICT", "provider hall configuration changed; reload before saving")
 	ErrProviderHallProfileExists = infraerrors.Conflict("PROVIDER_HALL_PROFILE_EXISTS", "model and protocol already configured")
+	ErrProviderHallProfileInUse  = infraerrors.Conflict("PROVIDER_HALL_PROFILE_IN_USE", "profile is still targeted by one or more groups")
 	ErrProviderHallNotReady      = infraerrors.Conflict("PROVIDER_HALL_NOT_READY", "provider hall runtime is not available in this implementation batch")
 )
 

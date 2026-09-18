@@ -14,6 +14,7 @@ import (
 	"github.com/Wei-Shaw/sub2api/ent/group"
 	"github.com/Wei-Shaw/sub2api/ent/providerhallconfig"
 	"github.com/Wei-Shaw/sub2api/ent/providerhallprobekey"
+	"github.com/Wei-Shaw/sub2api/ent/providerhallprofile"
 	"github.com/Wei-Shaw/sub2api/ent/providerhalltarget"
 	"github.com/Wei-Shaw/sub2api/ent/usagelog"
 	"github.com/Wei-Shaw/sub2api/internal/pkg/openai"
@@ -57,14 +58,34 @@ func (r *providerHallRepository) ListAdminGroups(ctx context.Context, f service.
 	if err != nil {
 		return nil, err
 	}
-	if f.Sort == "name_desc" {
-		q.Order(ent.Desc(group.FieldName), ent.Asc(group.FieldID))
+	// display_order is the shopper-facing order, so the admin list sorts by it
+	// too. Unlisted groups have no position in the hall and come last.
+	var gs []*ent.Group
+	if f.Sort == "display_order" {
+		all, err := q.All(ctx)
+		if err != nil {
+			return nil, err
+		}
+		sort.SliceStable(all, func(i, j int) bool { return providerHallGroupLess(lm, all[i], all[j]) })
+		start := (f.Page - 1) * f.PageSize
+		if start > len(all) {
+			start = len(all)
+		}
+		end := start + f.PageSize
+		if end > len(all) {
+			end = len(all)
+		}
+		gs = all[start:end]
 	} else {
-		q.Order(ent.Asc(group.FieldName, group.FieldID))
-	}
-	gs, err := q.Limit(f.PageSize).Offset((f.Page - 1) * f.PageSize).All(ctx)
-	if err != nil {
-		return nil, err
+		if f.Sort == "name_desc" {
+			q.Order(ent.Desc(group.FieldName), ent.Asc(group.FieldID))
+		} else {
+			q.Order(ent.Asc(group.FieldName, group.FieldID))
+		}
+		gs, err = q.Limit(f.PageSize).Offset((f.Page - 1) * f.PageSize).All(ctx)
+		if err != nil {
+			return nil, err
+		}
 	}
 	ids := []int64{}
 	for _, g := range gs {
@@ -162,6 +183,31 @@ func (r *providerHallRepository) ListAdminGroups(ctx context.Context, f service.
 		out.Items = append(out.Items, v)
 	}
 	return out, nil
+}
+
+// providerHallGroupLess orders groups the way the user-facing hall does: by
+// hall display order, then by group name. Groups that are not listed have no
+// hall position and sort after every listed group.
+func providerHallGroupLess(lm map[int64]*ent.ProviderHallGroup, a, b *ent.Group) bool {
+	al, bl := lm[a.ID], lm[b.ID]
+	aL, bL := al != nil && al.Listed, bl != nil && bl.Listed
+	if aL != bL {
+		return aL
+	}
+	ao, bo := 0, 0
+	if al != nil {
+		ao = al.DisplayOrder
+	}
+	if bl != nil {
+		bo = bl.DisplayOrder
+	}
+	if ao != bo {
+		return ao < bo
+	}
+	if a.Name != b.Name {
+		return a.Name < b.Name
+	}
+	return a.ID < b.ID
 }
 
 func providerHallKeyOption(k *ent.APIKey, registered bool) service.ProviderHallProbeKeyOption {
@@ -283,11 +329,116 @@ func (r *providerHallRepository) EnsureProbeKey(ctx context.Context, groupID, pr
 	return &opt, nil
 }
 
+// DeleteProfile removes an unreferenced profile. It returns the groups that
+// still target it; the caller turns a non-empty result into a refusal, so the
+// delete and the reference check share one transaction.
+func (r *providerHallRepository) DeleteProfile(ctx context.Context, id int64) ([]int64, error) {
+	tx, err := r.client.Tx(ctx)
+	if err != nil {
+		return nil, err
+	}
+	defer func() { _ = tx.Rollback() }()
+	if _, err := tx.ProviderHallProfile.Query().Where(providerhallprofile.IDEQ(id)).ForUpdate().Only(ctx); err != nil {
+		if ent.IsNotFound(err) {
+			return nil, service.ErrProviderHallNotFound
+		}
+		return nil, err
+	}
+	ts, err := tx.ProviderHallTarget.Query().Where(providerhalltarget.ProfileIDEQ(id)).All(ctx)
+	if err != nil {
+		return nil, err
+	}
+	groups := make([]int64, 0, len(ts))
+	for _, t := range ts {
+		groups = append(groups, t.GroupID)
+	}
+	if len(groups) > 0 {
+		sort.Slice(groups, func(i, j int) bool { return groups[i] < groups[j] })
+		return groups, nil
+	}
+	if err := tx.ProviderHallProfile.DeleteOneID(id).Exec(ctx); err != nil {
+		return nil, err
+	}
+	if err := tx.Commit(); err != nil {
+		return nil, err
+	}
+	return nil, nil
+}
+
 func (r *providerHallRepository) ListModelCandidates(ctx context.Context, groupID int64) ([]service.ProviderHallModelCandidate, error) {
 	g, err := r.client.Group.Query().Where(group.IDEQ(groupID), group.DeletedAtIsNil()).WithAccounts().Only(ctx)
 	if err != nil {
 		return nil, err
 	}
+	return r.listGroupModelCandidates(ctx, g)
+}
+
+// ListAllModelCandidates merges the per-group candidate lists into one
+// profile-shaped list keyed by model and protocol. A profile is a global
+// entity, so the profile editor needs the union over every group rather than
+// one group's view; each candidate carries the groups it can be used in.
+func (r *providerHallRepository) ListAllModelCandidates(ctx context.Context) ([]service.ProviderHallModelCandidate, error) {
+	gs, err := r.client.Group.Query().Where(group.DeletedAtIsNil(),
+		group.PlatformIn(service.PlatformOpenAI, service.PlatformComposite)).
+		Order(ent.Asc(group.FieldName), ent.Asc(group.FieldID)).All(ctx)
+	if err != nil {
+		return nil, err
+	}
+	type agg struct {
+		candidate service.ProviderHallModelCandidate
+		sources   map[string]bool
+	}
+	merged := map[string]*agg{}
+	for _, lite := range gs {
+		g, err := r.client.Group.Query().Where(group.IDEQ(lite.ID), group.DeletedAtIsNil()).WithAccounts().Only(ctx)
+		if err != nil {
+			return nil, err
+		}
+		items, err := r.listGroupModelCandidates(ctx, g)
+		if err != nil {
+			return nil, err
+		}
+		for _, item := range items {
+			key := item.Model + ":" + item.Protocol
+			entry := merged[key]
+			if entry == nil {
+				item.Groups = []int64{}
+				entry = &agg{candidate: item, sources: map[string]bool{}}
+				merged[key] = entry
+			}
+			entry.sources[item.Source] = true
+			// A model is available if any group can actually reach it.
+			if item.Available {
+				entry.candidate.Available = true
+				entry.candidate.Reason = ""
+			}
+			if item.UpstreamModel != "" {
+				entry.candidate.UpstreamModel = item.UpstreamModel
+			}
+			entry.candidate.Groups = append(entry.candidate.Groups, g.ID)
+		}
+	}
+	out := make([]service.ProviderHallModelCandidate, 0, len(merged))
+	for _, entry := range merged {
+		entry.candidate.Sources = make([]string, 0, len(entry.sources))
+		for source := range entry.sources {
+			entry.candidate.Sources = append(entry.candidate.Sources, source)
+		}
+		sort.Strings(entry.candidate.Sources)
+		entry.candidate.Source = entry.candidate.Sources[0]
+		out = append(out, entry.candidate)
+	}
+	sort.Slice(out, func(i, j int) bool {
+		if out[i].Model != out[j].Model {
+			return out[i].Model < out[j].Model
+		}
+		return out[i].Protocol < out[j].Protocol
+	})
+	return out, nil
+}
+
+func (r *providerHallRepository) listGroupModelCandidates(ctx context.Context, g *ent.Group) ([]service.ProviderHallModelCandidate, error) {
+	groupID := g.ID
 	out := []service.ProviderHallModelCandidate{}
 	seen := map[string]bool{}
 	routes := NewCompositeModelRouteRepository(r.client)
