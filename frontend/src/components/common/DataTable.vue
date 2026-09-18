@@ -51,8 +51,31 @@
         class="card p-4"
       >
         <div class="space-y-3">
-          <div v-if="selectable" class="flex justify-end">
+          <div v-if="selectable || expandable" class="flex items-center justify-end gap-2">
+            <button
+              v-if="expandable"
+              type="button"
+              class="inline-flex h-7 items-center gap-1 rounded-md px-2 text-xs font-medium text-txt-secondary transition-colors hover:bg-neon-cyan/10 hover:text-txt-primary"
+              :aria-expanded="isRowExpanded(row, index)"
+              :aria-label="getRowExpandLabel(row, index)"
+              data-test="row-expand"
+              @click.stop="toggleRowExpanded(row, index)"
+            >
+              <svg
+                class="h-3.5 w-3.5 transition-transform duration-150"
+                :class="{ 'rotate-90': isRowExpanded(row, index) }"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="2"
+                viewBox="0 0 24 24"
+                aria-hidden="true"
+              >
+                <path stroke-linecap="round" stroke-linejoin="round" d="M9 5l7 7-7 7" />
+              </svg>
+              {{ t('common.expand') }}
+            </button>
             <input
+              v-if="selectable"
               type="checkbox"
               class="h-4 w-4 rounded border-gray-300 text-primary-600 focus:ring-primary-500 dark:border-dark-600 dark:bg-dark-800"
               :checked="isRowSelected(row, index)"
@@ -79,6 +102,13 @@
           </div>
           <div v-if="hasActionsColumn" class="border-t border-cyber-border pt-3">
             <slot name="cell-actions" :row="row" :value="row['actions']" :expanded="actionsExpanded"></slot>
+          </div>
+          <div
+            v-if="expandable && isRowExpanded(row, index)"
+            class="border-t border-cyber-border pt-3"
+            :data-expanded-for="resolveRowKey(row, index)"
+          >
+            <slot name="expanded" :row="row" :index="index" />
           </div>
         </div>
       </div>
@@ -196,9 +226,8 @@
                 :style="{ height: virtualPaddingTop + 'px', padding: 0, border: 'none' }">
             </td>
           </tr>
+          <template v-for="item in renderRows" :key="resolveRowKey(item.row, item.index)">
           <tr
-            v-for="item in renderRows"
-            :key="resolveRowKey(item.row, item.index)"
             :data-row-id="resolveRowKey(item.row, item.index)"
             :data-index="item.index"
             :ref="item.measure ? measureElement : undefined"
@@ -209,6 +238,28 @@
             }"
             @click="clickableRows && emit('rowClick', item.row)"
           >
+            <td v-if="expandable" class="w-11 min-w-11 px-3 py-4 text-center">
+              <button
+                type="button"
+                class="inline-flex h-7 w-7 items-center justify-center rounded-md text-txt-secondary transition-colors hover:bg-neon-cyan/10 hover:text-txt-primary"
+                :aria-expanded="isRowExpanded(item.row, item.index)"
+                :aria-label="getRowExpandLabel(item.row, item.index)"
+                data-test="row-expand"
+                @click.stop="toggleRowExpanded(item.row, item.index)"
+              >
+                <svg
+                  class="h-3.5 w-3.5 transition-transform duration-150"
+                  :class="{ 'rotate-90': isRowExpanded(item.row, item.index) }"
+                  fill="none"
+                  stroke="currentColor"
+                  stroke-width="2"
+                  viewBox="0 0 24 24"
+                  aria-hidden="true"
+                >
+                  <path stroke-linecap="round" stroke-linejoin="round" d="M9 5l7 7-7 7" />
+                </svg>
+              </button>
+            </td>
             <td v-if="selectable" class="w-11 min-w-11 px-3 py-4 text-center">
               <input
                 type="checkbox"
@@ -240,6 +291,15 @@
               </slot>
             </td>
           </tr>
+          <tr
+            v-if="expandable && isRowExpanded(item.row, item.index)"
+            :data-expanded-for="resolveRowKey(item.row, item.index)"
+          >
+            <td :colspan="tableColumnCount" class="px-3 pb-4 pt-0">
+              <slot name="expanded" :row="item.row" :index="item.index" />
+            </td>
+          </tr>
+          </template>
           <tr v-if="virtualPaddingBottom > 0" aria-hidden="true">
             <td :colspan="tableColumnCount"
                 :style="{ height: virtualPaddingBottom + 'px', padding: 0, border: 'none' }">
@@ -270,6 +330,8 @@ const emit = defineEmits<{
   rowClick: [row: any]
   'update:selectedKeys': [keys: Array<string | number>]
   selectionChange: [keys: Array<string | number>]
+  'update:expandedKeys': [keys: Array<string | number>]
+  expand: [key: string | number, expanded: boolean]
 }>()
 
 // 表格容器引用
@@ -460,6 +522,15 @@ interface Props {
   selectedKeys?: Array<string | number>
   /** Accessible label for a row selection checkbox. */
   selectionLabel?: string | ((row: any) => string)
+  /**
+   * Render a disclosure toggle per row. The expanded content comes from the
+   * `expanded` slot, which spans the full table width underneath the row.
+   */
+  expandable?: boolean
+  /** Controlled expanded row keys. Omit to let the table own the state. */
+  expandedKeys?: Array<string | number>
+  /** Accessible label for a row disclosure toggle. */
+  expandLabel?: string | ((row: any) => string)
 }
 
 const props = withDefaults(defineProps<Props>(), {
@@ -470,7 +541,8 @@ const props = withDefaults(defineProps<Props>(), {
   defaultSortOrder: 'asc',
   serverSideSort: false,
   selectable: false,
-  selectedKeys: () => []
+  selectedKeys: () => [],
+  expandable: false
 })
 
 const sortKey = ref<string>('')
@@ -693,7 +765,7 @@ const sortedData = computed(() => {
     .map(item => item.row)
 })
 
-const tableColumnCount = computed(() => props.columns.length + (props.selectable ? 1 : 0))
+const tableColumnCount = computed(() => props.columns.length + (props.selectable ? 1 : 0) + (props.expandable ? 1 : 0))
 const selectedKeySet = computed(() => new Set(props.selectedKeys))
 const visibleRowKeys = computed(() =>
   (sortedData.value ?? []).map((row, index) => resolveRowKey(row, index))
@@ -715,6 +787,40 @@ const emitSelection = (next: Set<string | number>) => {
 
 const isRowSelected = (row: any, index: number) =>
   selectedKeySet.value.has(resolveRowKey(row, index))
+
+// Expansion state lives in the table so any page can add a detail row without
+// copying the toggle markup. Passing `expandedKeys` makes it controlled, which
+// is what lets a page decline a collapse (for example to guard unsaved edits).
+const expandedKeySet = ref<Set<string | number>>(new Set())
+
+const controlledExpandedKeySet = computed(() =>
+  props.expandedKeys ? new Set(props.expandedKeys) : null
+)
+
+const isRowExpanded = (row: any, index: number) => {
+  const keys = controlledExpandedKeySet.value
+  if (keys) return keys.has(resolveRowKey(row, index))
+  return expandedKeySet.value.has(resolveRowKey(row, index))
+}
+
+const getRowExpandLabel = (row: any, index: number) => {
+  if (typeof props.expandLabel === 'function') return props.expandLabel(row)
+  if (props.expandLabel) return props.expandLabel
+  return `${t('common.expandRow')} ${resolveRowKey(row, index)}`
+}
+
+const toggleRowExpanded = (row: any, index: number) => {
+  const key = resolveRowKey(row, index)
+  const nowExpanded = !isRowExpanded(row, index)
+  // Works uncontrolled (the table owns the set) and controlled (the page does;
+  // an unchanged emit is how a page declines the toggle).
+  const next = new Set(controlledExpandedKeySet.value ?? expandedKeySet.value)
+  if (nowExpanded) next.add(key)
+  else next.delete(key)
+  if (!controlledExpandedKeySet.value) expandedKeySet.value = next
+  emit('update:expandedKeys', Array.from(next))
+  emit('expand', key, nowExpanded)
+}
 
 const getRowSelectionLabel = (row: any, index: number) => {
   if (typeof props.selectionLabel === 'function') return props.selectionLabel(row)
